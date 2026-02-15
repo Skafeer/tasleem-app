@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image,
-  TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal
+  TouchableOpacity, ActivityIndicator, TextInput, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
+import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 
@@ -34,8 +35,10 @@ export default function ProductDetailsScreen() {
     if (!product) return;
     const minPrice = product.wholesalePrice + 1000;
     if (Number(sellingPrice) < minPrice) {
-      Alert.alert('خطأ في السعر',
-        `يجب أن يكون سعر البيع أعلى من سعر الجملة بـ 1000 دينار كحد أدنى.\nالسعر المطلوب: ${minPrice.toLocaleString()} د.ع`);
+      toast.error(
+        `يجب أن يكون سعر البيع ${minPrice.toLocaleString()} د.ع أو أكثر`,
+        'خطأ في السعر'
+      );
       return;
     }
     const raw = await AsyncStorage.getItem('cart');
@@ -50,10 +53,7 @@ export default function ProductDetailsScreen() {
     await AsyncStorage.setItem('cart', JSON.stringify(cart));
     queryClient.invalidateQueries({ queryKey: ['cart'] });
     setShowDialog(false);
-    Alert.alert('تمت الإضافة', 'يمكنك متابعة التسوق أو إكمال الطلب من السلة', [
-      { text: 'متابعة التسوق', style: 'cancel' },
-      { text: 'عرض السلة', onPress: () => router.push('/cart') },
-    ]);
+    toast.success(`تمت إضافة ${product.name} إلى السلة`, 'تمت الإضافة للسلة 🛒');
   };
 
   if (isLoading) return (
@@ -67,7 +67,6 @@ export default function ProductDetailsScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-forward" size={24} color="#374151" />
@@ -77,15 +76,12 @@ export default function ProductDetailsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}>
-
-        {/* Product Image */}
         <View style={s.imgBox}>
           <Image source={{ uri: product.imageUrl }}
             style={s.img} resizeMode="cover" />
         </View>
 
         <View style={s.body}>
-          {/* Category + Code */}
           <View style={s.metaRow}>
             <View style={s.infoChip}>
               <Ionicons name="information-circle-outline" size={14} color="#6b7280" />
@@ -98,13 +94,9 @@ export default function ProductDetailsScreen() {
             </View>
           </View>
 
-          {/* Name */}
           <Text style={s.name}>{product.name}</Text>
-
-          {/* Description */}
           <Text style={s.desc}>{product.description}</Text>
 
-          {/* Price Box */}
           <View style={s.priceBox}>
             <View style={s.priceRow}>
               <Text style={s.priceVal}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
@@ -121,7 +113,6 @@ export default function ProductDetailsScreen() {
             </View>
           </View>
 
-          {/* Add to Cart Button */}
           <TouchableOpacity style={s.addBtn} onPress={() => setShowDialog(true)}>
             <Ionicons name="cart-outline" size={22} color="#fff" />
             <Text style={s.addBtnText}>🛒 أضف للسلة</Text>
@@ -129,44 +120,34 @@ export default function ProductDetailsScreen() {
         </View>
       </ScrollView>
 
-      {/* Dialog */}
       <Modal visible={showDialog} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>إضافة إلى السلة</Text>
-
             <View style={s.dialogRow}>
-              {/* Profit Box */}
               <View style={s.profitChip}>
                 <Text style={s.profitChipLabel}>صافي الربح المتوقع</Text>
                 <Text style={s.profitChipVal}>
                   {profit > 0 ? profit.toLocaleString() : 0} د.ع
                 </Text>
               </View>
-              {/* Price Input */}
               <View style={{ flex: 1 }}>
                 <Text style={s.inputLabel}>
                   سعر البيع (د.ع) <Text style={{ color: '#ef4444' }}>*</Text>
                 </Text>
-                <TextInput
-                  style={s.priceInput}
+                <TextInput style={s.priceInput}
                   placeholder={minPrice.toString()}
-                  value={sellingPrice}
-                  onChangeText={setSellingPrice}
-                  keyboardType="numeric"
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                />
+                  value={sellingPrice} onChangeText={setSellingPrice}
+                  keyboardType="numeric" textAlign="right"
+                  placeholderTextColor="#9ca3af" />
                 <Text style={s.inputHint}>
                   يجب أن يكون السعر {minPrice.toLocaleString()} د.ع أو أكثر
                 </Text>
               </View>
             </View>
-
             <TouchableOpacity style={s.confirmBtn} onPress={handleAddToCart}>
               <Text style={s.confirmBtnText}>إضافة للسلة</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={s.cancelBtn} onPress={() => setShowDialog(false)}>
               <Text style={s.cancelBtnText}>إلغاء</Text>
             </TouchableOpacity>
@@ -194,9 +175,8 @@ const s = StyleSheet.create({
   catChip: { backgroundColor: `${PRIMARY}18`, paddingHorizontal: 14,
     paddingVertical: 6, borderRadius: 20 },
   catChipText: { color: PRIMARY, fontSize: 13, fontWeight: 'bold' },
-  infoChip: { flexDirection: 'row-reverse', alignItems: 'center',
-    gap: 4, backgroundColor: '#f3f4f6',
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  infoChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
+    backgroundColor: '#f3f4f6', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   infoChipText: { fontSize: 12, color: '#6b7280' },
   name: { fontSize: 26, fontWeight: 'bold', color: '#111827',
     textAlign: 'right', marginBottom: 12 },
@@ -208,12 +188,10 @@ const s = StyleSheet.create({
   priceLabel: { fontSize: 13, color: '#9ca3af' },
   priceVal: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
   addBtn: { backgroundColor: PRIMARY, borderRadius: 16, height: 56,
-    flexDirection: 'row-reverse', justifyContent: 'center',
-    alignItems: 'center', gap: 10,
+    flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 10,
     shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
   addBtnText: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28,
     borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827',
@@ -221,13 +199,12 @@ const s = StyleSheet.create({
   dialogRow: { flexDirection: 'row-reverse', gap: 12, marginBottom: 20 },
   inputLabel: { fontSize: 13, fontWeight: '500', color: '#374151',
     textAlign: 'right', marginBottom: 6 },
-  priceInput: { borderWidth: 1.5, borderColor: `${PRIMARY}40`,
-    borderRadius: 12, padding: 12, fontSize: 18,
-    color: '#111827', backgroundColor: '#f9fafb' },
+  priceInput: { borderWidth: 1.5, borderColor: `${PRIMARY}40`, borderRadius: 12,
+    padding: 12, fontSize: 18, color: '#111827', backgroundColor: '#f9fafb' },
   inputHint: { fontSize: 10, color: '#9ca3af', textAlign: 'right', marginTop: 4 },
-  profitChip: { backgroundColor: '#f0fdf4', borderRadius: 14,
-    borderWidth: 1, borderColor: '#bbf7d0',
-    padding: 12, justifyContent: 'center', alignItems: 'center', minWidth: 110 },
+  profitChip: { backgroundColor: '#f0fdf4', borderRadius: 14, borderWidth: 1,
+    borderColor: '#bbf7d0', padding: 12, justifyContent: 'center',
+    alignItems: 'center', minWidth: 110 },
   profitChipLabel: { fontSize: 11, color: '#16a34a', marginBottom: 6 },
   profitChipVal: { fontSize: 18, fontWeight: 'bold', color: '#15803d' },
   confirmBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 50,

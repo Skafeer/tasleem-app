@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, ActivityIndicator, Image
+  TouchableOpacity, ActivityIndicator, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
+import { toast } from '../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const PROVINCES = [
@@ -40,8 +41,10 @@ export default function CartScreen() {
     queryClient.setQueryData(['cart'], newItems);
   };
 
-  const removeItem = (productId: number) =>
+  const removeItem = (productId: number) => {
     updateCart(items.filter((i: any) => i.product.id !== productId));
+    toast.info('تم حذف المنتج من السلة');
+  };
 
   const updateQty = (productId: number, qty: number) => {
     if (qty < 1) { removeItem(productId); return; }
@@ -63,21 +66,22 @@ export default function CartScreen() {
     },
     onSuccess: () => {
       updateCart([]);
-      Alert.alert('تم!', 'تم إرسال طلبك بنجاح وسيتم معالجته قريباً', [
-        { text: 'حسناً', onPress: () => router.replace('/(tabs)/orders') }
-      ]);
+      toast.success('تم إرسال طلبك بنجاح وسيتم معالجته قريباً', 'تم استلام الطلب! 🎉');
+      setTimeout(() => router.replace('/(tabs)/orders'), 1500);
     },
-    onError: (e: any) => Alert.alert('خطأ', e?.response?.data?.message || 'فشل إرسال الطلب'),
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.message || 'فشل إرسال الطلب، حاول مجدداً', 'خطأ في الطلب');
+    },
   });
 
   const handleConfirm = () => {
     if (!province || !customerName || !customerPhone || !address) {
-      Alert.alert('بيانات ناقصة', 'يرجى ملء جميع الحقول المطلوبة لإتمام الطلب');
+      toast.warning('يرجى ملء جميع الحقول المطلوبة لإتمام الطلب', 'بيانات ناقصة');
       return;
     }
     const phoneRegex = /^07\d{9}$/;
     if (!phoneRegex.test(customerPhone)) {
-      Alert.alert('رقم هاتف غير صالح', 'يجب أن يبدأ رقم الهاتف بـ 07 ويتكون من 11 رقماً');
+      toast.error('يجب أن يبدأ رقم الهاتف بـ 07 ويتكون من 11 رقماً', 'رقم هاتف غير صالح');
       return;
     }
     createOrder.mutate({
@@ -280,8 +284,7 @@ const s = StyleSheet.create({
   browseBtn: { backgroundColor: PRIMARY, borderRadius: 14,
     paddingHorizontal: 24, paddingVertical: 12 },
   browseBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  secHead: { flexDirection: 'row-reverse', alignItems: 'center',
-    gap: 8, marginBottom: 12 },
+  secHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
   secTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   productCard: { backgroundColor: '#fff', borderRadius: 20, padding: 14,
     flexDirection: 'row-reverse', gap: 12, marginBottom: 12,
@@ -325,8 +328,7 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 20 },
   profitBox: { flexDirection: 'row-reverse', justifyContent: 'space-between',
     alignItems: 'center', backgroundColor: '#f0fdf4',
-    margin: 12, padding: 14, borderRadius: 16,
-    borderWidth: 1, borderColor: '#bbf7d0' },
+    margin: 12, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#bbf7d0' },
   profitBoxLabel: { fontSize: 12, color: '#16a34a', fontWeight: 'bold' },
   profitBoxVal: { fontSize: 15, fontWeight: 'bold', color: '#15803d' },
   confirmBtn: { backgroundColor: PRIMARY, borderRadius: 18, height: 56,
