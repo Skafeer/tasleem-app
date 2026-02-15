@@ -53,14 +53,15 @@ export default function CartScreen() {
   };
 
   const deliveryFee = province.includes('البصرة') ? 3000 : province ? 5000 : 0;
-  const totalWholesale = items.reduce((s: number, i: any) => s + i.product.wholesalePrice * i.quantity, 0);
-  const totalSelling = items.reduce((s: number, i: any) => s + i.sellingPrice * i.quantity, 0);
-  const totalOrder = totalSelling + deliveryFee;
-  const totalProfit = totalSelling - totalWholesale;
-  const totalItems = items.reduce((s: number, i: any) => s + i.quantity, 0);
+  const totalWholesale = items.reduce((s: number, i: any) => s + Number(i.product.wholesalePrice) * i.quantity, 0);
+  const totalSelling   = items.reduce((s: number, i: any) => s + Number(i.sellingPrice) * i.quantity, 0);
+  const totalOrder     = totalSelling + deliveryFee;
+  const totalProfit    = totalSelling - totalWholesale;
+  const totalItems     = items.reduce((s: number, i: any) => s + i.quantity, 0);
 
   const createOrder = useMutation({
     mutationFn: async (data: any) => {
+      console.log('Sending order:', JSON.stringify(data));
       const res = await api.post('/api/orders', data);
       return res.data;
     },
@@ -70,13 +71,15 @@ export default function CartScreen() {
       setTimeout(() => router.replace('/(tabs)/orders'), 1500);
     },
     onError: (e: any) => {
-      toast.error(e?.response?.data?.message || 'فشل إرسال الطلب، حاول مجدداً', 'خطأ في الطلب');
+      const msg = e?.response?.data?.message || e?.message || 'فشل إرسال الطلب';
+      console.log('Order error:', JSON.stringify(e?.response?.data));
+      toast.error(msg, 'خطأ في الطلب');
     },
   });
 
   const handleConfirm = () => {
     if (!province || !customerName || !customerPhone || !address) {
-      toast.warning('يرجى ملء جميع الحقول المطلوبة لإتمام الطلب', 'بيانات ناقصة');
+      toast.warning('يرجى ملء جميع الحقول المطلوبة', 'بيانات ناقصة');
       return;
     }
     const phoneRegex = /^07\d{9}$/;
@@ -84,15 +87,21 @@ export default function CartScreen() {
       toast.error('يجب أن يبدأ رقم الهاتف بـ 07 ويتكون من 11 رقماً', 'رقم هاتف غير صالح');
       return;
     }
-    createOrder.mutate({
-      customerName, customerPhone, province, address,
+
+    const orderData = {
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      province: province.trim(),
+      address: address.trim(),
       notes: backupPhone ? `رقم هاتف احتياطي: ${backupPhone}` : '',
       items: items.map((i: any) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-        sellingPrice: i.sellingPrice,
+        productId: Number(i.product.id),
+        quantity: Number(i.quantity),
+        sellingPrice: Number(i.sellingPrice),
       })),
-    });
+    };
+
+    createOrder.mutate(orderData);
   };
 
   return (
@@ -135,12 +144,12 @@ export default function CartScreen() {
                 <View style={s.priceRow}>
                   <View>
                     <Text style={s.priceLabel}>سعر البيع:</Text>
-                    <Text style={s.priceVal}>{item.sellingPrice.toLocaleString()} د.ع</Text>
+                    <Text style={s.priceVal}>{Number(item.sellingPrice).toLocaleString()} د.ع</Text>
                   </View>
                   <View>
                     <Text style={s.priceLabel}>الربح للقطعة:</Text>
                     <Text style={s.profitVal}>
-                      {(item.sellingPrice - item.product.wholesalePrice).toLocaleString()} د.ع
+                      {(Number(item.sellingPrice) - Number(item.product.wholesalePrice)).toLocaleString()} د.ع
                     </Text>
                   </View>
                 </View>
