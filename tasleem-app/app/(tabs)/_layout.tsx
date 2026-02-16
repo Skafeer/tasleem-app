@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -9,10 +10,13 @@ export default function TabsLayout() {
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return null;
       const { data } = await api.get('/api/auth/me');
       return data;
     },
     staleTime: 0,
+    refetchOnMount: true,
   });
 
   const isAdmin = user?.role === 'admin';
@@ -39,7 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="admin"
         options={{
           title: 'الإدارة',
-          href: isAdmin ? '/admin' : null,
+          tabBarButton: isAdmin ? undefined : () => null,
           tabBarIcon: ({ color }) =>
             <Ionicons name="shield-checkmark-outline" size={24} color={color} />,
         }} />
