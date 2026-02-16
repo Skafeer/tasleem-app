@@ -9,10 +9,9 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request — أضف session
 api.interceptors.request.use(async (config) => {
   try {
-    const sid = await AsyncStorage.getItem('connect.sid');
+    const sid = await AsyncStorage.getItem('sessionId');
     if (sid) {
       config.headers['Cookie'] = `connect.sid=${sid}`;
       config.headers['x-session-id'] = sid;
@@ -21,31 +20,28 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response — احفظ session
 api.interceptors.response.use(
   async (response) => {
     try {
+      // Save sessionId from response body
+      if (response.data?.sessionId) {
+        await AsyncStorage.setItem('sessionId', response.data.sessionId);
+      }
+      // Also try from cookies
       const setCookies = response.headers['set-cookie'];
       if (setCookies) {
         const cookies = Array.isArray(setCookies) ? setCookies : [setCookies];
         for (const cookie of cookies) {
           const match = cookie.match(/connect\.sid=([^;]+)/);
-          if (match) {
-            await AsyncStorage.setItem('connect.sid', match[1]);
-            console.log('Session saved:', match[1].substring(0, 20) + '...');
-          }
+          if (match) await AsyncStorage.setItem('sessionId', match[1]);
         }
       }
     } catch {}
     return response;
   },
   async (error) => {
-    console.log('API Error:', error.response?.status, error.response?.data);
     if (error.response?.status === 401) {
-      try {
-        await AsyncStorage.removeItem('connect.sid');
-        await AsyncStorage.removeItem('cart');
-      } catch {}
+      await AsyncStorage.multiRemove(['sessionId', 'cart']);
     }
     return Promise.reject(error);
   }
