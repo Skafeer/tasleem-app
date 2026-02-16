@@ -7,42 +7,41 @@ const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor — add cookie for mobile
+// Request — أضف connect.sid
 api.interceptors.request.use(async (config) => {
   try {
-    const cookie = await AsyncStorage.getItem('session_cookie');
-    if (cookie) {
-      config.headers['Cookie'] = cookie;
+    const sid = await AsyncStorage.getItem('connect.sid');
+    if (sid) {
+      config.headers['Cookie'] = `connect.sid=${sid}`;
     }
   } catch {}
   return config;
 });
 
-// Response interceptor — save cookie
+// Response — احفظ connect.sid فقط
 api.interceptors.response.use(
   async (response) => {
     try {
-      const setCookie = response.headers['set-cookie'];
-      if (setCookie && setCookie.length > 0) {
-        // Save full cookie string
-        const cookieStr = Array.isArray(setCookie)
-          ? setCookie.join('; ')
-          : setCookie;
-        await AsyncStorage.setItem('session_cookie', cookieStr);
+      const setCookies = response.headers['set-cookie'];
+      if (setCookies) {
+        const cookies = Array.isArray(setCookies) ? setCookies : [setCookies];
+        for (const cookie of cookies) {
+          const match = cookie.match(/connect\.sid=([^;]+)/);
+          if (match) {
+            await AsyncStorage.setItem('connect.sid', match[1]);
+          }
+        }
       }
     } catch {}
     return response;
   },
   async (error) => {
-    // If 401 — clear session and redirect
     if (error.response?.status === 401) {
       try {
-        await AsyncStorage.removeItem('session_cookie');
+        await AsyncStorage.removeItem('connect.sid');
         await AsyncStorage.removeItem('cart');
       } catch {}
     }
