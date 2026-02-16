@@ -6,20 +6,22 @@ const BASE_URL = 'https://tasleem-api-production.up.railway.app';
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Request — أضف session
 api.interceptors.request.use(async (config) => {
   try {
     const sid = await AsyncStorage.getItem('connect.sid');
     if (sid) {
       config.headers['Cookie'] = `connect.sid=${sid}`;
+      config.headers['x-session-id'] = sid;
     }
   } catch {}
   return config;
 });
 
+// Response — احفظ session
 api.interceptors.response.use(
   async (response) => {
     try {
@@ -30,6 +32,7 @@ api.interceptors.response.use(
           const match = cookie.match(/connect\.sid=([^;]+)/);
           if (match) {
             await AsyncStorage.setItem('connect.sid', match[1]);
+            console.log('Session saved:', match[1].substring(0, 20) + '...');
           }
         }
       }
@@ -37,6 +40,7 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    console.log('API Error:', error.response?.status, error.response?.data);
     if (error.response?.status === 401) {
       try {
         await AsyncStorage.removeItem('connect.sid');
