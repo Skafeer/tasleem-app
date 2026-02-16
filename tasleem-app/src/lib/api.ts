@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://ai-prompt-genie--SAJAD66777.replit.app';
+const BASE_URL = 'https://tasleem-api-production.up.railway.app';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -10,7 +10,6 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request — أضف connect.sid
 api.interceptors.request.use(async (config) => {
   try {
     const sid = await AsyncStorage.getItem('connect.sid');
@@ -21,7 +20,6 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Response — احفظ connect.sid فقط
 api.interceptors.response.use(
   async (response) => {
     try {
