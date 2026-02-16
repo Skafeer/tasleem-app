@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 
-// تفعيل اتجاه RTL بالكامل
-I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
+// RTL
+if (Platform.OS !== 'web') {
+  I18nManager.allowRTL(true);
+  I18nManager.forceRTL(true);
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
