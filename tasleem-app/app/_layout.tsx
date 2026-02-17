@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { I18nManager, Platform } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Force RTL
+SplashScreen.preventAutoHideAsync();
+
 if (Platform.OS !== 'web') {
   I18nManager.allowRTL(true);
   I18nManager.forceRTL(true);
@@ -18,31 +19,28 @@ const queryClient = new QueryClient({
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
-
-  const { data: token, isLoading } = useQuery({
-    queryKey: ['auth-token'],
-    queryFn: async () => {
-      const t = await AsyncStorage.getItem('token');
-      return t;
-    },
-    staleTime: 0,
-    refetchOnMount: true,
-  });
+  const [token, setToken] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (isLoading) return;
+    AsyncStorage.getItem('token').then(t => {
+      setToken(t);
+      SplashScreen.hideAsync();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (token === undefined) return;
     
     const inAuth = segments[0] === 'auth';
     
-    // إذا ما في توكن ومو في صفحة اللوجن → روح للوجن
     if (!token && !inAuth) {
       router.replace('/auth');
-    }
-    // إذا في توكن وفي صفحة اللوجن → روح للرئيسية
-    else if (token && inAuth) {
+    } else if (token && inAuth) {
       router.replace('/(tabs)');
     }
-  }, [token, isLoading, segments]);
+  }, [token, segments]);
+
+  if (token === undefined) return null;
 
   return <>{children}</>;
 }
@@ -52,17 +50,11 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthGuard>
-          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_left' }}>
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="auth" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="cart" />
             <Stack.Screen name="products/[id]" />
-            <Stack.Screen name="order-details/[id]" />
-            <Stack.Screen name="withdraw-history/index" />
-            <Stack.Screen name="stats/index" />
-            <Stack.Screen name="profile-edit/index" />
-            <Stack.Screen name="contact/index" />
-            <Stack.Screen name="privacy/index" />
           </Stack>
         </AuthGuard>
       </ToastProvider>

@@ -37,7 +37,7 @@ export default function AuthScreen() {
     onSuccess: (data) => {
       queryClient.setQueryData(['user'], data);
       toast.success('أهلاً بك! ' + data.storeName, 'تم تسجيل الدخول');
-      router.replace('/(tabs)');
+      router.replace('/(tabs)'); queryClient.invalidateQueries();
     },
     onError: (e: any) => setError(e?.response?.data?.message || 'رقم الهاتف أو كلمة المرور غير صحيحة'),
   });
@@ -50,7 +50,7 @@ export default function AuthScreen() {
     onSuccess: (data) => {
       queryClient.setQueryData(['user'], data);
       toast.success('تم إنشاء حسابك بنجاح!', 'مرحباً');
-      router.replace('/(tabs)');
+      router.replace('/(tabs)'); queryClient.invalidateQueries();
     },
     onError: (e: any) => setError(e?.response?.data?.message || 'حدث خطأ أثناء إنشاء الحساب'),
   });
