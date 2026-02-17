@@ -259,7 +259,7 @@ export default function ProductDetailScreen() {
                   <Text style={s.profitLabel}>الربح</Text>
                 </View>
                 <TextInput style={s.priceInput}
-                  placeholder={`أدنى: ${Math.round(discountedPrice).toLocaleString()}`}
+                  placeholder={`الحد الأدنى: ${Math.round(product?.sellingPriceMin || 0).toLocaleString()} د.ع`}
                   value={sellingPrice} onChangeText={setSellingPrice}
                   keyboardType="numeric" textAlign="right"
                   placeholderTextColor="#9ca3af" />
