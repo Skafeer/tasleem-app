@@ -67,7 +67,7 @@ export default function ProductDetailScreen() {
   };
 
   const addToCart = async () => {
-    if (!sellingPrice || Number(sellingPrice) < discountedPrice) {
+    if (!sellingPrice || Number(sellingPrice) < product.sellingPriceMin) {
       toast.warning('السعر يجب أن يكون أكبر من سعر الجملة'); return;
     }
     try {
