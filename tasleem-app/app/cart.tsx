@@ -77,7 +77,9 @@ export default function CartScreen() {
   const handleSubmit = () => {
     if (items.length === 0) { toast.warning('السلة فارغة'); return; }
     if (!customerName.trim()) { toast.warning('يرجى إدخال اسم الزبون'); return; }
-    if (!customerPhone.trim()) { toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم'); return; }
+    if (!customerPhone.trim() || !customerPhone.startsWith('07') || customerPhone.length !== 11) {
+      toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم'); return;
+    }
     if (!province) { toast.warning('يرجى اختيار المحافظة'); return; }
     if (!address.trim()) { toast.warning('يرجى إدخال العنوان'); return; }
 
@@ -180,9 +182,12 @@ export default function CartScreen() {
               value={customerName} onChangeText={setCustomerName}
               textAlign="right" placeholderTextColor="#9ca3af" />
 
-            <Text style={s.label}>رقم الهاتف *</Text>
+            <Text style={s.label}>رقم الهاتف * (07xxxxxxxxx)</Text>
             <TextInput style={s.input} placeholder="07xxxxxxxxx"
-              value={customerPhone} onChangeText={(v) => { if (v.length <= 11) setCustomerPhone(v); }}
+              value={customerPhone}
+              onChangeText={(v) => {
+                if (v.length <= 11 && /^[0-9]*$/.test(v)) setCustomerPhone(v);
+              }}
               maxLength={11}
               keyboardType="phone-pad" textAlign="right" placeholderTextColor="#9ca3af" />
 
