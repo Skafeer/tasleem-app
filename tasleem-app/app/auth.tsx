@@ -1,13 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, I18nManager
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
@@ -15,221 +16,217 @@ const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
 
 export default function AuthScreen() {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [regStoreName, setRegStoreName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regAddress, setRegAddress] = useState('');
-  const [showLoginPass, setShowLoginPass] = useState(false);
-  const [showRegPass, setShowRegPass] = useState(false);
-  const [error, setError] = useState('');
-
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isLogin, setIsLogin] = useState(true);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [address, setAddress] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const loginMutation = useMutation({
-    mutationFn: async (body: any) => {
-      const { data } = await api.post('/api/auth/login', body);
-      return data;
+    mutationFn: async (data: any) => {
+      const res = await api.post('/api/auth/login', data);
+      return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(['user'], data);
-      toast.success('أهلاً بك! ' + data.storeName, 'تم تسجيل الدخول');
-      router.replace('/(tabs)'); queryClient.invalidateQueries();
+    onSuccess: async (data) => {
+      await AsyncStorage.setItem('token', data.token);
+      queryClient.clear();
+      toast.success('أهلاً بك! 👋');
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 100);
     },
-    onError: (e: any) => setError(e?.response?.data?.message || 'رقم الهاتف أو كلمة المرور غير صحيحة'),
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.message || 'فشل تسجيل الدخول');
+    },
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (body: any) => {
-      const { data } = await api.post('/api/auth/register', body);
-      return data;
+    mutationFn: async (data: any) => {
+      const res = await api.post('/api/auth/register', data);
+      return res.data;
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(['user'], data);
-      toast.success('تم إنشاء حسابك بنجاح!', 'مرحباً');
-      router.replace('/(tabs)'); queryClient.invalidateQueries();
+    onSuccess: async (data) => {
+      await AsyncStorage.setItem('token', data.token);
+      queryClient.clear();
+      toast.success('تم إنشاء الحساب بنجاح! 🎉');
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 100);
     },
-    onError: (e: any) => setError(e?.response?.data?.message || 'حدث خطأ أثناء إنشاء الحساب'),
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.message || 'فشل إنشاء الحساب');
+    },
   });
 
-  const handleLogin = () => {
-    setError('');
-    if (!loginPhone || !loginPassword) { setError('يرجى تعبئة جميع الحقول'); return; }
-    loginMutation.mutate({ phone: loginPhone, password: loginPassword });
-  };
-
-  const handleRegister = () => {
-    setError('');
-    if (!regStoreName || !regPhone || !regPassword || !regAddress) {
-      setError('يرجى تعبئة جميع الحقول'); return;
+  const handleSubmit = () => {
+    if (!phone || !password) {
+      toast.warning('يرجى ملء جميع الحقول المطلوبة');
+      return;
     }
-    registerMutation.mutate({ storeName: regStoreName, phone: regPhone, password: regPassword, address: regAddress });
+    if (isLogin) {
+      loginMutation.mutate({ phone, password });
+    } else {
+      if (!storeName || !address) {
+        toast.warning('يرجى ملء جميع الحقول المطلوبة');
+        return;
+      }
+      registerMutation.mutate({ phone, password, storeName, address });
+    }
   };
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={s.bgTop} />
-      <View style={s.bgCircle} />
+    <SafeAreaView style={s.container}>
+      <LinearGradient colors={[PRIMARY, '#0a5566']} style={s.header}>
+        <Text style={s.logo}>تسليم</Text>
+        <Text style={s.tagline}>منصة التجارة الإلكترونية</Text>
+      </LinearGradient>
 
-      <ScrollView style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={s.formContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={s.card}>
+            <View style={s.tabs}>
+              <TouchableOpacity
+                style={[s.tab, isLogin && s.tabActive]}
+                onPress={() => setIsLogin(true)}>
+                <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.tab, !isLogin && s.tabActive]}
+                onPress={() => setIsLogin(false)}>
+                <Text style={[s.tabText, !isLogin && s.tabTextActive]}>حساب جديد</Text>
+              </TouchableOpacity>
+            </View>
 
-        <View style={s.logoSection}>
-          <LinearGradient colors={[PRIMARY, SECONDARY]}
-            style={s.logoBox} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Text style={s.logoLetter}>ت</Text>
-          </LinearGradient>
-          <Text style={s.logoTitle}>منصة تسليم</Text>
-          <Text style={s.logoSub}>منصتك الأولى للدروبشيبينغ في العراق</Text>
-        </View>
+            <Text style={s.label}>رقم الهاتف</Text>
+            <View style={s.inputBox}>
+              <Ionicons name="call-outline" size={20} color="#9ca3af" />
+              <TextInput
+                style={s.input}
+                placeholder="07xxxxxxxxx"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                textAlign="right"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
 
-        <View style={s.card}>
-          <View style={s.tabsBar}>
+            {!isLogin && (
+              <>
+                <Text style={s.label}>اسم المتجر</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="storefront-outline" size={20} color="#9ca3af" />
+                  <TextInput
+                    style={s.input}
+                    placeholder="اسم متجرك"
+                    value={storeName}
+                    onChangeText={setStoreName}
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                  />
+                </View>
+
+                <Text style={s.label}>العنوان</Text>
+                <View style={s.inputBox}>
+                  <Ionicons name="location-outline" size={20} color="#9ca3af" />
+                  <TextInput
+                    style={s.input}
+                    placeholder="المحافظة، المدينة..."
+                    value={address}
+                    onChangeText={setAddress}
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                  />
+                </View>
+              </>
+            )}
+
+            <Text style={s.label}>كلمة المرور</Text>
+            <View style={s.inputBox}>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color="#9ca3af"
+                />
+              </TouchableOpacity>
+              <TextInput
+                style={s.input}
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                textAlign="right"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+
             <TouchableOpacity
-              style={[s.tabBtn, tab === 'register' && s.tabActive]}
-              onPress={() => { setTab('register'); setError(''); }}>
-              <Text style={[s.tabText, tab === 'register' && s.tabTextActive]}>إنشاء حساب</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.tabBtn, tab === 'login' && s.tabActive]}
-              onPress={() => { setTab('login'); setError(''); }}>
-              <Text style={[s.tabText, tab === 'login' && s.tabTextActive]}>تسجيل الدخول</Text>
+              style={[s.btn, isPending && { opacity: 0.6 }]}
+              onPress={handleSubmit}
+              disabled={isPending}>
+              <LinearGradient
+                colors={[PRIMARY, '#0a8a9f']}
+                style={s.btnGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}>
+                {isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={isLogin ? 'log-in-outline' : 'person-add-outline'}
+                      size={20}
+                      color="#fff"
+                    />
+                    <Text style={s.btnText}>
+                      {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
-
-          {tab === 'login' && (
-            <View>
-              <Text style={s.label}>رقم الهاتف</Text>
-              <View style={s.fieldBox}>
-                <TextInput
-                  style={s.fieldInput}
-                  placeholder="07xxxxxxxxx"
-                  value={loginPhone}
-                  onChangeText={setLoginPhone}
-                  keyboardType="phone-pad"
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <Ionicons name="call-outline" size={20} color="#9ca3af" />
-              </View>
-
-              <Text style={s.label}>كلمة المرور</Text>
-              <View style={s.fieldBox}>
-                <TouchableOpacity onPress={() => setShowLoginPass(!showLoginPass)} style={s.eyeBtn}>
-                  <Ionicons name={showLoginPass ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9ca3af" />
-                </TouchableOpacity>
-                <TextInput
-                  style={s.fieldInput}
-                  placeholder="••••••••"
-                  value={loginPassword}
-                  onChangeText={setLoginPassword}
-                  secureTextEntry={!showLoginPass}
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <Ionicons name="lock-closed-outline" size={20} color="#9ca3af" />
-              </View>
-
-              {error ? <View style={s.errorBox}><Text style={s.errorText}>⚠️ {error}</Text></View> : null}
-
-              <TouchableOpacity style={[s.btn, { backgroundColor: PRIMARY }, isPending && { opacity: 0.7 }]}
-                onPress={handleLogin} disabled={isPending}>
-                {isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>دخول</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {tab === 'register' && (
-            <View>
-              <Text style={s.label}>اسم المتجر</Text>
-              <View style={s.fieldBox}>
-                <TextInput style={s.fieldInput} placeholder="اسم متجرك"
-                  value={regStoreName} onChangeText={setRegStoreName}
-                  textAlign="right" placeholderTextColor="#9ca3af"
-                  autoCorrect={false} autoCapitalize="none" />
-                <Ionicons name="storefront-outline" size={20} color="#9ca3af" />
-              </View>
-
-              <Text style={s.label}>رقم الهاتف</Text>
-              <View style={s.fieldBox}>
-                <TextInput style={s.fieldInput} placeholder="07xxxxxxxxx"
-                  value={regPhone} onChangeText={setRegPhone}
-                  keyboardType="phone-pad" textAlign="right"
-                  placeholderTextColor="#9ca3af" autoCorrect={false} autoCapitalize="none" />
-                <Ionicons name="call-outline" size={20} color="#9ca3af" />
-              </View>
-
-              <Text style={s.label}>العنوان</Text>
-              <View style={s.fieldBox}>
-                <TextInput style={s.fieldInput} placeholder="بغداد، الكرادة..."
-                  value={regAddress} onChangeText={setRegAddress}
-                  textAlign="right" placeholderTextColor="#9ca3af"
-                  autoCorrect={false} autoCapitalize="none" />
-                <Ionicons name="location-outline" size={20} color="#9ca3af" />
-              </View>
-
-              <Text style={s.label}>كلمة المرور</Text>
-              <View style={s.fieldBox}>
-                <TouchableOpacity onPress={() => setShowRegPass(!showRegPass)} style={s.eyeBtn}>
-                  <Ionicons name={showRegPass ? 'eye-off-outline' : 'eye-outline'} size={18} color="#9ca3af" />
-                </TouchableOpacity>
-                <TextInput style={s.fieldInput} placeholder="••••••••"
-                  value={regPassword} onChangeText={setRegPassword}
-                  secureTextEntry={!showRegPass} textAlign="right"
-                  placeholderTextColor="#9ca3af" autoCorrect={false} autoCapitalize="none" />
-                <Ionicons name="lock-closed-outline" size={20} color="#9ca3af" />
-              </View>
-
-              {error ? <View style={s.errorBox}><Text style={s.errorText}>⚠️ {error}</Text></View> : null}
-
-              <TouchableOpacity style={[s.btn, { backgroundColor: SECONDARY }, isPending && { opacity: 0.7 }]}
-                onPress={handleRegister} disabled={isPending}>
-                {isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>إنشاء حساب جديد</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-        <Text style={s.footer}>جميع الحقوق محفوظة © {new Date().getFullYear()} تسليم</Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#f9fafb' },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 20, paddingTop: 60 },
-  bgTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 384, backgroundColor: 'rgba(12,102,121,0.07)' },
-  bgCircle: { position: 'absolute', top: -60, right: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(245,160,6,0.07)' },
-  logoSection: { alignItems: 'center', marginBottom: 32 },
-  logoBox: { width: 68, height: 68, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
-  logoLetter: { fontSize: 30, fontWeight: 'bold', color: '#fff' },
-  logoTitle: { fontSize: 28, fontWeight: 'bold', color: PRIMARY, marginBottom: 6 },
-  logoSub: { fontSize: 13, color: '#6b7280', textAlign: 'center' },
-  card: { backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 28, padding: 24, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 24, elevation: 8 },
-  tabsBar: { flexDirection: 'row', backgroundColor: 'rgba(243,244,246,0.8)', borderRadius: 14, padding: 4, marginBottom: 24, height: 50 },
-  tabBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
-  tabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
-  tabTextActive: { color: PRIMARY, fontWeight: '700' },
-  label: { fontSize: 13, fontWeight: '500', color: '#374151', textAlign: 'right', marginBottom: 6, marginTop: 12 },
-  fieldBox: { flexDirection: 'row-reverse', alignItems: 'center', height: 50, borderRadius: 14, backgroundColor: '#f9fafb', borderWidth: 1.5, borderColor: '#e5e7eb', paddingHorizontal: 14, marginBottom: 2 },
-  fieldInput: { flex: 1, fontSize: 14, color: '#111827', paddingHorizontal: 8 },
-  eyeBtn: { padding: 4 },
-  errorBox: { backgroundColor: '#fef2f2', borderRadius: 10, padding: 12, marginTop: 8 },
-  errorText: { color: '#dc2626', fontSize: 13, textAlign: 'right' },
-  btn: { borderRadius: 14, height: 50, justifyContent: 'center', alignItems: 'center', marginTop: 18, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { paddingVertical: 40, alignItems: 'center' },
+  logo: { fontSize: 48, fontWeight: 'bold', color: '#fff' },
+  tagline: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 8 },
+  formContainer: { padding: 20 },
+  card: { backgroundColor: '#fff', borderRadius: 24, padding: 24,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, elevation: 5 },
+  tabs: { flexDirection: 'row', backgroundColor: '#f3f4f6',
+    borderRadius: 16, padding: 4, marginBottom: 24 },
+  tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  tabActive: { backgroundColor: '#fff',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 14, color: '#9ca3af', fontWeight: '600' },
+  tabTextActive: { color: PRIMARY, fontWeight: 'bold' },
+  label: { fontSize: 13, color: '#374151', marginBottom: 8,
+    marginTop: 16, fontWeight: '600', textAlign: 'right' },
+  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 14,
+    paddingHorizontal: 14, backgroundColor: '#f9fafb' },
+  input: { flex: 1, fontSize: 15, color: '#111827', paddingVertical: 14 },
+  btn: { borderRadius: 16, overflow: 'hidden', marginTop: 24,
+    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 12, elevation: 5 },
+  btnGradient: { flexDirection: 'row', justifyContent: 'center',
+    alignItems: 'center', gap: 8, paddingVertical: 16 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  footer: { textAlign: 'center', color: '#9ca3af', fontSize: 12, marginTop: 28 },
 });

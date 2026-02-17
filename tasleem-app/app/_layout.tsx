@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager, Platform, View, ActivityIndicator } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-SplashScreen.preventAutoHideAsync();
 
 if (Platform.OS !== 'web') {
   I18nManager.allowRTL(true);
@@ -17,30 +15,48 @@ const queryClient = new QueryClient({
 });
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
+  const [isReady, setIsReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
   const segments = useSegments();
-  const [token, setToken] = useState<string | null | undefined>(undefined);
 
+  // تحميل حالة التوكن عند البداية فقط
   useEffect(() => {
-    AsyncStorage.getItem('token').then(t => {
-      setToken(t);
-      SplashScreen.hideAsync();
+    AsyncStorage.getItem('token').then(token => {
+      setIsAuthenticated(!!token);
+      setIsReady(true);
     });
   }, []);
 
+  // مراقبة التغييرات في التوكن من AsyncStorage
   useEffect(() => {
-    if (token === undefined) return;
-    
-    const inAuth = segments[0] === 'auth';
-    
-    if (!token && !inAuth) {
+    const interval = setInterval(async () => {
+      const token = await AsyncStorage.getItem('token');
+      setIsAuthenticated(!!token);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // التنقل بناءً على حالة المصادقة
+  useEffect(() => {
+    if (!isReady) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!isAuthenticated && !inAuthGroup) {
       router.replace('/auth');
-    } else if (token && inAuth) {
+    } else if (isAuthenticated && inAuthGroup) {
       router.replace('/(tabs)');
     }
-  }, [token, segments]);
+  }, [isAuthenticated, isReady, segments]);
 
-  if (token === undefined) return null;
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0c6679' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
 
   return <>{children}</>;
 }
