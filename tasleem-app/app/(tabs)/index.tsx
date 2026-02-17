@@ -1,235 +1,215 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  FlatList, StyleSheet, ActivityIndicator,
-  ScrollView, Image, I18nManager
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  TextInput, Image, Dimensions, RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useUser } from '../../src/hooks/useAuth';
-import { useProducts } from '../../src/hooks/useProducts';
-import { useOrders } from '../../src/hooks/useOrders';
+import api from '../../src/lib/api';
 
-I18nManager.forceRTL(true);
-const TEAL = '#0c6679';
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2;
+const PRIMARY = '#0c6679';
+const SECONDARY = '#f5a006';
 
 export default function HomeScreen() {
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
   const router = useRouter();
-  const { data: user, isLoading: userLoading } = useUser();
-  const { data: products, isLoading: productsLoading } = useProducts();
-  const { data: orders } = useOrders();
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState('الكل');
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (userLoading) return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color={TEAL} />
-    </View>
-  );
+  const { data: products = [], refetch } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
+  });
 
-  if (!user) { router.replace('/auth'); return null; }
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+  });
 
-  const categories = [...new Set(products?.map(p => p.category) || [])];
-  const filtered = products?.filter(p =>
-    (!category || p.category === category) &&
-    (!search || p.name.includes(search) || p.description?.includes(search))
-  ) || [];
-  const pendingOrders = orders?.filter(o => o.status === 'pending').length || 0;
+  const categories = ['الكل', ...Array.from(new Set(products.map((p: any) => p.category))) as string[]];
+
+  const filtered = products.filter((p: any) => {
+    const matchCat = activeCategory === 'الكل' || p.category === activeCategory;
+    const matchSearch = !search || p.name.includes(search);
+    return matchCat && matchSearch;
+  });
+
+  const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
+
+  const getImages = (p: any) => {
+    const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
+    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={s.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/cart')} style={styles.cartBtn}>
-          <Ionicons name="cart-outline" size={24} color="#333" />
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
+          <Ionicons name="cart-outline" size={24} color={PRIMARY} />
         </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <Text style={styles.headerTitle}>تسليم</Text>
-          <View style={styles.headerIcon}>
-            <Ionicons name="cube-outline" size={20} color="#fff" />
-          </View>
+        <View>
+          <Text style={s.greeting}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
+          <Text style={s.subtitle}>{filtered.length} منتج متاح</Text>
+        </View>
+        <View style={s.logo}>
+          <Text style={s.logoText}>ت</Text>
         </View>
       </View>
 
+      {/* Search */}
+      <View style={s.searchBox}>
+        <Ionicons name="search-outline" size={18} color="#9ca3af" />
+        <TextInput style={s.searchInput} placeholder="ابحث عن منتج..."
+          value={search} onChangeText={setSearch}
+          placeholderTextColor="#9ca3af" textAlign="right" />
+        {search ? <TouchableOpacity onPress={() => setSearch('')}>
+          <Ionicons name="close-circle" size={18} color="#9ca3af" />
+        </TouchableOpacity> : null}
+      </View>
+
+      {/* Categories */}
+      <FlatList horizontal data={categories} showsHorizontalScrollIndicator={false}
+        style={s.catList} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        keyExtractor={i => i}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={[s.catBtn, activeCategory === item && s.catBtnActive]}
+            onPress={() => setActiveCategory(item)}>
+            <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
+          </TouchableOpacity>
+        )} />
+
+      {/* Products Grid */}
       <FlatList
         data={filtered}
-        keyExtractor={item => item.id.toString()}
         numColumns={2}
+        keyExtractor={i => String(i.id)}
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+        columnWrapperStyle={{ gap: 12, flexDirection: 'row-reverse' }}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            {/* Welcome */}
-            <View style={styles.welcomeSection}>
-              <Text style={styles.welcomeSub}>إليك نظرة عامة على نشاطك</Text>
-              <Text style={styles.welcomeTitle}>مرحباً، {user.storeName} 👋</Text>
-            </View>
-
-            {/* Search */}
-            <View style={styles.searchBox}>
-              <Ionicons name="search-outline" size={18} color="#aaa" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="ابحث عن منتج، كود، أو وصف..."
-                value={search}
-                onChangeText={setSearch}
-                textAlign="right"
-                placeholderTextColor="#bbb"
-              />
-            </View>
-
-            {/* Categories */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 16 }}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-              {['الكل', ...categories].map(cat => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.catBtn,
-                    (cat === 'الكل' ? !category : category === cat) && styles.catActive]}
-                  onPress={() => setCategory(cat === 'الكل' ? null : cat)}
-                >
-                  <Text style={[styles.catText,
-                    (cat === 'الكل' ? !category : category === cat) && styles.catTextActive]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Stats */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <View style={styles.statTop}>
-                  <Text style={styles.statValue}>{user.balance.toLocaleString()}</Text>
-                  <Ionicons name="wallet-outline" size={18} color={TEAL} />
-                </View>
-                <Text style={styles.statLabel}>الرصيد المتاح</Text>
-                <Text style={styles.statUnit}>د.ع</Text>
-              </View>
-              <View style={styles.statCard}>
-                <View style={styles.statTop}>
-                  <Text style={styles.statValue}>{user.pendingBalance.toLocaleString()}</Text>
-                  <Ionicons name="time-outline" size={18} color="#f59e0b" />
-                </View>
-                <Text style={styles.statLabel}>رصيد معلق</Text>
-                <Text style={styles.statUnit}>د.ع</Text>
-              </View>
-              <View style={[styles.statCard, { flex: 2 }]}>
-                <View style={styles.statTop}>
-                  <Text style={styles.statValue}>{pendingOrders}</Text>
-                  <Ionicons name="trending-up-outline" size={18} color="#6366f1" />
-                </View>
-                <Text style={styles.statLabel}>الطلبات النشطة</Text>
-              </View>
-            </View>
-
-            {/* Section Title */}
-            <View style={styles.sectionHeader}>
-              <Ionicons name="cube-outline" size={18} color={TEAL} />
-              <Text style={styles.sectionTitle}>أحدث المنتجات</Text>
-            </View>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
+        ListEmptyComponent={
+          <View style={s.empty}>
+            <Ionicons name="cube-outline" size={60} color="#d1d5db" />
+            <Text style={s.emptyText}>لا توجد منتجات</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.productCard}
-            onPress={() => router.push(`/products/${item.id}`)}
-          >
-            <View style={styles.productImgBox}>
-              <Image
-                source={{ uri: item.imageUrl }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryBadgeText}>{item.category}</Text>
+        renderItem={({ item: p }) => {
+          const imgs = getImages(p);
+          const hasDiscount = p.discount > 0;
+          const discountedPrice = hasDiscount
+            ? p.wholesalePrice * (1 - p.discount / 100)
+            : p.wholesalePrice;
+
+          return (
+            <TouchableOpacity style={s.card} onPress={() => router.push(`/products/${p.id}`)}>
+              {/* Image */}
+              <View style={s.imgBox}>
+                {imgs[0] ? (
+                  <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
+                ) : (
+                  <View style={[s.img, s.imgPlaceholder]}>
+                    <Ionicons name="image-outline" size={32} color="#d1d5db" />
+                  </View>
+                )}
+                {/* Badges */}
+                <View style={s.badges}>
+                  {p.isRenewable && (
+                    <View style={s.renewBadge}>
+                      <Text style={s.renewText}>قابل للتجديد</Text>
+                    </View>
+                  )}
+                </View>
+                {hasDiscount && (
+                  <View style={s.discountBadge}>
+                    <Text style={s.discountText}>خصم {p.discount}%</Text>
+                  </View>
+                )}
+                {imgs.length > 1 && (
+                  <View style={s.imgCount}>
+                    <Ionicons name="images-outline" size={12} color="#fff" />
+                    <Text style={s.imgCountText}>{imgs.length}</Text>
+                  </View>
+                )}
               </View>
-            </View>
-            <View style={styles.productInfo}>
-              <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-              <Text style={styles.productDesc} numberOfLines={1}>{item.description}</Text>
-              <Text style={styles.productPrice}>
-                سعر الجملة: {item.sellingPriceMin.toLocaleString()} د.ع
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
-        ListEmptyComponent={
-          productsLoading
-            ? <ActivityIndicator size="large" color={TEAL} style={{ marginTop: 40 }} />
-            : <Text style={styles.empty}>لا توجد منتجات</Text>
-        }
+
+              {/* Info */}
+              <View style={s.cardBody}>
+                <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
+                <View style={s.priceRow}>
+                  {hasDiscount && (
+                    <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>
+                  )}
+                  <Text style={s.price}>{Math.round(discountedPrice).toLocaleString()} د.ع</Text>
+                </View>
+                <View style={s.stockRow}>
+                  <Text style={[s.stockText, p.stock < 5 && { color: '#ef4444' }]}>
+                    {p.stock < 5 ? '⚠️ ' : ''}{p.stock} قطعة
+                  </Text>
+                  <View style={s.catPill}>
+                    <Text style={s.catPillText}>{p.category}</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-  },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a1a' },
-  headerIcon: { width: 36, height: 36, borderRadius: 10,
-    backgroundColor: TEAL, justifyContent: 'center', alignItems: 'center' },
-  cartBtn: { position: 'relative', padding: 4 },
-  welcomeSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 },
-  welcomeTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a', textAlign: 'right' },
-  welcomeSub: { fontSize: 13, color: '#888', textAlign: 'right', marginTop: 2 },
-  searchBox: {
-    flexDirection: 'row-reverse', alignItems: 'center',
-    backgroundColor: '#fff', marginHorizontal: 16,
-    borderRadius: 12, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14,
-  },
-  searchInput: { flex: 1, paddingVertical: 11,
-    fontSize: 13, color: '#333', marginRight: 8 },
-  catBtn: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#fff',
-  },
-  catActive: { backgroundColor: TEAL, borderColor: TEAL },
-  catText: { fontSize: 13, color: '#555', fontWeight: '500' },
-  catTextActive: { color: '#fff', fontWeight: '600' },
-  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap',
-    paddingHorizontal: 12, gap: 8, marginBottom: 20 },
-  statCard: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-  },
-  statTop: { flexDirection: 'row-reverse',
-    justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  statValue: { fontSize: 22, fontWeight: 'bold', color: '#1a1a1a' },
-  statLabel: { fontSize: 12, color: '#888', textAlign: 'right' },
-  statUnit: { fontSize: 11, color: '#aaa', textAlign: 'right' },
-  sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center',
-    gap: 6, paddingHorizontal: 16, marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1a1a1a' },
-  productCard: {
-    flex: 1, margin: 4, backgroundColor: '#fff',
-    borderRadius: 14, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-  },
-  productImgBox: { position: 'relative' },
-  productImage: { width: '100%', height: 130 },
-  categoryBadge: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: TEAL, borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  categoryBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
-  productInfo: { padding: 10 },
-  productName: { fontSize: 13, fontWeight: '600',
-    textAlign: 'right', color: '#1a1a1a', marginBottom: 3 },
-  productDesc: { fontSize: 11, color: '#999',
-    textAlign: 'right', marginBottom: 6 },
-  productPrice: { fontSize: 12, color: TEAL,
-    textAlign: 'right', fontWeight: '700' },
-  empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  logo: { width: 40, height: 40, borderRadius: 12, backgroundColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center' },
+  logoText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
+  greeting: { fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
+  subtitle: { fontSize: 12, color: '#6b7280', textAlign: 'right' },
+  cartBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: PRIMARY + '12',
+    justifyContent: 'center', alignItems: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    margin: 12, borderRadius: 14, paddingHorizontal: 14, height: 44,
+    borderWidth: 1, borderColor: '#e5e7eb', gap: 8 },
+  searchInput: { flex: 1, fontSize: 13, color: '#111827' },
+  catList: { maxHeight: 48, marginBottom: 4 },
+  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  catText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  catTextActive: { color: '#fff' },
+  card: { width: CARD_WIDTH, backgroundColor: '#fff', borderRadius: 18,
+    overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06,
+    shadowRadius: 10, elevation: 3 },
+  imgBox: { width: '100%', height: CARD_WIDTH, position: 'relative' },
+  img: { width: '100%', height: '100%' },
+  imgPlaceholder: { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  badges: { position: 'absolute', top: 8, right: 8, gap: 4 },
+  renewBadge: { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  renewText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: SECONDARY,
+    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  discountText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  imgCount: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row',
+    alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  imgCountText: { color: '#fff', fontSize: 10 },
+  cardBody: { padding: 10 },
+  productName: { fontSize: 13, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 6 },
+  priceRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
+  price: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
+  oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
+  stockRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  stockText: { fontSize: 11, color: '#6b7280' },
+  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  catPillText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
+  emptyText: { fontSize: 16, color: '#9ca3af', marginTop: 12 },
 });
