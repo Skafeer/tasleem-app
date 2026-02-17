@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
@@ -19,7 +19,6 @@ const SECONDARY = '#f5a006';
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const qc = useQueryClient();
   const [activeImg, setActiveImg] = useState(0);
   const [showCart, setShowCart] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
@@ -47,11 +46,12 @@ export default function ProductDetailScreen() {
   const hasDiscount = product?.discount > 0;
   const discountedPrice = hasDiscount
     ? product?.wholesalePrice * (1 - product?.discount / 100)
-    : product?.wholesalePrice;
+    : product?.wholesalePrice || 0;
 
-  const profit = sellingPrice
-    ? Number(sellingPrice) - (discountedPrice || 0) - (promoData ? (Number(sellingPrice) * promoData.discountPercent / 100) : 0)
+  const promoDiscount = promoData && sellingPrice
+    ? (Number(sellingPrice) * promoData.discountPercent / 100)
     : 0;
+  const profit = sellingPrice ? Number(sellingPrice) - discountedPrice - promoDiscount : 0;
 
   const verifyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -68,7 +68,7 @@ export default function ProductDetailScreen() {
   };
 
   const addToCart = async () => {
-    if (!sellingPrice || Number(sellingPrice) < (discountedPrice || 0)) {
+    if (!sellingPrice || Number(sellingPrice) < discountedPrice) {
       toast.warning('السعر يجب أن يكون أكبر من سعر الجملة'); return;
     }
     try {
@@ -93,26 +93,9 @@ export default function ProductDetailScreen() {
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
       toast.success('تمت الإضافة إلى السلة ✅');
       setShowCart(false);
-      setSellingPrice('');
-      setQuantity('1');
-      setPromoCode('');
-      setPromoData(null);
-    } catch {
-      toast.error('فشل الإضافة إلى السلة');
-    }
-  };
-
-  const downloadImage = async (url: string) => {
-    await Linking.openURL(url);
-  };
-
-  const downloadAllImages = async () => {
-    if (!product) return;
-    const imgs = getImages(product);
-    for (const url of imgs) {
-      await Linking.openURL(url);
-    }
-    toast.info(`جاري تحميل ${imgs.length} صورة...`);
+      setSellingPrice(''); setQuantity('1');
+      setPromoCode(''); setPromoData(null);
+    } catch { toast.error('فشل الإضافة إلى السلة'); }
   };
 
   if (isLoading) return (
@@ -132,7 +115,6 @@ export default function ProductDetailScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#111827" />
@@ -141,13 +123,10 @@ export default function ProductDetailScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Images Slider */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Slider */}
         <View style={s.sliderBox}>
-          <FlatList
-            ref={flatRef}
-            data={images}
-            horizontal pagingEnabled
+          <FlatList ref={flatRef} data={images} horizontal pagingEnabled
             showsHorizontalScrollIndicator={false}
             keyExtractor={(_, i) => String(i)}
             onMomentumScrollEnd={e => {
@@ -155,63 +134,46 @@ export default function ProductDetailScreen() {
             }}
             renderItem={({ item }) => (
               <Image source={{ uri: item }} style={s.sliderImg} resizeMode="cover" />
-            )}
-          />
+            )} />
 
-          {/* Download Button */}
+          {/* Download */}
           <TouchableOpacity style={s.downloadBtn}
-            onPress={() => {
-              Alert.alert('تحميل الصور', 'اختر خيار التحميل', [
-                { text: 'تحميل هذه الصورة', onPress: () => downloadImage(images[activeImg]) },
-                { text: 'تحميل جميع الصور', onPress: downloadAllImages },
-                { text: 'إلغاء', style: 'cancel' },
-              ]);
-            }}>
+            onPress={() => Alert.alert('تحميل الصور', 'اختر خيار التحميل', [
+              { text: 'تحميل هذه الصورة', onPress: () => Linking.openURL(images[activeImg]) },
+              { text: 'تحميل جميع الصور', onPress: () => images.forEach((url: string) => Linking.openURL(url)) },
+              { text: 'إلغاء', style: 'cancel' },
+            ])}>
             <Ionicons name="download-outline" size={20} color="#fff" />
           </TouchableOpacity>
 
           {/* Dots */}
           {images.length > 1 && (
             <View style={s.dots}>
-              {images.map((_, i) => (
+              {images.map((_: any, i: number) => (
                 <TouchableOpacity key={i}
                   style={[s.dot, i === activeImg && s.dotActive]}
-                  onPress={() => {
-                    flatRef.current?.scrollToIndex({ index: i, animated: true });
-                    setActiveImg(i);
-                  }} />
+                  onPress={() => { flatRef.current?.scrollToIndex({ index: i, animated: true }); setActiveImg(i); }} />
               ))}
             </View>
           )}
 
           {/* Badges */}
           {product.isRenewable && (
-            <View style={s.renewBadge}>
-              <Text style={s.renewText}>قابل للتجديد</Text>
-            </View>
+            <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>
           )}
           {hasDiscount && (
-            <View style={s.discountBadge}>
-              <Text style={s.discountText}>خصم {product.discount}%</Text>
-            </View>
+            <View style={s.discountBadge}><Text style={s.discountText}>خصم {product.discount}%</Text></View>
           )}
-
-          {/* Image Counter */}
           <View style={s.imgCounter}>
             <Text style={s.imgCounterText}>{activeImg + 1}/{images.length}</Text>
           </View>
         </View>
 
         <View style={s.content}>
-          {/* Name */}
           <Text style={s.name}>{product.name}</Text>
+          <View style={s.catPill}><Text style={s.catText}>{product.category}</Text></View>
 
-          {/* Category */}
-          <View style={s.catPill}>
-            <Text style={s.catText}>{product.category}</Text>
-          </View>
-
-          {/* Price & Stock */}
+          {/* Info Grid */}
           <View style={s.infoGrid}>
             <View style={s.infoBox}>
               <Text style={s.infoLabel}>المخزون</Text>
@@ -237,9 +199,9 @@ export default function ProductDetailScreen() {
               {adLinks.map((link: string, i: number) => (
                 <TouchableOpacity key={i} style={s.adLink}
                   onPress={() => Linking.openURL(link.trim())}>
-                  <Ionicons name="link-outline" size={16} color={PRIMARY} />
-                  <Text style={s.adLinkText} numberOfLines={1}>{link.trim()}</Text>
                   <Ionicons name="open-outline" size={14} color="#9ca3af" />
+                  <Text style={s.adLinkText} numberOfLines={1}>{link.trim()}</Text>
+                  <Ionicons name="link-outline" size={16} color={PRIMARY} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -249,10 +211,9 @@ export default function ProductDetailScreen() {
           {product.description && (
             <View style={s.section}>
               <View style={s.sectionHeader}>
-                <TouchableOpacity onPress={async () => {
-                  await Share.share({ message: product.description });
-                  toast.info('تم نسخ الوصف');
-                }} style={s.copyBtn}>
+                <TouchableOpacity
+                  onPress={async () => { await Share.share({ message: product.description }); }}
+                  style={s.copyBtn}>
                   <Ionicons name="copy-outline" size={18} color={PRIMARY} />
                 </TouchableOpacity>
                 <Text style={s.sectionTitle}>📋 المواصفات</Text>
@@ -263,13 +224,13 @@ export default function ProductDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Floating Add to Cart Button */}
+      {/* Float Button */}
       <TouchableOpacity style={s.floatBtn} onPress={() => setShowCart(true)}>
         <Ionicons name="cart-outline" size={22} color="#fff" />
         <Text style={s.floatBtnText}>إضافة إلى السلة</Text>
       </TouchableOpacity>
 
-      {/* Add to Cart Modal */}
+      {/* Cart Modal */}
       <Modal visible={showCart} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
@@ -281,7 +242,6 @@ export default function ProductDetailScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Price Input */}
               <Text style={s.inputLabel}>سعر البيع (د.ع) *</Text>
               <View style={s.priceInputBox}>
                 <View style={s.profitBox}>
@@ -297,7 +257,6 @@ export default function ProductDetailScreen() {
                   placeholderTextColor="#9ca3af" />
               </View>
 
-              {/* Quantity */}
               <Text style={s.inputLabel}>الكمية</Text>
               <View style={s.qtyRow}>
                 <TouchableOpacity style={s.qtyBtn}
@@ -311,20 +270,18 @@ export default function ProductDetailScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Promo Code */}
               <Text style={s.inputLabel}>كود الخصم (اختياري)</Text>
               <View style={s.promoRow}>
                 <TouchableOpacity style={[s.promoVerifyBtn, promoLoading && { opacity: 0.6 }]}
                   onPress={verifyPromo} disabled={promoLoading}>
                   {promoLoading
                     ? <ActivityIndicator size="small" color="#fff" />
-                    : <Text style={s.promoVerifyText}>تحقق</Text>
-                  }
+                    : <Text style={s.promoVerifyText}>تحقق</Text>}
                 </TouchableOpacity>
                 <TextInput style={s.promoInput}
                   placeholder="أدخل كود الخصم"
                   value={promoCode}
-                  onChangeText={(v) => { setPromoCode(v.toUpperCase()); setPromoData(null); }}
+                  onChangeText={v => { setPromoCode(v.toUpperCase()); setPromoData(null); }}
                   textAlign="right" placeholderTextColor="#9ca3af"
                   autoCapitalize="characters" />
               </View>
@@ -335,7 +292,6 @@ export default function ProductDetailScreen() {
                 </View>
               )}
 
-              {/* Summary */}
               <View style={s.summary}>
                 <View style={s.summaryRow}>
                   <Text style={s.summaryVal}>{Math.round(discountedPrice).toLocaleString()} د.ع</Text>
@@ -350,7 +306,7 @@ export default function ProductDetailScreen() {
                 {promoData && sellingPrice && (
                   <View style={s.summaryRow}>
                     <Text style={[s.summaryVal, { color: '#ef4444' }]}>
-                      -{Math.round(Number(sellingPrice) * promoData.discountPercent / 100).toLocaleString()} د.ع
+                      -{Math.round(promoDiscount).toLocaleString()} د.ع
                     </Text>
                     <Text style={s.summaryLabel}>خصم الكود</Text>
                   </View>
@@ -388,8 +344,8 @@ const s = StyleSheet.create({
   downloadBtn: { position: 'absolute', top: 12, left: 12, width: 40, height: 40,
     borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center', alignItems: 'center' },
-  dots: { position: 'absolute', bottom: 12, alignSelf: 'center',
-    flexDirection: 'row', gap: 6, left: 0, right: 0, justifyContent: 'center' },
+  dots: { position: 'absolute', bottom: 12, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { width: 18, backgroundColor: '#fff' },
   renewBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: '#166534',
@@ -398,8 +354,9 @@ const s = StyleSheet.create({
   discountBadge: { position: 'absolute', top: 52, right: 12, backgroundColor: SECONDARY,
     borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
   discountText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  imgCounter: { position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  imgCounter: { position: 'absolute', bottom: 12, right: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 4 },
   imgCounterText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   content: { padding: 16 },
   name: { fontSize: 22, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 8 },
@@ -413,9 +370,10 @@ const s = StyleSheet.create({
   infoLabel: { fontSize: 12, color: '#9ca3af', marginBottom: 4 },
   infoVal: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   oldPrice: { fontSize: 12, color: '#9ca3af', textDecorationLine: 'line-through', textAlign: 'center' },
-  section: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  section: { backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   copyBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY + '12',
     justifyContent: 'center', alignItems: 'center' },
@@ -446,7 +404,8 @@ const s = StyleSheet.create({
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
   qtyBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: PRIMARY + '12',
     justifyContent: 'center', alignItems: 'center' },
-  qtyVal: { fontSize: 24, fontWeight: 'bold', color: '#111827', minWidth: 40, textAlign: 'center' },
+  qtyVal: { fontSize: 24, fontWeight: 'bold', color: '#111827',
+    minWidth: 40, textAlign: 'center' },
   promoRow: { flexDirection: 'row', gap: 10 },
   promoInput: { flex: 1, borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 14,
     padding: 12, fontSize: 14, color: '#111827', backgroundColor: '#f9fafb' },
