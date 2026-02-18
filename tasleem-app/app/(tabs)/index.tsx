@@ -23,7 +23,7 @@ export default function HomeScreen() {
 
   const { data: products = [], refetch } = useQuery({
     queryKey: ['products'],
-    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
+    queryFn: async () => { const { data } = await api.get("/api/products"); return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); },
   });
 
   const { data: user } = useQuery({
