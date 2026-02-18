@@ -76,8 +76,15 @@ export default function ProfileScreen() {
     withdrawMutation.mutate({ amount, card: masterCard });
   };
 
-  const handleLogout = () => {
-    logoutMutation.mutate();
+    const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('token');
+      delete api.defaults.headers.common['Authorization'];
+      queryClient.clear();
+      router.replace('/auth');
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
   };
 
   return (
