@@ -477,7 +477,7 @@ export default function AdminScreen() {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                 {/* Image Upload */}
-                <Text style={s.inputLabel}>صور المنتج ({form.images.length}/10) *</Text>
+                <Text style={s.inputLabel}>روابط صور المنتج (افصل بفواصل) *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{gap:10,paddingBottom:8}}>
                   {form.images.map((url,i)=>(
