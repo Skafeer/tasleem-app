@@ -76,7 +76,7 @@ export default function CartScreen() {
 
 
   const checkStock = () => {
-    for (const item of cart) {
+    for (const item of items) {
       if (item.quantity > item.stock) {
         toast.error(`المنتج "${item.name}" متوفر فقط ${item.stock} قطعة`);
         return false;
