@@ -77,6 +77,8 @@ export default function CartScreen() {
   const handleSubmit = () => {
     if (items.length === 0) { toast.warning('السلة فارغة'); return; }
     if (!customerName.trim()) { toast.warning('يرجى إدخال اسم الزبون'); return; }
+    if (!checkStock()) return;
+    
     if (!customerPhone.trim() || !customerPhone.startsWith('07') || customerPhone.length !== 11) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم'); return;
     }
