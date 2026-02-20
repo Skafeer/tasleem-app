@@ -15,6 +15,19 @@ import { toast } from '../../src/lib/toast';
 const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
 
+
+const generateProductCode = (id: number) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const seed = id * 12345 + 67890; // seed ثابت لنفس الـ ID
+  let code = '';
+  let tempSeed = seed;
+  for (let i = 0; i < 5; i++) {
+    code += chars[tempSeed % chars.length];
+    tempSeed = Math.floor(tempSeed / chars.length) + (i * 17);
+  }
+  return code;
+};
+
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -90,6 +103,7 @@ export default function ProductDetailScreen() {
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
       toast.success('تمت الإضافة إلى السلة ✅');
+      router.push('/cart');
       setShowCart(false);
       setSellingPrice(''); setQuantity('1');
       setPromoCode(''); setPromoData(null);
@@ -179,6 +193,8 @@ export default function ProductDetailScreen() {
 
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
+          <Text style={s.productCode}>🏷️ #{generateProductCode(product.id)}</Text>
+          <Text style={s.productId}>🔢 رقم المنتج: #{product.id}</Text>
           <View style={s.catPill}><Text style={s.catText}>{product.category}</Text></View>
 
           {/* Info */}
@@ -369,6 +385,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3 },
   imgCounterText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   content: { padding: 14 },
+  productCode: { fontSize: 13, color: '#6b7280', marginTop: 4, fontWeight: '600', letterSpacing: 1 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 8 },
   catPill: { backgroundColor: PRIMARY + '15', borderRadius: 9, paddingHorizontal: 11,
     paddingVertical: 4, alignSelf: 'flex-end', marginBottom: 14 },

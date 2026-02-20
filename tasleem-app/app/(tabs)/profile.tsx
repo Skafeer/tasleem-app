@@ -43,7 +43,7 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <Text style={s.userName}>{user?.storeName}</Text>
-            <Text style={s.userId}>🆔 ID: {user?.merchantId}</Text>
+            <Text style={s.userId}>ID: {user?.merchantId}</Text>
           </View>
         </View>
 
