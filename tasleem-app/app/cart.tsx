@@ -75,23 +75,30 @@ export default function CartScreen() {
   });
 
 
-  const checkStock = () => {
-    for (const item of items) {
-      if (item.quantity > item.stock) {
-        toast.error(`المنتج "${item.name}" متوفر فقط ${item.stock} قطعة`);
-        return false;
+  
+  const checkStock = async () => {
+    try {
+      for (const item of items) {
+        const { data: product } = await api.get(`/api/products/${item.productId}`);
+        if (item.quantity > product.stock) {
+          toast.error(`المنتج "${item.name}" متوفر فقط ${product.stock} قطعة`);
+          return false;
+        }
+        if (product.stock === 0) {
+          toast.error(`المنتج "${item.name}" غير متوفر حالياً`);
+          return false;
+        }
       }
-      if (item.stock === 0) {
-        toast.error(`المنتج "${item.name}" غير متوفر حالياً`);
-        return false;
-      }
+      return true;
+    } catch (e) {
+      toast.error('فشل التحقق من المخزون');
+      return false;
     }
-    return true;
   };
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (items.length === 0) { toast.warning('السلة فارغة'); return; }
     if (!customerName.trim()) { toast.warning('يرجى إدخال اسم الزبون'); return; }
-    if (!checkStock()) return;
+    if (!(await checkStock())) return;
     if (!checkStock()) return;
     
     if (!customerPhone.trim() || !customerPhone.startsWith('07') || customerPhone.length !== 11) {
@@ -159,7 +166,18 @@ export default function CartScreen() {
                     <Ionicons name="remove" size={16} color={PRIMARY} />
                   </TouchableOpacity>
                   <Text style={s.qtyVal}>{item.quantity}</Text>
-                  <TouchableOpacity style={s.qtyBtn} onPress={() => { if (item.quantity < item.stock) { updateQty(item.productId, item.quantity + 1); } else { toast.warning(`المخزون المتوفر: ${item.stock}`); } }}>
+                  <TouchableOpacity style={s.qtyBtn} onPress={async () => {
+                      try {
+                        const { data: product } = await api.get(`/api/products/${item.productId}`);
+                        if (item.quantity < product.stock) {
+                          updateQty(item.productId, item.quantity + 1);
+                        } else {
+                          toast.warning(`المخزون المتوفر: ${product.stock}`);
+                        }
+                      } catch (e) {
+                        toast.error('فشل التحقق من المخزون');
+                      }
+                    }}>
                     <Ionicons name="add" size={16} color={PRIMARY} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.delBtn} onPress={() => removeItem(item.productId)}>
