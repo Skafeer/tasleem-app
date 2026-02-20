@@ -16,14 +16,19 @@ const STATUS: any = {
   rejected: { label: 'مرفوض', color: '#dc2626', bg: '#fee2e2' },
 };
 
-const METHODS = ['Zain Cash', 'Asia Hawala', 'تحويل بنكي'];
+// طريقة الدفع ثابتة (ماستركارد) ولكن سيتم عرضها بالعربية
+const PAYMENT_METHOD = 'mastercard';
+const PAYMENT_METHOD_ARABIC = 'ماستر كارد';
 
 export default function WalletScreen() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState('');
-  const method = 'mastercard';
-  const [details, setDetails] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  
+  // حالات الأخطاء - كل حقل له خطأ منفصل
+  const [amountError, setAmountError] = useState('');
+  const [cardError, setCardError] = useState('');
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -46,25 +51,80 @@ export default function WalletScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      setIsOpen(false); setAmount(''); setDetails('');
+      
+      // إغلاق النافذة وتفريغ الحقول
+      setIsOpen(false);
+      setAmount('');
+      setCardNumber('');
+      setAmountError('');
+      setCardError('');
+      
+      // يمكنك استبدال هذا بنظام الإشعارات الخاص بك
       Alert.alert('تم إرسال الطلب', 'سيتم مراجعة طلب السحب قريباً');
     },
-    onError: (e: any) =>
-      Alert.alert('فشل إرسال الطلب', e?.response?.data?.message || 'حدث خطأ'),
+    onError: (e: any) => {
+      // يمكنك استبدال هذا بنظام الإشعارات الخاص بك
+      Alert.alert('فشل إرسال الطلب', e?.response?.data?.message || 'حدث خطأ');
+    },
   });
 
-  const handleWithdraw = () => {
+  // دالة التحقق من الحقول وعرض الأخطاء المناسبة
+  const validateFields = () => {
+    let isValid = true;
+    
+    // التحقق من المبلغ
     const val = Number(amount);
-    if (!val || val <= 0) { Alert.alert('خطأ', 'يرجى إدخال مبلغ صحيح'); return; }
-    if (val > (user?.balance || 0)) {
-      Alert.alert('رصيد غير كافي', 'المبلغ المطلوب أكبر من رصيدك المتاح'); return;
+    if (!amount || amount.trim() === '') {
+      setAmountError('يرجى إدخال المبلغ');
+      isValid = false;
+    } else if (isNaN(val) || val <= 0) {
+      setAmountError('يرجى إدخال مبلغ صحيح');
+      isValid = false;
+    } else if (val > (user?.balance || 0)) {
+      setAmountError('المبلغ المطلوب أكبر من رصيدك المتاح');
+      isValid = false;
+    } else {
+      setAmountError('');
     }
-    createWithdrawal.mutate({ amount: val, method, accountDetails: details });
+
+    // التحقق من رقم البطاقة
+    const trimmedCard = cardNumber.replace(/\s/g, '');
+    if (!cardNumber || cardNumber.trim() === '') {
+      setCardError('يرجى إدخال رقم البطاقة');
+      isValid = false;
+    } else if (!/^\d{10}$/.test(trimmedCard)) {
+      setCardError('رقم البطاقة يجب أن يحتوي على 10 أرقام بالضبط');
+      isValid = false;
+    } else {
+      setCardError('');
+    }
+
+    return isValid;
+  };
+
+  const handleWithdraw = () => {
+    // التحقق من الحقول أولاً
+    if (!validateFields()) {
+      return; // إذا كان هناك خطأ، لا ترسل الطلب
+    }
+
+    // إذا كل شيء صحيح، أرسل الطلب
+    createWithdrawal.mutate({
+      amount: Number(amount),
+      method: PAYMENT_METHOD,
+      accountDetails: cardNumber.replace(/\s/g, ''),
+    });
   };
 
   const formatDate = (d: string) => d
     ? new Date(d).toLocaleDateString('ar-IQ', { month: 'long', day: 'numeric' })
     : '';
+
+  // دالة لعرض اسم طريقة الدفع بالعربية
+  const formatMethod = (method: string) => {
+    if (method === 'mastercard') return PAYMENT_METHOD_ARABIC;
+    return method;
+  };
 
   return (
     <SafeAreaView style={s.container}>
@@ -73,7 +133,7 @@ export default function WalletScreen() {
         <Text style={s.title}>المحفظة المالية</Text>
       </View>
 
-      {/* Balance Card — bg gray-900 to gray-800 */}
+      {/* Balance Card */}
       <View style={s.balanceCard}>
         <View style={s.balanceGlow} />
         <View style={s.balanceTop}>
@@ -124,7 +184,9 @@ export default function WalletScreen() {
                 </View>
                 <View style={s.wInfo}>
                   <Text style={s.wAmount}>{item.amount?.toLocaleString()} د.ع</Text>
-                  <Text style={s.wMeta}>{item.method} • {formatDate(item.createdAt)}</Text>
+                  <Text style={s.wMeta}>
+                    {formatMethod(item.method)} • {formatDate(item.createdAt)}
+                  </Text>
                 </View>
                 <View style={[s.badge, { backgroundColor: st.bg }]}>
                   <Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text>
@@ -147,43 +209,69 @@ export default function WalletScreen() {
               <Text style={s.availableLabel}>الرصيد المتاح:</Text>
             </View>
 
-            {/* Amount */}
-            <Text style={s.label}>المبلغ</Text>
-            <TextInput style={s.input} placeholder="0"
-              value={amount} onChangeText={setAmount}
-              keyboardType="numeric" textAlign="right"
-              placeholderTextColor="#9ca3af" />
-
-            {/* Method */}
-            <Text style={s.label}>طريقة الدفع</Text>
-            <View style={s.methodRow}>
-              {METHODS.map(m => (
-                <TouchableOpacity key={m}
-                  style={[s.methodBtn, method === m && s.methodActive]}
-                  onPress={() => setMethod(m)}>
-                  <Text style={[s.methodText, method === m && s.methodActiveText]}>
-                    {m}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* Amount Field with Error */}
+            <View>
+              <Text style={s.label}>المبلغ</Text>
+              <TextInput
+                style={[s.input, amountError ? s.inputError : null]}
+                placeholder="0"
+                value={amount}
+                onChangeText={(text) => {
+                  setAmount(text);
+                  // إخفاء الخطأ عند بدء الكتابة
+                  if (amountError) setAmountError('');
+                }}
+                keyboardType="numeric"
+                textAlign="right"
+                placeholderTextColor="#9ca3af"
+              />
+              {/* رسالة الخطأ تحت حقل المبلغ */}
+              {amountError ? <Text style={s.errorText}>{amountError}</Text> : null}
             </View>
 
-            {/* Details */}
-            <Text style={s.label}>تفاصيل الحساب</Text>
-            <TextInput style={s.input}
-              placeholder="رقم الهاتف أو رقم الحساب"
-              value={details} onChangeText={setDetails}
-              textAlign="right" placeholderTextColor="#9ca3af" />
+            {/* Card Number Field with Error */}
+            <View>
+              <Text style={s.label}>رقم البطاقة (10 أرقام)</Text>
+              <TextInput
+                style={[s.input, cardError ? s.inputError : null]}
+                placeholder="أدخل رقم البطاقة"
+                value={cardNumber}
+                onChangeText={(text) => {
+                  // السماح فقط بالأرقام
+                  const numericText = text.replace(/[^0-9]/g, '');
+                  setCardNumber(numericText);
+                  // إخفاء الخطأ عند بدء الكتابة
+                  if (cardError) setCardError('');
+                }}
+                keyboardType="numeric"
+                maxLength={10}
+                textAlign="right"
+                placeholderTextColor="#9ca3af"
+              />
+              {/* رسالة الخطأ تحت حقل رقم البطاقة */}
+              {cardError ? <Text style={s.errorText}>{cardError}</Text> : null}
+            </View>
 
             <TouchableOpacity
               style={[s.confirmBtn, createWithdrawal.isPending && { opacity: 0.7 }]}
-              onPress={handleWithdraw} disabled={createWithdrawal.isPending}>
-              {createWithdrawal.isPending
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.confirmText}>تأكيد السحب</Text>
-              }
+              onPress={handleWithdraw}
+              disabled={createWithdrawal.isPending}
+            >
+              {createWithdrawal.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={s.confirmText}>تأكيد السحب</Text>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => setIsOpen(false)}>
+            <TouchableOpacity 
+              style={s.cancelBtn} 
+              onPress={() => {
+                setIsOpen(false);
+                // تفريغ الأخطاء عند الإلغاء
+                setAmountError('');
+                setCardError('');
+              }}
+            >
               <Text style={s.cancelText}>إلغاء</Text>
             </TouchableOpacity>
           </View>
@@ -195,63 +283,150 @@ export default function WalletScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
   title: { fontSize: 28, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  balanceCard: { margin: 16, backgroundColor: '#1f2937', borderRadius: 24,
-    padding: 24, overflow: 'hidden',
-    shadowColor: '#111827', shadowOpacity: 0.25, shadowRadius: 16, elevation: 6 },
-  balanceGlow: { position: 'absolute', top: -80, right: -80,
-    width: 240, height: 240, borderRadius: 120,
-    backgroundColor: 'rgba(255,255,255,0.04)' },
-  balanceTop: { flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: 24 },
+  balanceCard: {
+    margin: 16,
+    backgroundColor: '#1f2937',
+    borderRadius: 24,
+    padding: 24,
+    overflow: 'hidden',
+    shadowColor: '#111827',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  balanceGlow: {
+    position: 'absolute',
+    top: -80,
+    right: -80,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  balanceTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
   balanceLabel: { fontSize: 13, color: '#9ca3af', textAlign: 'right', marginBottom: 8 },
   balanceVal: { fontSize: 40, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
   balanceUnit: { fontSize: 20, color: '#6b7280' },
-  withdrawBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 48,
-    flexDirection: 'row-reverse', justifyContent: 'center',
-    alignItems: 'center', gap: 8,
-    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4 },
+  withdrawBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    height: 48,
+    flexDirection: 'row-reverse',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   withdrawBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  secHead: { flexDirection: 'row-reverse', alignItems: 'center',
-    gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  secHead: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   secTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   emptyBox: { alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyText: { fontSize: 14, color: '#9ca3af' },
-  withdrawCard: { backgroundColor: '#fff', borderRadius: 18, padding: 16,
-    flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  wIcon: { width: 46, height: 46, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center' },
+  withdrawCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  wIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   wInfo: { flex: 1, alignItems: 'flex-end' },
   wAmount: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   wMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   badge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10 },
   badgeText: { fontSize: 12, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28,
-    borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827',
-    textAlign: 'right', marginBottom: 16 },
-  availableBox: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 14,
-    flexDirection: 'row-reverse', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 16,
-    borderWidth: 1, borderColor: '#dbeafe' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 16 },
+  availableBox: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
   availableLabel: { fontSize: 13, color: '#2563eb' },
   availableVal: { fontSize: 16, fontWeight: 'bold', color: '#2563eb' },
-  label: { fontSize: 13, fontWeight: '500', color: '#374151',
-    textAlign: 'right', marginBottom: 8, marginTop: 12 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12,
-    padding: 14, fontSize: 15, color: '#111827', backgroundColor: '#f9fafb' },
-  methodRow: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' },
-  methodBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-    borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#f9fafb' },
-  methodActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  methodText: { fontSize: 13, color: '#6b7280', fontWeight: '500' },
-  methodActiveText: { color: '#fff', fontWeight: 'bold' },
-  confirmBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 50,
-    justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  label: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
+    textAlign: 'right',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+  // ستايل خاص للحقل عندما يكون فيه خطأ
+  inputError: {
+    borderColor: '#dc2626', // أحمر
+    borderWidth: 1.5,
+  },
+  // نص الخطأ الأحمر
+  errorText: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginTop: 4,
+    marginRight: 4,
+    textAlign: 'right',
+  },
+  confirmBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
   confirmText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   cancelBtn: { height: 44, justifyContent: 'center', alignItems: 'center' },
   cancelText: { color: '#9ca3af', fontSize: 14 },
