@@ -21,10 +21,13 @@ export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('الكل');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: products = [], refetch } = useQuery({
+  const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
     queryFn: async () => { const { data } = await api.get("/api/products"); return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); },
   });
+
+  // إخفاء المنتجات المنتهية
+  const products = allProducts.filter((p: any) => p.stock > 0);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
