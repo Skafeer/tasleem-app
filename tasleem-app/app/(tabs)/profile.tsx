@@ -47,19 +47,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Balance Card */}
-        <LinearGradient colors={[PRIMARY, '#0a5566']} style={s.balanceCard}>
-          <View style={s.balanceIcon}>
-            <Ionicons name="wallet-outline" size={28} color="#fff" />
-          </View>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={s.balanceLabel}>الرصيد المتاح للسحب</Text>
-            <Text style={s.balanceValue}>{(user?.balance || 0).toLocaleString()} د.ع</Text>
-          </View>
-          <TouchableOpacity style={s.withdrawBtn} onPress={() => router.push('/withdraw')}>
-            <Text style={s.withdrawBtnText}>سحب الأرباح</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        
 
         {/* Menu Items */}
         {menuItems.map(item => (
