@@ -273,7 +273,7 @@ export default function ProductDetailScreen() {
                 </TouchableOpacity>
                 <Text style={s.qtyVal}>{quantity}</Text>
                 <TouchableOpacity style={s.qtyBtn}
-                  onPress={() => setQuantity(q => String(Number(q) + 1))}>
+                  onPress={() => { const newQty = Number(quantity) + 1; if (newQty <= product.stock) { setQuantity(String(newQty)); } else { toast.warning(`المخزون المتوفر: ${product.stock}`); } }}>
                   <Ionicons name="add" size={20} color={PRIMARY} />
                 </TouchableOpacity>
               </View>
