@@ -18,7 +18,7 @@ const SECONDARY = '#f5a006';
 
 const generateProductCode = (id: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const seed = id * 12345 + 67890; // seed ثابت لنفس الـ ID
+  const seed = id * 12345 + 67890;
   let code = '';
   let tempSeed = seed;
   for (let i = 0; i < 5; i++) {
@@ -115,6 +115,12 @@ export default function ProductDetailScreen() {
     toast.success('تم النسخ ✅');
   };
 
+  const copyProductCode = () => {
+    const code = generateProductCode(product.id);
+    Clipboard.setString(code);
+    toast.success('تم نسخ الكود ✅');
+  };
+
   if (isLoading) return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <ActivityIndicator size="large" color={PRIMARY} />
@@ -156,7 +162,6 @@ export default function ProductDetailScreen() {
                 style={{ width, height: sliderHeight }} resizeMode="cover" />
             )} />
 
-          {/* Download */}
           <TouchableOpacity style={s.downloadBtn}
             onPress={() => Alert.alert('تحميل الصور', 'اختر خيار التحميل', [
               { text: 'تحميل هذه الصورة', onPress: () => Linking.openURL(images[activeImg]) },
@@ -166,7 +171,6 @@ export default function ProductDetailScreen() {
             <Ionicons name="download-outline" size={20} color="#fff" />
           </TouchableOpacity>
 
-          {/* Dots */}
           {images.length > 1 && (
             <View style={s.dots}>
               {images.map((_: any, i: number) => (
@@ -193,8 +197,15 @@ export default function ProductDetailScreen() {
 
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
-          <Text style={s.productCode}>رقم المنتج : #{generateProductCode(product.id)}</Text>
-          {/* <Text style={s.productId}>🔢 رقم المنتج: #{product.id}</Text> */}
+          
+          {/* كود المنتج تحت العنوان بالتنسيق الجميل */}
+          <View style={s.codeChip}>
+            <Text style={s.productCode}>رقم المنتج : #{generateProductCode(product.id)}</Text>
+            <TouchableOpacity onPress={copyProductCode} style={s.copyCodeBtn}>
+              <Ionicons name="copy-outline" size={18} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+
           <View style={s.catPill}><Text style={s.catText}>{product.category}</Text></View>
 
           {/* Info */}
@@ -385,8 +396,34 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3 },
   imgCounterText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   content: { padding: 14 },
-  productCode: { fontSize: 13, color: '#6b7280', marginTop: 4, fontWeight: '600', letterSpacing: 1 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 8 },
+  
+  // التنسيق الجميل للكود تحت العنوان
+  codeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: PRIMARY + '15', // خلفية PRIMARY بشفافية 15%
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 12,
+    alignSelf: 'flex-start', // هذا يخلّيها تاخد حجم المحتوى فقط وتبقى تحت النص
+  },
+  productCode: {
+    fontSize: 13,
+    color: PRIMARY,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginRight: 8,
+  },
+  copyCodeBtn: {
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  
   catPill: { backgroundColor: PRIMARY + '15', borderRadius: 9, paddingHorizontal: 11,
     paddingVertical: 4, alignSelf: 'flex-end', marginBottom: 14 },
   catText: { fontSize: 11, color: PRIMARY, fontWeight: 'bold' },
