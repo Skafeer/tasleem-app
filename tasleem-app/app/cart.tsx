@@ -159,7 +159,7 @@ export default function CartScreen() {
                     <Ionicons name="remove" size={16} color={PRIMARY} />
                   </TouchableOpacity>
                   <Text style={s.qtyVal}>{item.quantity}</Text>
-                  <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(item.productId, item.quantity + 1)}>
+                  <TouchableOpacity style={s.qtyBtn} onPress={() => { if (item.quantity < item.stock) { updateQty(item.productId, item.quantity + 1); } else { toast.warning(`المخزون المتوفر: ${item.stock}`); } }}>
                     <Ionicons name="add" size={16} color={PRIMARY} />
                   </TouchableOpacity>
                   <TouchableOpacity style={s.delBtn} onPress={() => removeItem(item.productId)}>
