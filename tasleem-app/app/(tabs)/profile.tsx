@@ -24,11 +24,11 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
-    { key: 'profile-edit', label: 'الملف الشخصي', icon: 'person-outline', route: '/profile-edit' },
-    { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', route: '/withdraw-history' },
-    { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', route: '/stats' },
-    { key: 'privacy', label: 'سياسة الخصوصية والشروط', icon: 'shield-checkmark-outline', route: '/privacy' },
-    { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', route: '/contact' },
+    { key: 'profile-edit', label: 'الملف الشخصي', icon: 'person-outline', color: '#3b82f6', bg: '#dbeafe', route: '/profile-edit' },
+    { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', color: '#8b5cf6', bg: '#ede9fe', route: '/withdraw-history' },
+    { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', color: '#10b981', bg: '#d1fae5', route: '/stats' },
+    { key: 'privacy', label: 'سياسة الخصوصية والشروط', icon: 'shield-checkmark-outline', color: '#f59e0b', bg: '#fef3c7', route: '/privacy' },
+    { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', color: '#06b6d4', bg: '#cffafe', route: '/contact' },
   ];
 
   return (
@@ -105,6 +105,7 @@ const s = StyleSheet.create({
   menuItem: { backgroundColor: '#fff', borderRadius: 14, padding: 16,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  iconBox: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   menuLabel: { flex: 1, fontSize: 15, color: '#374151', fontWeight: '500', textAlign: 'right' },
   logoutBtn: { backgroundColor: '#fef2f2', borderRadius: 14, padding: 16,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginTop: 10,
