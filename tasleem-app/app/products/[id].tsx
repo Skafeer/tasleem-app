@@ -193,8 +193,8 @@ export default function ProductDetailScreen() {
 
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
-          <Text style={s.productCode}>🏷️ #{generateProductCode(product.id)}</Text>
-          <Text style={s.productId}>🔢 رقم المنتج: #{product.id}</Text>
+          <Text style={s.productCode}>رقم المنتج : #{generateProductCode(product.id)}</Text>
+          {/* <Text style={s.productId}>🔢 رقم المنتج: #{product.id}</Text> */}
           <View style={s.catPill}><Text style={s.catText}>{product.category}</Text></View>
 
           {/* Info */}
