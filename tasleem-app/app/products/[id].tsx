@@ -98,7 +98,6 @@ export default function ProductDetailScreen() {
           sellingPrice: Number(sellingPrice),
           quantity: Number(quantity),
           promoCode: promoData ? promoCode : '',
-      router.push("/cart");
           promoDiscount: promoData?.discountPercent || 0,
         });
       }
