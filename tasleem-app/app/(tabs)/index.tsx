@@ -76,21 +76,24 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      {/* Categories - تم تعديل height ليعرض جميع التصنيفات */}
-      <FlatList 
-        horizontal 
-        data={categories}
-        showsHorizontalScrollIndicator={false}
-        style={s.catList}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}
-        keyExtractor={i => i}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[s.catBtn, activeCategory === item && s.catBtnActive]}
-            onPress={() => setActiveCategory(item)}>
-            <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
-          </TouchableOpacity>
-        )} />
+      {/* Categories - تعديل شامل لحل مشكلة الانضغاط */}
+      <View style={s.categoriesWrapper}>
+        <FlatList 
+          horizontal 
+          data={categories}
+          showsHorizontalScrollIndicator={false}
+          style={s.catList}
+          contentContainerStyle={s.catListContent}
+          keyExtractor={i => i}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[s.catBtn, activeCategory === item && s.catBtnActive]}
+              onPress={() => setActiveCategory(item)}>
+              <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          )} 
+        />
+      </View>
 
       {/* Products Grid */}
       <FlatList
@@ -185,15 +188,35 @@ const s = StyleSheet.create({
     marginHorizontal: 12, marginVertical: 8, borderRadius: 12, paddingHorizontal: 12,
     height: 42, borderWidth: 1, borderColor: '#e5e7eb', gap: 8 },
   searchInput: { flex: 1, fontSize: 13, color: '#111827' },
-  catList: { 
-    // تمت إزالة maxHeight: 44 حتى لا تنضغط التصنيفات
-    marginBottom: 4 
+  
+  // تعديل شامل لل categories
+  categoriesWrapper: {
+    marginBottom: 8,
+    minHeight: 50, // إعطاء ارتفاع كافي
   },
-  catBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
+  catList: {
+    flexGrow: 0, // منع التمدد
+  },
+  catListContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+    paddingVertical: 6, // إضافة padding عمودي
+  },
+  catBtn: { 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6', 
+    borderWidth: 1, 
+    borderColor: '#e5e7eb',
+    minWidth: 60, // عرض أدنى للأزرار
+    alignItems: 'center',
+  },
   catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  catText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  catText: { fontSize: 13, color: '#6b7280', fontWeight: '600' }, // تكبير الخط قليلاً
   catTextActive: { color: '#fff' },
+  
   card: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   imgBox: { width: '100%', position: 'relative' },
