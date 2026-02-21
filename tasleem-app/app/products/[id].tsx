@@ -36,8 +36,8 @@ export default function ProductDetailScreen() {
   const [showCart, setShowCart] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [promoCode, setPromoCode] = useState('');
-  const [promoData, setPromoData] = useState<any>(null);
+  
+  
   const [promoLoading, setPromoLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
@@ -63,7 +63,7 @@ export default function ProductDetailScreen() {
 
   const promoDiscount = promoData && sellingPrice
     ? (Number(sellingPrice) * promoData.discountPercent / 100) : 0;
-  const profit = sellingPrice ? Number(sellingPrice) - discountedPrice - promoDiscount : 0;
+  const profit = sellingPrice ? Number(sellingPrice) edPrice - promoDiscount : 0;
 
   const verifyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -97,8 +97,7 @@ export default function ProductDetailScreen() {
           wholesalePrice: discountedPrice,
           sellingPrice: Number(sellingPrice),
           quantity: Number(quantity),
-          promoCode: promoData ? promoCode : '',
-          promoDiscount: promoData?.discountPercent || 0,
+          
         });
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
