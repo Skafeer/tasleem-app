@@ -15,7 +15,6 @@ import { toast } from '../../src/lib/toast';
 const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
 
-
 const generateProductCode = (id: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const seed = id * 12345 + 67890;
@@ -36,9 +35,6 @@ export default function ProductDetailScreen() {
   const [showCart, setShowCart] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [promoCode, setPromoCode] = useState('');
-  const [promoData, setPromoData] = useState<any>(null);
-  const [promoLoading, setPromoLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
   const { data: product, isLoading } = useQuery({
@@ -61,23 +57,7 @@ export default function ProductDetailScreen() {
     ? product?.wholesalePrice * (1 - product?.discount / 100)
     : product?.wholesalePrice || 0;
 
-  const promoDiscount = promoData && sellingPrice
-    ? (Number(sellingPrice) * promoData.discountPercent / 100) : 0;
-  const profit = sellingPrice ? Number(sellingPrice) - discountedPrice - promoDiscount : 0;
-
-  const verifyPromo = async () => {
-    if (!promoCode.trim()) return;
-    setPromoLoading(true);
-    try {
-      const { data } = await api.post('/api/promo-codes/verify', { code: promoCode });
-      setPromoData(data);
-      toast.success(`كود صحيح! خصم ${data.discountPercent}% ✅`);
-    } catch {
-      setPromoData(null);
-      toast.error('كود غير صحيح أو منتهي الصلاحية');
-    }
-    setPromoLoading(false);
-  };
+  const profit = sellingPrice ? Number(sellingPrice) - discountedPrice : 0;
 
   const addToCart = async () => {
     if (!sellingPrice || Number(sellingPrice) < product.sellingPriceMin) {
@@ -97,8 +77,6 @@ export default function ProductDetailScreen() {
           wholesalePrice: discountedPrice,
           sellingPrice: Number(sellingPrice),
           quantity: Number(quantity),
-          promoCode: promoData ? promoCode : '',
-          promoDiscount: promoData?.discountPercent || 0,
         });
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
@@ -107,7 +85,6 @@ export default function ProductDetailScreen() {
       setTimeout(() => router.push('/cart'), 100);
       setShowCart(false);
       setSellingPrice(''); setQuantity('1');
-      setPromoCode(''); setPromoData(null);
     } catch { toast.error('فشل الإضافة إلى السلة'); }
   };
 
@@ -271,7 +248,7 @@ export default function ProductDetailScreen() {
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <View style={s.modalHeader}>
-              <TouchableOpacity onPress={() => { setShowCart(false); setPromoCode(''); setPromoData(null); }}>
+              <TouchableOpacity onPress={() => { setShowCart(false); }}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
               <Text style={s.modalTitle}>تحديد السعر والكمية</Text>
@@ -306,29 +283,6 @@ export default function ProductDetailScreen() {
                 </TouchableOpacity>
               </View>
 
-              <Text style={s.inputLabel}>كود الخصم (اختياري)</Text>
-              <View style={s.promoRow}>
-                <TouchableOpacity
-                  style={[s.promoVerifyBtn, promoLoading && { opacity: 0.6 }]}
-                  onPress={verifyPromo} disabled={promoLoading}>
-                  {promoLoading
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Text style={s.promoVerifyText}>تحقق</Text>}
-                </TouchableOpacity>
-                <TextInput style={s.promoInput}
-                  placeholder="أدخل كود الخصم"
-                  value={promoCode}
-                  onChangeText={v => { setPromoCode(v.toUpperCase()); setPromoData(null); }}
-                  textAlign="right" placeholderTextColor="#9ca3af"
-                  autoCapitalize="characters" />
-              </View>
-              {promoData && (
-                <View style={s.promoSuccess}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                  <Text style={s.promoSuccessText}>خصم {promoData.discountPercent}% مطبق ✅</Text>
-                </View>
-              )}
-
               <View style={s.summary}>
                 <View style={s.summaryRow}>
                   <Text style={s.summaryVal}>{Math.round(discountedPrice).toLocaleString()} د.ع</Text>
@@ -338,14 +292,6 @@ export default function ProductDetailScreen() {
                   <View style={s.summaryRow}>
                     <Text style={s.summaryVal}>{Number(sellingPrice).toLocaleString()} د.ع</Text>
                     <Text style={s.summaryLabel}>سعر البيع</Text>
-                  </View>
-                )}
-                {promoData && sellingPrice && (
-                  <View style={s.summaryRow}>
-                    <Text style={[s.summaryVal, { color: '#ef4444' }]}>
-                      -{Math.round(promoDiscount).toLocaleString()} د.ع
-                    </Text>
-                    <Text style={s.summaryLabel}>خصم الكود</Text>
                   </View>
                 )}
                 <View style={[s.summaryRow, s.summaryTotal]}>
@@ -404,13 +350,13 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: PRIMARY + '15', // خلفية PRIMARY بشفافية 15%
+    backgroundColor: PRIMARY + '15',
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
     marginTop: 4,
     marginBottom: 12,
-    alignSelf: 'flex-start', // هذا يخلّيها تاخد حجم المحتوى فقط وتبقى تحت النص
+    alignSelf: 'flex-start',
   },
   productCode: {
     fontSize: 13,
@@ -472,15 +418,6 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center' },
   qtyVal: { fontSize: 22, fontWeight: 'bold', color: '#111827',
     minWidth: 36, textAlign: 'center' },
-  promoRow: { flexDirection: 'row', gap: 9 },
-  promoInput: { flex: 1, borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    padding: 11, fontSize: 13, color: '#111827', backgroundColor: '#f9fafb' },
-  promoVerifyBtn: { backgroundColor: SECONDARY, borderRadius: 12,
-    paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center' },
-  promoVerifyText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  promoSuccess: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6,
-    backgroundColor: '#ecfdf5', borderRadius: 9, padding: 9, marginTop: 7 },
-  promoSuccessText: { fontSize: 12, color: '#10b981', fontWeight: '600' },
   summary: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginTop: 14 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
   summaryTotal: { borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8, marginTop: 4 },
