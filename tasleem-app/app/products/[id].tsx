@@ -103,7 +103,8 @@ export default function ProductDetailScreen() {
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
       toast.success('تمت الإضافة إلى السلة ✅');
-      router.push('/cart');
+      // انتظر قليلاً للتأكد من الحفظ
+      setTimeout(() => router.push('/cart'), 100);
       setShowCart(false);
       setSellingPrice(''); setQuantity('1');
       setPromoCode(''); setPromoData(null);
