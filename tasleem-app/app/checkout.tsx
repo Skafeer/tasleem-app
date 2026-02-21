@@ -183,7 +183,7 @@ export default function CheckoutScreen() {
 
         <Text style={s.label}>العنوان التفصيلي *</Text>
         <TextInput style={[s.input, { height: 70 }]}
-          placeholder="مثال: قرب جامع الرحمن، بناية 15، شقة 3"
+          placeholder="مثال: قرب جامع الرحمن،"
           value={address} onChangeText={setAddress} multiline
           textAlign="right" placeholderTextColor="#9ca3af" />
 
