@@ -76,8 +76,10 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
-      {/* Categories */}
-      <FlatList horizontal data={categories}
+      {/* Categories - تم تعديل height ليعرض جميع التصنيفات */}
+      <FlatList 
+        horizontal 
+        data={categories}
         showsHorizontalScrollIndicator={false}
         style={s.catList}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center' }}
@@ -183,7 +185,10 @@ const s = StyleSheet.create({
     marginHorizontal: 12, marginVertical: 8, borderRadius: 12, paddingHorizontal: 12,
     height: 42, borderWidth: 1, borderColor: '#e5e7eb', gap: 8 },
   searchInput: { flex: 1, fontSize: 13, color: '#111827' },
-  catList: { maxHeight: 44, marginBottom: 4 },
+  catList: { 
+    // تمت إزالة maxHeight: 44 حتى لا تنضغط التصنيفات
+    marginBottom: 4 
+  },
   catBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
     backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
   catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
