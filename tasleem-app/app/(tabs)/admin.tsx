@@ -733,7 +733,7 @@ export default function AdminScreen() {
                   </View>
                   <View style={{flex:1}}>
                     <Text style={s.toggleText}>قابل للتجديد</Text>
-                    <Text style={s.toggleSubText}>يسمح للتجار بتجديد الطلب تلقائياً</Text>
+                    <Text style={s.toggleSubText}>يتجدد لاحقًا</Text>
                   </View>
                   <Ionicons name="refresh-circle-outline" size={22} color={form.isRenewable?SUCCESS:'#9ca3af'}/>
                 </TouchableOpacity>
