@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, ActivityIndicator, Image, RefreshControl, Alert,
-  useWindowDimensions, KeyboardAvoidingView, Platform
+  useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -552,10 +552,8 @@ export default function AdminScreen() {
 
       {/* ═══════════════ ADD / EDIT PRODUCT MODAL ═══════════════ */}
       {(showAddProduct || showEditProduct) && (
-        <Modal visible transparent animationType="slide">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={s.modalOverlay}>
+        <Modal visible transparent animationType="slide" onRequestClose={()=>{setShowAddProduct(false);setShowEditProduct(null);resetForm();}}>
+          <View style={s.modalOverlay}>
             <View style={s.modalCard}>
 
               {/* Modal Header */}
@@ -570,6 +568,7 @@ export default function AdminScreen() {
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 contentContainerStyle={s.modalScrollContent}
                 nestedScrollEnabled={true}>
 
@@ -756,15 +755,13 @@ export default function AdminScreen() {
               </TouchableOpacity>
 
             </View>
-          </KeyboardAvoidingView>
+          </View>
         </Modal>
       )}
 
       {/* ═══════════════ ADD PROMO MODAL ═══════════════ */}
-      <Modal visible={showAddPromo} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={s.modalOverlay}>
+      <Modal visible={showAddPromo} transparent animationType="slide" onRequestClose={()=>setShowAddPromo(false)}>
+        <View style={s.modalOverlay}>
           <View style={[s.modalCard, {maxHeight: height * 0.55}]}>
 
             <LinearGradient colors={[SECONDARY,'#e09000']} style={s.modalHeaderGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
@@ -778,6 +775,7 @@ export default function AdminScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               contentContainerStyle={s.modalScrollContent}
               nestedScrollEnabled={true}>
 
@@ -820,7 +818,7 @@ export default function AdminScreen() {
 
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
     </SafeAreaView>
