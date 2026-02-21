@@ -144,7 +144,10 @@ export default function CheckoutScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-        <Text style={s.sectionTitle}>📋 معلومات الزبون</Text>
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="person-outline" size={20} color={PRIMARY} />
+          <Text style={s.sectionTitle}>معلومات الزبون</Text>
+        </View>
         
         <Text style={s.label}>اسم الزبون *</Text>
         <TextInput style={s.input} placeholder="أدخل الاسم الكامل"
@@ -190,7 +193,10 @@ export default function CheckoutScreen() {
           value={notes} onChangeText={setNotes} multiline
           textAlign="right" placeholderTextColor="#9ca3af" />
 
-        <Text style={s.sectionTitle}>🎁 كود الخصم</Text>
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="pricetag-outline" size={20} color={PRIMARY} />
+          <Text style={s.sectionTitle}>كود الخصم</Text>
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity style={s.promoBtn}
             onPress={() => promoCode.trim() && verifyPromo.mutate(promoCode)}
@@ -211,7 +217,10 @@ export default function CheckoutScreen() {
         )}
 
         <View style={s.summary}>
-          <Text style={s.summaryTitle}>📊 ملخص الطلب</Text>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="receipt-outline" size={20} color={PRIMARY} />
+          <Text style={s.summaryTitle}>ملخص الطلب</Text>
+        </View>
           <View style={s.summaryRow}>
             <Text style={s.summaryVal}>{subtotal.toLocaleString()} د.ع</Text>
             <Text style={s.summaryLabel}>المجموع الفرعي</Text>
