@@ -177,13 +177,14 @@ export default function AdminScreen() {
   };
 
   const handleSaveProduct = () => {
-    if (!form.name || !form.wholesalePrice || !form.sellingPriceMin) {
-      toast.warning('يرجى ملء الحقول المطلوبة'); return;
+    if (!form.name || !form.companyWholesalePrice || !form.wholesalePrice || !form.sellingPriceMin) {
+      toast.warning('يرجى ملء جميع الحقول المطلوبة (سعر الشركة، سعر الجملة، أدنى سعر بيع)'); return;
     }
     if (form.images.length === 0) { toast.warning('يرجى إضافة صورة واحدة على الأقل'); return; }
     saveProduct.mutate({
       name:form.name, description:form.description,
-      wholesalePrice:Number(form.wholesalePrice),
+      companyWholesalePrice:Number(form.companyWholesalePrice),
+        wholesalePrice:Number(form.wholesalePrice),
       sellingPriceMin:Number(form.sellingPriceMin),
       category:form.category,
       imageUrl:form.images[0],
@@ -221,6 +222,7 @@ export default function AdminScreen() {
         </View>
         <View style={s.headerCenter}>
           <Text style={s.headerTitle}>لوحة الإدارة</Text>
+                  </View>
           <Text style={s.headerSub}>مرحباً مدير النظام 👋</Text>
         </View>
         <TouchableOpacity style={[s.headerIconBox, {backgroundColor:'rgba(255,255,255,0.15)'}]} onPress={onRefresh}>
@@ -396,7 +398,11 @@ export default function AdminScreen() {
                   {p.description ? (
                     <Text style={s.productDesc} numberOfLines={2}>{p.description}</Text>
                   ) : null}
-                  <Text style={s.productPrice}>
+                  <View style={{marginTop:4}}>
+                    <Text style={{fontSize:11, color:"#9ca3af", textAlign:"right"}}>
+                      🏭 سعر الشركة: {p.companyWholesalePrice?.toLocaleString()} د.ع
+                    </Text>
+                    <Text style={s.productPrice}>
                     جملة: {p.wholesalePrice?.toLocaleString()} د.ع{'\n'}أدنى بيع: {p.sellingPriceMin?.toLocaleString()} د.ع
                   </Text>
                   <View style={{flexDirection:'row', gap:5, marginTop:5, flexWrap:'wrap'}}>
@@ -407,7 +413,6 @@ export default function AdminScreen() {
                         📦 {p.stock}
                       </Text>
                     </View>
-                  </View>
                 </View>
                 <View style={s.productActions}>
                   <TouchableOpacity style={s.editBtn} onPress={()=>openEdit(p)}>
@@ -634,7 +639,17 @@ export default function AdminScreen() {
                 {/* ── الأسعار ── */}
                 <View style={s.rowInputs}>
                   <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>💲 سعر الجملة *</Text>
+                    <Text style={s.inputLabel}>🏭 سعر الشركة (الكلفة) *</Text>
+                <TextInput
+                  style={s.modalInput}
+                  placeholder="0"
+                  value={form.companyWholesalePrice}
+                  onChangeText={v=>setForm(p=>({...p,companyWholesalePrice:v}))}
+                  keyboardType="numeric"
+                  textAlign="right"
+                  placeholderTextColor="#9ca3af"/>
+
+                <Text style={s.inputLabel}>💲 سعر الجملة للتاجر *</Text>
                     <TextInput
                       style={s.modalInput}
                       placeholder="0"
@@ -658,7 +673,16 @@ export default function AdminScreen() {
                 </View>
 
                 {/* معاينة الربح */}
-                {form.wholesalePrice && form.sellingPriceMin && (
+                {form.companyWholesalePrice && form.wholesalePrice && form.sellingPriceMin && (
+                  <View style={s.profitPreview}>
+                    <Ionicons name="business-outline" size={16} color={PRIMARY}/>
+                    <Text style={s.profitPreviewText}>
+                      هامش ربح الشركة: <Text style={{color:PRIMARY, fontWeight:"bold"}}>
+                        {(Number(form.wholesalePrice)-Number(form.companyWholesalePrice)).toLocaleString()} د.ع
+                      </Text>
+                    </Text>
+                  </View>
+
                   <View style={s.profitPreview}>
                     <Ionicons name="calculator-outline" size={16} color={SUCCESS}/>
                     <Text style={s.profitPreviewText}>
