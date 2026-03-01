@@ -14,6 +14,7 @@ import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
+const SUCCESS = '#10b981';
 
 const generateProductCode = (id: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -81,7 +82,6 @@ export default function ProductDetailScreen() {
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
       toast.success('تمت الإضافة إلى السلة ✅');
-      // انتظر قليلاً للتأكد من الحفظ
       setTimeout(() => router.push('/cart'), 100);
       setShowCart(false);
       setSellingPrice(''); setQuantity('1');
@@ -163,12 +163,19 @@ export default function ProductDetailScreen() {
           )}
 
           {product.isRenewable && (
-            <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>
+            <View style={s.renewBadge}>
+              <Ionicons name="refresh-outline" size={12} color="#fff" />
+              <Text style={s.renewText}>قابل للتجديد</Text>
+            </View>
           )}
           {hasDiscount && (
-            <View style={s.discountBadge}><Text style={s.discountText}>خصم {product.discount}%</Text></View>
+            <View style={s.discountBadge}>
+              <Ionicons name="pricetag-outline" size={12} color="#fff" />
+              <Text style={s.discountText}>خصم {product.discount}%</Text>
+            </View>
           )}
           <View style={s.imgCounter}>
+            <Ionicons name="images-outline" size={12} color="#fff" />
             <Text style={s.imgCounterText}>{activeImg + 1}/{images.length}</Text>
           </View>
         </View>
@@ -176,40 +183,60 @@ export default function ProductDetailScreen() {
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
           
-          {/* كود المنتج تحت العنوان بالتنسيق الجميل */}
+          {/* كود المنتج تحت العنوان */}
           <View style={s.codeChip}>
-            <Text style={s.productCode}>رقم المنتج : #{generateProductCode(product.id)}</Text>
+            <Ionicons name="barcode-outline" size={16} color={PRIMARY} />
+            <Text style={s.productCode}>#{generateProductCode(product.id)}</Text>
             <TouchableOpacity onPress={copyProductCode} style={s.copyCodeBtn}>
-              <Ionicons name="copy-outline" size={18} color={PRIMARY} />
+              <Ionicons name="copy-outline" size={16} color={PRIMARY} />
             </TouchableOpacity>
           </View>
 
-          <View style={s.catPill}><Text style={s.catText}>{product.category}</Text></View>
+          <View style={s.catPill}>
+            <Ionicons name="pricetags-outline" size={12} color={PRIMARY} />
+            <Text style={s.catText}>{product.category}</Text>
+          </View>
 
-          {/* Info */}
+          {/* Info Grid - تم التعديل: 3 أعمدة */}
           <View style={s.infoGrid}>
+            {/* المخزون */}
             <View style={s.infoBox}>
+              <Ionicons name="cube-outline" size={20} color="#9ca3af" />
               <Text style={s.infoLabel}>المخزون</Text>
               <Text style={[s.infoVal, product.stock < 5 && { color: '#ef4444' }]}>
-                {product.stock} قطعة
+                {product.stock}
               </Text>
             </View>
-            <View style={[s.infoBox, { borderRightWidth: 1, borderRightColor: '#e5e7eb' }]}>
-              {hasDiscount && (
-                <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
-                <Text style={s.suggestedPrice}>💡 السعر المقترح: {(product.suggestedPrice || product.wholesalePrice).toLocaleString()} د.ع</Text>
-              )}
+
+            {/* السعر المقترح - مربع جديد باللون الأخضر */}
+            <View style={[s.infoBox, s.suggestedBox]}>
+              <Ionicons name="trending-up-outline" size={20} color={SUCCESS} />
+              <Text style={s.infoLabel}>السعر المقترح</Text>
+              <Text style={[s.infoVal, { color: SUCCESS }]}>
+                {(product.suggestedPrice || product.wholesalePrice).toLocaleString()}
+              </Text>
+            </View>
+
+            {/* سعر الجملة */}
+            <View style={s.infoBox}>
+              <Ionicons name="pricetag-outline" size={20} color={PRIMARY} />
               <Text style={s.infoLabel}>سعر الجملة</Text>
               <Text style={[s.infoVal, { color: PRIMARY }]}>
-                {Math.round(discountedPrice).toLocaleString()} د.ع
+                {Math.round(discountedPrice).toLocaleString()}
               </Text>
+              {hasDiscount && (
+                <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()}</Text>
+              )}
             </View>
           </View>
 
           {/* Ad Links */}
           {adLinks.length > 0 && (
             <View style={s.section}>
-              <Text style={s.sectionTitle}>🔗 الروابط الإعلانية</Text>
+              <View style={s.sectionHeader}>
+                <Ionicons name="link-outline" size={18} color={PRIMARY} />
+                <Text style={s.sectionTitle}>الروابط الإعلانية</Text>
+              </View>
               {adLinks.map((link: string, i: number) => (
                 <TouchableOpacity key={i} style={s.adLink}
                   onPress={() => Linking.openURL(link.trim())}>
@@ -228,7 +255,8 @@ export default function ProductDetailScreen() {
                 <TouchableOpacity onPress={() => copyText(product.description)} style={s.copyBtn}>
                   <Ionicons name="copy-outline" size={18} color={PRIMARY} />
                 </TouchableOpacity>
-                <Text style={s.sectionTitle}>📋 المواصفات</Text>
+                <Ionicons name="document-text-outline" size={18} color={PRIMARY} />
+                <Text style={s.sectionTitle}>المواصفات</Text>
               </View>
               <Text style={s.description}>{product.description}</Text>
             </View>
@@ -259,7 +287,7 @@ export default function ProductDetailScreen() {
               <Text style={s.inputLabel}>سعر البيع (د.ع) *</Text>
               <View style={s.priceInputBox}>
                 <View style={s.profitBox}>
-                  <Text style={[s.profitVal, { color: profit >= 0 ? '#10b981' : '#ef4444' }]}>
+                  <Text style={[s.profitVal, { color: profit >= 0 ? SUCCESS : '#ef4444' }]}>
                     {profit > 0 ? '+' : ''}{Math.round(profit).toLocaleString()}
                   </Text>
                   <Text style={s.profitLabel}>الربح</Text>
@@ -297,7 +325,7 @@ export default function ProductDetailScreen() {
                 )}
                 <View style={[s.summaryRow, s.summaryTotal]}>
                   <Text style={[s.summaryVal,
-                    { color: profit >= 0 ? '#10b981' : '#ef4444', fontWeight: 'bold', fontSize: 16 }]}>
+                    { color: profit >= 0 ? SUCCESS : '#ef4444', fontWeight: 'bold', fontSize: 16 }]}>
                     {Math.round(profit).toLocaleString()} د.ع
                   </Text>
                   <Text style={[s.summaryLabel, { fontWeight: 'bold' }]}>صافي الربح</Text>
@@ -334,23 +362,26 @@ const s = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { width: 18, backgroundColor: '#fff' },
   renewBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: '#166534',
-    borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4 },
+    borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 4 },
   renewText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   discountBadge: { position: 'absolute', top: 48, right: 12, backgroundColor: SECONDARY,
-    borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4 },
+    borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 4 },
   discountText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   imgCounter: { position: 'absolute', bottom: 12, right: 12,
     backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 9,
-    paddingHorizontal: 8, paddingVertical: 3 },
+    paddingHorizontal: 8, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 4 },
   imgCounterText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   content: { padding: 14 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 8 },
   
-  // التنسيق الجميل للكود تحت العنوان
+  // كود المنتج
   codeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
     backgroundColor: PRIMARY + '15',
     borderRadius: 20,
     paddingVertical: 6,
@@ -364,7 +395,6 @@ const s = StyleSheet.create({
     color: PRIMARY,
     fontWeight: '600',
     letterSpacing: 1,
-    marginRight: 8,
   },
   copyCodeBtn: {
     padding: 4,
@@ -373,23 +403,59 @@ const s = StyleSheet.create({
   },
   
   catPill: { backgroundColor: PRIMARY + '15', borderRadius: 9, paddingHorizontal: 11,
-    paddingVertical: 4, alignSelf: 'flex-end', marginBottom: 14 },
+    paddingVertical: 4, alignSelf: 'flex-end', marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 4 },
   catText: { fontSize: 11, color: PRIMARY, fontWeight: 'bold' },
-  infoGrid: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 14,
-    padding: 14, marginBottom: 12, shadowColor: '#000',
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  infoBox: { flex: 1, alignItems: 'center' },
-  infoLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
-  infoVal: { fontSize: 17, fontWeight: 'bold', color: '#111827' },
-  suggestedPrice: { fontSize: 14, color: '#10b981', fontWeight: '600', textAlign: 'right', marginTop: 4 },
-  oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through', textAlign: 'center' },
+  
+  // Info Grid - تم التعديل إلى 3 أعمدة
+  infoGrid: { 
+    flexDirection: 'row', 
+    backgroundColor: '#fff', 
+    borderRadius: 14,
+    padding: 14, 
+    marginBottom: 12, 
+    shadowColor: '#000',
+    shadowOpacity: 0.04, 
+    shadowRadius: 6, 
+    elevation: 2,
+    gap: 8,
+  },
+  infoBox: { 
+    flex: 1, 
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 10,
+  },
+  suggestedBox: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  infoLabel: { 
+    fontSize: 11, 
+    color: '#9ca3af', 
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  infoVal: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: '#111827' 
+  },
+  oldPrice: { 
+    fontSize: 10, 
+    color: '#9ca3af', 
+    textDecorationLine: 'line-through', 
+    marginTop: 2 
+  },
+  
   section: { backgroundColor: '#fff', borderRadius: 14, padding: 14,
     marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginRight: 4 },
   copyBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: PRIMARY + '12',
-    justifyContent: 'center', alignItems: 'center' },
+    justifyContent: 'center', alignItems: 'center', marginLeft: 'auto' },
   description: { fontSize: 13, color: '#374151', lineHeight: 21, textAlign: 'right' },
   adLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
     backgroundColor: '#f0f9ff', borderRadius: 9, padding: 9, marginBottom: 7 },
