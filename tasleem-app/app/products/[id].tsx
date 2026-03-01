@@ -197,6 +197,7 @@ export default function ProductDetailScreen() {
             <View style={[s.infoBox, { borderRightWidth: 1, borderRightColor: '#e5e7eb' }]}>
               {hasDiscount && (
                 <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
+                <Text style={s.suggestedPrice}>💡 السعر المقترح: {(product.suggestedPrice || product.wholesalePrice).toLocaleString()} د.ع</Text>
               )}
               <Text style={s.infoLabel}>سعر الجملة</Text>
               <Text style={[s.infoVal, { color: PRIMARY }]}>
@@ -380,6 +381,7 @@ const s = StyleSheet.create({
   infoBox: { flex: 1, alignItems: 'center' },
   infoLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
   infoVal: { fontSize: 17, fontWeight: 'bold', color: '#111827' },
+  suggestedPrice: { fontSize: 14, color: '#10b981', fontWeight: '600', textAlign: 'right', marginTop: 4 },
   oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through', textAlign: 'center' },
   section: { backgroundColor: '#fff', borderRadius: 14, padding: 14,
     marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
