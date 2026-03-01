@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal, ActivityIndicator, Image, RefreshControl, Alert,
-  useWindowDimensions
+  useWindowDimensions, FlatList, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,496 @@ const W_STATUS: any = {
 
 const CATEGORIES = ['إلكترونيات','ملابس','مستحضرات','أجهزة منزلية','رياضة','ألعاب','أخرى'];
 
+// ==================== PRODUCTS TAB ====================
+function ProductsTab() {
+  const qc = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [form, setForm] = useState({
+    name: '', description: '', category: 'إلكترونيات', 
+    companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
+    stock: '10', discount: '0', adLinks: '', images: [] as string[],
+    isRenewable: false,
+  });
+  const [uploadingImgs, setUploadingImgs] = useState(false);
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['admin-products'],
+    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
+  });
+
+  const pickAndUploadImage = async () => {
+    if (form.images.length >= 10) { toast.warning('الحد الأقصى 10 صور'); return; }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast.error('يرجى السماح بالوصول للصور'); return; }
+    
+    const result = await ImagePicker.launchImageLibraryAsync({ 
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      allowsMultipleSelection: true,
+      selectionLimit: 10 - form.images.length,
+      quality: 0.8,
+      base64: true,
+    });
+    
+    if (result.canceled) return;
+    setUploadingImgs(true);
+    
+    try {
+      const urls: string[] = [];
+      for (const asset of result.assets) {
+        const base64 = `data:image/jpeg;base64,${asset.base64}`;
+        const { data } = await api.post('/api/upload', { image: base64 });
+        urls.push(data.url);
+      }
+      setForm(p => ({ ...p, images: [...p.images, ...urls].slice(0, 10) }));
+      toast.success(`تم رفع ${urls.length} صورة ✅`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'فشل رفع الصور');
+    } finally { 
+      setUploadingImgs(false); 
+    }
+  };
+
+  const saveProduct = useMutation({
+    mutationFn: async (data: any) => {
+      if (editingProduct) {
+        const res = await api.put(`/api/products/${editingProduct.id}`, data);
+        return res.data;
+      } else {
+        const res = await api.post('/api/products', data);
+        return res.data;
+      }
+    },
+    onSuccess: () => {
+      toast.success(editingProduct ? 'تم التحديث ✅' : 'تمت الإضافة ✅');
+      qc.invalidateQueries({ queryKey: ['admin-products'] });
+      setShowModal(false);
+      resetForm();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل الحفظ'),
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: async (id: number) => { await api.delete(`/api/products/${id}`); },
+    onSuccess: () => { 
+      toast.success('تم الحذف ✅'); 
+      qc.invalidateQueries({ queryKey: ['admin-products'] }); 
+    },
+  });
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast.warning('يرجى إدخال اسم المنتج'); return; }
+    if (!form.companyWholesalePrice || Number(form.companyWholesalePrice) <= 0) { 
+      toast.warning('سعر الشركة مطلوب'); 
+      return; 
+    }
+    if (!form.wholesalePrice || Number(form.wholesalePrice) <= 0) { 
+      toast.warning('سعر التاجر مطلوب'); 
+      return; 
+    }
+    if (!form.suggestedPrice || Number(form.suggestedPrice) <= 0) { 
+      toast.warning('السعر المقترح مطلوب'); 
+      return; 
+    }
+    if (!form.stock || Number(form.stock) < 0) { 
+      toast.warning('المخزون مطلوب'); 
+      return; 
+    }
+    if (form.images.length === 0) { 
+      toast.warning('يرجى إضافة صورة واحدة على الأقل'); 
+      return; 
+    }
+
+    const minPrice = form.sellingPriceMin.trim() 
+      ? Number(form.sellingPriceMin) 
+      : Number(form.wholesalePrice);
+
+    saveProduct.mutate({
+      name: form.name, 
+      description: form.description, 
+      category: form.category || 'إلكترونيات',
+      companyWholesalePrice: Number(form.companyWholesalePrice),
+      wholesalePrice: Number(form.wholesalePrice), 
+      suggestedPrice: Number(form.suggestedPrice),
+      sellingPriceMin: minPrice,
+      stock: Number(form.stock), 
+      discount: Number(form.discount) || 0,
+      adLinks: form.adLinks, 
+      imageUrl: form.images[0],
+      images: form.images.join(','),
+      isRenewable: form.isRenewable,
+    });
+  };
+
+  const resetForm = () => {
+    setForm({ 
+      name: '', description: '', category: 'إلكترونيات', 
+      companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
+      stock: '10', discount: '0', adLinks: '', images: [],
+      isRenewable: false,
+    });
+    setEditingProduct(null);
+  };
+
+  const openEdit = (p: any) => {
+    setEditingProduct(p);
+    const imgs = p.images ? p.images.split(',').filter(Boolean) : (p.imageUrl ? [p.imageUrl] : []);
+    setForm({
+      name: p.name, 
+      description: p.description || '', 
+      category: p.category || 'إلكترونيات',
+      companyWholesalePrice: String(p.companyWholesalePrice || p.wholesalePrice || ''),
+      wholesalePrice: String(p.wholesalePrice || ''), 
+      suggestedPrice: String(p.suggestedPrice || p.wholesalePrice || ''),
+      sellingPriceMin: String(p.sellingPriceMin || ''),
+      stock: String(p.stock || '10'),
+      discount: String(p.discount || '0'), 
+      adLinks: p.adLinks || '',
+      images: imgs,
+      isRenewable: p.isRenewable || false,
+    });
+    setShowModal(true);
+  };
+
+  // حساب الربح المتوقع
+  const calculateProfit = () => {
+    if (form.wholesalePrice && form.suggestedPrice) {
+      return Number(form.suggestedPrice) - Number(form.wholesalePrice);
+    }
+    return 0;
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={products}
+        keyExtractor={i => i.id.toString()}
+        contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+        ListHeaderComponent={
+          <TouchableOpacity style={s.addBtn} onPress={() => { resetForm(); setShowModal(true); }}>
+            <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.addBtnGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
+              <Ionicons name="add-circle-outline" size={20} color="#fff" />
+              <Text style={s.addBtnText}>إضافة منتج جديد</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        }
+        ListEmptyComponent={
+          <View style={s.emptyBox}>
+            <Ionicons name="cube-outline" size={52} color="#d1d5db"/>
+            <Text style={s.emptyTitle}>لا توجد منتجات</Text>
+            <Text style={s.emptyText}>ابدأ بإضافة أول منتج</Text>
+          </View>
+        }
+        renderItem={({ item: p }) => {
+          const imgs = p.images ? p.images.split(',').filter(Boolean) : (p.imageUrl?[p.imageUrl]:[]);
+          return (
+            <View style={s.productCard}>
+              {imgs[0]
+                ? <Image source={{uri:imgs[0]}} style={s.productImg} resizeMode="cover"/>
+                : <View style={[s.productImg, {backgroundColor:'#f3f4f6', justifyContent:'center', alignItems:'center'}]}>
+                    <Ionicons name="image-outline" size={28} color="#d1d5db"/>
+                  </View>
+              }
+              <View style={s.productInfo}>
+                <View style={s.productCatPill}>
+                  <Text style={s.productCatText}>{p.category || 'عام'}</Text>
+                </View>
+                <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
+                
+                {/* الأسعار - النقطة الرئيسية الجديدة */}
+                <View style={{marginTop: 6, gap: 4}}>
+                  <Text style={s.productPrice}>
+                    <Text style={{color: '#6b7280'}}>🏢 سعر الشركة: </Text>
+                    <Text style={{color: '#374151', fontWeight: '600'}}>{(p.companyWholesalePrice || 0).toLocaleString()} د.ع</Text>
+                  </Text>
+                  <Text style={s.productPrice}>
+                    <Text style={{color: '#6b7280'}}>💼 سعر التاجر: </Text>
+                    <Text style={{color: '#374151', fontWeight: '600'}}>{p.wholesalePrice?.toLocaleString()} د.ع</Text>
+                  </Text>
+                  <Text style={s.productPrice}>
+                    <Text style={{color: '#6b7280'}}>💰 سعر مقترح: </Text>
+                    <Text style={{color: '#f5a006', fontWeight: '600'}}>{(p.suggestedPrice || p.wholesalePrice).toLocaleString()} د.ع</Text>
+                  </Text>
+                  <Text style={s.productPrice}>
+                    <Text style={{color: '#6b7280'}}>📉 الحد الأدنى: </Text>
+                    <Text style={{color: '#ef4444', fontWeight: '600'}}>{p.sellingPriceMin?.toLocaleString()} د.ع</Text>
+                  </Text>
+                </View>
+                
+                <View style={{flexDirection:'row', gap:5, marginTop:8, flexWrap:'wrap'}}>
+                  {p.isRenewable && <View style={s.renewPill}><Text style={s.renewText}>🔄 تجديد</Text></View>}
+                  {p.discount > 0 && <View style={s.discPill}><Text style={s.discText}>🏷️ {p.discount}%</Text></View>}
+                  <View style={[s.stockPill, {backgroundColor: p.stock < 5 ? '#fef2f2' : '#f0fdf4'}]}>
+                    <Text style={[s.stockText, {color: p.stock < 5 ? DANGER : SUCCESS}]}>
+                      📦 {p.stock}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={s.productActions}>
+                <TouchableOpacity style={s.editBtn} onPress={() => openEdit(p)}>
+                  <Ionicons name="create-outline" size={17} color={PRIMARY}/>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.delBtn}
+                  onPress={() => Alert.alert('حذف المنتج','هل أنت متأكد من حذف هذا المنتج؟',[
+                    {text:'إلغاء',style:'cancel'},
+                    {text:'حذف',style:'destructive',onPress:() => deleteProduct.mutate(p.id)},
+                  ])}>
+                  <Ionicons name="trash-outline" size={17} color={DANGER}/>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }}
+      />
+
+      {/* Modal إضافة/تعديل المنتج */}
+      <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetForm(); }}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, {maxHeight: '92%'}]}>
+            
+            {/* Modal Header */}
+            <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.modalHeaderGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
+              <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
+                <Ionicons name="close" size={22} color="rgba(255,255,255,0.8)"/>
+              </TouchableOpacity>
+              <Text style={s.modalTitle}>{editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</Text>
+              <Ionicons name={editingProduct ? 'create-outline' : 'cube-outline'} size={22} color="rgba(255,255,255,0.8)"/>
+            </LinearGradient>
+
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex:1}}>
+              <ScrollView 
+                ref={scrollRef}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={s.modalScrollContent}
+                nestedScrollEnabled={true}>
+
+                {/* صور المنتج */}
+                <Text style={s.inputLabel}>📷 صور المنتج *</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={s.imageUploadContainer}
+                  nestedScrollEnabled={true}>
+                  {form.images.map((url,i)=>(
+                    <View key={i} style={s.imgThumbBox}>
+                      <Image source={{uri:url}} style={s.imgThumb} resizeMode="cover"/>
+                      {i===0 && (
+                        <View style={s.imgMainBadge}>
+                          <Text style={{fontSize:9, color:'#fff', fontWeight:'bold'}}>رئيسية</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity style={s.imgRemoveBtn} onPress={() => setForm(p => ({...p, images: p.images.filter((_, idx) => idx !== i)}))}>
+                        <Ionicons name="close-circle" size={22} color={DANGER}/>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {form.images.length < 10 && (
+                    <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImage} disabled={uploadingImgs}>
+                      {uploadingImgs
+                        ? <ActivityIndicator color={PRIMARY}/>
+                        : <>
+                            <Ionicons name="camera-outline" size={26} color={PRIMARY}/>
+                            <Text style={s.imgAddText}>إضافة</Text>
+                            <Text style={s.imgCountText}>{form.images.length}/10</Text>
+                          </>
+                      }
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+
+                {/* اسم المنتج */}
+                <Text style={s.inputLabel}>📦 اسم المنتج *</Text>
+                <TextInput
+                  style={s.modalInput}
+                  placeholder="اسم المنتج"
+                  value={form.name}
+                  onChangeText={v => setForm(p => ({...p, name: v}))}
+                  textAlign="right"
+                  placeholderTextColor="#9ca3af"/>
+
+                {/* الوصف */}
+                <Text style={s.inputLabel}>📝 وصف المنتج</Text>
+                <TextInput
+                  style={[s.modalInput, s.textArea]}
+                  placeholder="اكتب وصفاً تفصيلياً للمنتج: المواصفات، الاستخدامات، المميزات..."
+                  value={form.description}
+                  onChangeText={v => setForm(p => ({...p, description: v}))}
+                  textAlign="right"
+                  placeholderTextColor="#9ca3af"
+                  multiline={true}
+                  numberOfLines={6}
+                  textAlignVertical="top"/>
+
+                {/* التصنيف - استخدام القائمة الموجودة */}
+                <Text style={s.inputLabel}>🗂️ التصنيف</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={s.categoriesScroll}
+                  nestedScrollEnabled={true}>
+                  <View style={{flexDirection:'row', gap:8}}>
+                    {CATEGORIES.map(cat=>(
+                      <TouchableOpacity key={cat}
+                        style={[s.catBtn, form.category===cat && s.catBtnActive]}
+                        onPress={() => setForm(p => ({...p, category: cat}))}>
+                        <Text style={[s.catText, form.category===cat && s.catTextActive]}>{cat}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                {/* الأسعار - الجزء المحسن الجديد */}
+                <Text style={[s.inputLabel, {marginTop: 20, color: PRIMARY}]}>💰 الأسعار (دينار عراقي)</Text>
+                
+                {/* سعر الشركة (مخفي) */}
+                <View style={{marginBottom: 8}}>
+                  <Text style={s.inputLabel}>🏢 سعر الشركة (مخفي عن التاجر) *</Text>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="0"
+                    value={form.companyWholesalePrice}
+                    onChangeText={v => setForm(p => ({...p, companyWholesalePrice: v}))}
+                    keyboardType="numeric"
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                    onFocus={() => scrollRef.current?.scrollToEnd({animated: true})}/>
+                </View>
+
+                {/* سعر الجملة للتاجر */}
+                <View style={{marginBottom: 8}}>
+                  <Text style={s.inputLabel}>💼 سعر الجملة للتاجر *</Text>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="0"
+                    value={form.wholesalePrice}
+                    onChangeText={v => setForm(p => ({...p, wholesalePrice: v}))}
+                    keyboardType="numeric"
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                    onFocus={() => scrollRef.current?.scrollToEnd({animated: true})}/>
+                </View>
+
+                {/* السعر المقترح */}
+                <View style={{marginBottom: 8}}>
+                  <Text style={s.inputLabel}>💰 سعر البيع المقترح *</Text>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="0"
+                    value={form.suggestedPrice}
+                    onChangeText={v => setForm(p => ({...p, suggestedPrice: v}))}
+                    keyboardType="numeric"
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                    onFocus={() => scrollRef.current?.scrollToEnd({animated: true})}/>
+                </View>
+
+                {/* عرض الربح المتوقع للتاجر */}
+                {form.wholesalePrice && form.suggestedPrice && (
+                  <View style={s.profitPreview}>
+                    <Ionicons name="calculator-outline" size={16} color={SUCCESS}/>
+                    <Text style={s.profitPreviewText}>
+                      الربح المتوقع للتاجر:{' '}
+                      <Text style={{color: SUCCESS, fontWeight: 'bold'}}>
+                        {calculateProfit().toLocaleString()} د.ع
+                      </Text>
+                    </Text>
+                  </View>
+                )}
+
+                {/* الحد الأدنى لسعر البيع */}
+                <View style={{marginBottom: 8}}>
+                  <Text style={s.inputLabel}>📉 الحد الأدنى لسعر البيع (اختياري)</Text>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="اتركه فارغاً لاستخدام سعر التاجر"
+                    value={form.sellingPriceMin}
+                    onChangeText={v => setForm(p => ({...p, sellingPriceMin: v}))}
+                    keyboardType="numeric"
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                    onFocus={() => scrollRef.current?.scrollToEnd({animated: true})}/>
+                </View>
+
+                {/* المخزون والخصم */}
+                <View style={s.rowInputs}>
+                  <View style={{flex:1}}>
+                    <Text style={s.inputLabel}>📦 المخزون *</Text>
+                    <TextInput
+                      style={s.modalInput}
+                      placeholder="10"
+                      value={form.stock}
+                      onChangeText={v => setForm(p => ({...p, stock: v}))}
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor="#9ca3af"/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={s.inputLabel}>🏷️ الخصم %</Text>
+                    <TextInput
+                      style={s.modalInput}
+                      placeholder="0"
+                      value={form.discount}
+                      onChangeText={v => setForm(p => ({...p, discount: v}))}
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor="#9ca3af"/>
+                  </View>
+                </View>
+
+                {/* روابط إعلانية */}
+                <Text style={s.inputLabel}>🔗 روابط إعلانية</Text>
+                <TextInput
+                  style={s.modalInput}
+                  placeholder="https://..."
+                  value={form.adLinks}
+                  onChangeText={v => setForm(p => ({...p, adLinks: v}))}
+                  keyboardType="url"
+                  textAlign="right"
+                  placeholderTextColor="#9ca3af"/>
+
+                {/* قابل للتجديد */}
+                <TouchableOpacity style={s.toggleBtn}
+                  onPress={() => setForm(p => ({...p, isRenewable: !p.isRenewable}))}>
+                  <View style={[s.toggleTrack, form.isRenewable && s.toggleTrackActive]}>
+                    <View style={[s.toggleThumb, form.isRenewable && s.toggleThumbActive]}/>
+                  </View>
+                  <View style={{flex:1}}>
+                    <Text style={s.toggleText}>قابل للتجديد</Text>
+                    <Text style={s.toggleSubText}>المنتج قابل لتجديد الكمية لاحقًا...</Text>
+                  </View>
+                  <Ionicons name="refresh-circle-outline" size={22} color={form.isRenewable ? SUCCESS : '#9ca3af'}/>
+                </TouchableOpacity>
+
+              </ScrollView>
+            </KeyboardAvoidingView>
+
+            {/* زر الحفظ */}
+            <TouchableOpacity 
+              style={s.confirmBtn}
+              onPress={handleSave}
+              disabled={saveProduct.isPending || uploadingImgs}>
+              <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.confirmGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
+                {saveProduct.isPending
+                  ? <ActivityIndicator color="#fff"/>
+                  : <>
+                      <Ionicons name={editingProduct ? 'save-outline' : 'add-circle-outline'} size={20} color="#fff"/>
+                      <Text style={s.confirmText}>{editingProduct ? 'حفظ التعديلات' : 'إضافة المنتج'}</Text>
+                    </>
+                }
+              </LinearGradient>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 export default function AdminScreen() {
   const qc = useQueryClient();
   const { width, height } = useWindowDimensions();
@@ -45,7 +535,6 @@ export default function AdminScreen() {
   const [uploadingImgs, setUploadingImgs] = useState(false);
   const [promoForm, setPromoForm] = useState({ code: '', discountPercent: '' });
   const [form, setForm] = useState({
-    companyWholesalePrice: '',
     name:'', description:'', wholesalePrice:'', sellingPriceMin:'',
     category:'إلكترونيات', images:[] as string[], adLinks:'', stock:'10',
     isRenewable: false, discount: '0',
@@ -177,14 +666,13 @@ export default function AdminScreen() {
   };
 
   const handleSaveProduct = () => {
-    if (!form.name || !form.companyWholesalePrice || !form.wholesalePrice || !form.sellingPriceMin) {
-      toast.warning('يرجى ملء جميع الحقول المطلوبة (سعر الشركة، سعر الجملة، أدنى سعر بيع)'); return;
+    if (!form.name || !form.wholesalePrice || !form.sellingPriceMin) {
+      toast.warning('يرجى ملء الحقول المطلوبة'); return;
     }
     if (form.images.length === 0) { toast.warning('يرجى إضافة صورة واحدة على الأقل'); return; }
     saveProduct.mutate({
       name:form.name, description:form.description,
-      companyWholesalePrice:Number(form.companyWholesalePrice),
-        wholesalePrice:Number(form.wholesalePrice),
+      wholesalePrice:Number(form.wholesalePrice),
       sellingPriceMin:Number(form.sellingPriceMin),
       category:form.category,
       imageUrl:form.images[0],
@@ -222,7 +710,6 @@ export default function AdminScreen() {
         </View>
         <View style={s.headerCenter}>
           <Text style={s.headerTitle}>لوحة الإدارة</Text>
-                  </View>
           <Text style={s.headerSub}>مرحباً مدير النظام 👋</Text>
         </View>
         <TouchableOpacity style={[s.headerIconBox, {backgroundColor:'rgba(255,255,255,0.15)'}]} onPress={onRefresh}>
@@ -363,73 +850,8 @@ export default function AdminScreen() {
           </View>
         ))}
 
-        {/* ── PRODUCTS ── */}
-        {tab==='products' && <>
-          <TouchableOpacity style={s.addBtn} onPress={()=>setShowAddProduct(true)}>
-            <LinearGradient colors={[PRIMARY,'#0a8a9f']} style={s.addBtnGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-              <Ionicons name="add-circle-outline" size={20} color="#fff"/>
-              <Text style={s.addBtnText}>إضافة منتج جديد</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {filteredProducts.length === 0 && (
-            <View style={s.emptyBox}>
-              <Ionicons name="cube-outline" size={52} color="#d1d5db"/>
-              <Text style={s.emptyTitle}>لا توجد منتجات</Text>
-              <Text style={s.emptyText}>ابدأ بإضافة أول منتج</Text>
-            </View>
-          )}
-
-          {filteredProducts.map((p:any)=>{
-            const imgs = p.images ? p.images.split(',').filter(Boolean) : (p.imageUrl?[p.imageUrl]:[]);
-            return (
-              <View key={p.id} style={s.productCard}>
-                {imgs[0]
-                  ? <Image source={{uri:imgs[0]}} style={s.productImg} resizeMode="cover"/>
-                  : <View style={[s.productImg, {backgroundColor:'#f3f4f6', justifyContent:'center', alignItems:'center'}]}>
-                      <Ionicons name="image-outline" size={28} color="#d1d5db"/>
-                    </View>
-                }
-                <View style={s.productInfo}>
-                  <View style={s.productCatPill}>
-                    <Text style={s.productCatText}>{p.category}</Text>
-                  </View>
-                  <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
-                  {p.description ? (
-                    <Text style={s.productDesc} numberOfLines={2}>{p.description}</Text>
-                  ) : null}
-                  <View style={{marginTop:4}}>
-                    <Text style={{fontSize:11, color:"#9ca3af", textAlign:"right"}}>
-                      🏭 سعر الشركة: {p.companyWholesalePrice?.toLocaleString()} د.ع
-                    </Text>
-                    <Text style={s.productPrice}>
-                    جملة: {p.wholesalePrice?.toLocaleString()} د.ع{'\n'}أدنى بيع: {p.sellingPriceMin?.toLocaleString()} د.ع
-                  </Text>
-                  <View style={{flexDirection:'row', gap:5, marginTop:5, flexWrap:'wrap'}}>
-                    {p.isRenewable && <View style={s.renewPill}><Text style={s.renewText}>🔄 تجديد</Text></View>}
-                    {p.discount > 0 && <View style={s.discPill}><Text style={s.discText}>🏷️ {p.discount}%</Text></View>}
-                    <View style={[s.stockPill, {backgroundColor: p.stock < 5 ? '#fef2f2' : '#f0fdf4'}]}>
-                      <Text style={[s.stockText, {color: p.stock < 5 ? DANGER : SUCCESS}]}>
-                        📦 {p.stock}
-                      </Text>
-                    </View>
-                </View>
-                <View style={s.productActions}>
-                  <TouchableOpacity style={s.editBtn} onPress={()=>openEdit(p)}>
-                    <Ionicons name="create-outline" size={17} color={PRIMARY}/>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.delBtn}
-                    onPress={()=>Alert.alert('حذف المنتج','هل أنت متأكد من حذف هذا المنتج؟',[
-                      {text:'إلغاء',style:'cancel'},
-                      {text:'حذف',style:'destructive',onPress:()=>deleteProduct.mutate(p.id)},
-                    ])}>
-                    <Ionicons name="trash-outline" size={17} color={DANGER}/>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })}
-        </>}
+        {/* ── PRODUCTS ── استخدام ProductsTab الجديد */}
+        {tab==='products' && <ProductsTab />}
 
         {/* ── WITHDRAWALS ── */}
         {tab==='withdrawals' && <>
@@ -556,7 +978,7 @@ export default function AdminScreen() {
 
       </ScrollView>
 
-      {/* ═══════════════ ADD / EDIT PRODUCT MODAL ═══════════════ */}
+      {/* ═══════════════ ADD / EDIT PRODUCT MODAL (قديم - يمكن إزالته) ═══════════════ */}
       {(showAddProduct || showEditProduct) && (
         <Modal visible transparent animationType="slide" onRequestClose={()=>{setShowAddProduct(false);setShowEditProduct(null);resetForm();}}>
           <View style={s.modalOverlay}>
@@ -639,17 +1061,7 @@ export default function AdminScreen() {
                 {/* ── الأسعار ── */}
                 <View style={s.rowInputs}>
                   <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>🏭 سعر الشركة (الكلفة) *</Text>
-                <TextInput
-                  style={s.modalInput}
-                  placeholder="0"
-                  value={form.companyWholesalePrice}
-                  onChangeText={v=>setForm(p=>({...p,companyWholesalePrice:v}))}
-                  keyboardType="numeric"
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"/>
-
-                <Text style={s.inputLabel}>💲 سعر الجملة للتاجر *</Text>
+                    <Text style={s.inputLabel}>💲 سعر الجملة *</Text>
                     <TextInput
                       style={s.modalInput}
                       placeholder="0"
@@ -673,16 +1085,7 @@ export default function AdminScreen() {
                 </View>
 
                 {/* معاينة الربح */}
-                {form.companyWholesalePrice && form.wholesalePrice && form.sellingPriceMin && (
-                  <View style={s.profitPreview}>
-                    <Ionicons name="business-outline" size={16} color={PRIMARY}/>
-                    <Text style={s.profitPreviewText}>
-                      هامش ربح الشركة: <Text style={{color:PRIMARY, fontWeight:"bold"}}>
-                        {(Number(form.wholesalePrice)-Number(form.companyWholesalePrice)).toLocaleString()} د.ع
-                      </Text>
-                    </Text>
-                  </View>
-
+                {form.wholesalePrice && form.sellingPriceMin && (
                   <View style={s.profitPreview}>
                     <Ionicons name="calculator-outline" size={16} color={SUCCESS}/>
                     <Text style={s.profitPreviewText}>
