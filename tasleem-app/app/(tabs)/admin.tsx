@@ -279,7 +279,7 @@ function ProductsTab() {
       {/* Modal إضافة/تعديل المنتج */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => { setShowModal(false); resetForm(); }}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalCard, {maxHeight: '92%'}]}>
+          <View style={[s.modalCard, {maxHeight: '95%', marginTop: 20}]}>
             
             {/* Modal Header */}
             <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.modalHeaderGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
