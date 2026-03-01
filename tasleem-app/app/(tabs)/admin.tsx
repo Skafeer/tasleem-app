@@ -229,22 +229,22 @@ function ProductsTab() {
                 </View>
                 <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
                 
-                {/* الأسعار - النقطة الرئيسية الجديدة */}
+                {/* الأسعار */}
                 <View style={{marginTop: 6, gap: 4}}>
                   <Text style={s.productPrice}>
-                    <Text style={{color: '#6b7280'}}>🏢 سعر الشركة: </Text>
+                    <Text style={{color: '#6b7280'}}>سعر الشركة: </Text>
                     <Text style={{color: '#374151', fontWeight: '600'}}>{(p.companyWholesalePrice || 0).toLocaleString()} د.ع</Text>
                   </Text>
                   <Text style={s.productPrice}>
-                    <Text style={{color: '#6b7280'}}>💼 سعر التاجر: </Text>
+                    <Text style={{color: '#6b7280'}}>سعر التاجر: </Text>
                     <Text style={{color: '#374151', fontWeight: '600'}}>{p.wholesalePrice?.toLocaleString()} د.ع</Text>
                   </Text>
                   <Text style={s.productPrice}>
-                    <Text style={{color: '#6b7280'}}>💰 سعر مقترح: </Text>
+                    <Text style={{color: '#6b7280'}}>سعر مقترح: </Text>
                     <Text style={{color: '#f5a006', fontWeight: '600'}}>{(p.suggestedPrice || p.wholesalePrice).toLocaleString()} د.ع</Text>
                   </Text>
                   <Text style={s.productPrice}>
-                    <Text style={{color: '#6b7280'}}>📉 الحد الأدنى: </Text>
+                    <Text style={{color: '#6b7280'}}>الحد الأدنى: </Text>
                     <Text style={{color: '#ef4444', fontWeight: '600'}}>{p.sellingPriceMin?.toLocaleString()} د.ع</Text>
                   </Text>
                 </View>
@@ -300,7 +300,7 @@ function ProductsTab() {
                 nestedScrollEnabled={true}>
 
                 {/* صور المنتج */}
-                <Text style={s.inputLabel}>📷 صور المنتج *</Text>
+                <Text style={s.inputLabel}>صور المنتج *</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -334,7 +334,7 @@ function ProductsTab() {
                 </ScrollView>
 
                 {/* اسم المنتج */}
-                <Text style={s.inputLabel}>📦 اسم المنتج *</Text>
+                <Text style={s.inputLabel}>اسم المنتج *</Text>
                 <TextInput
                   style={s.modalInput}
                   placeholder="اسم المنتج"
@@ -344,10 +344,10 @@ function ProductsTab() {
                   placeholderTextColor="#9ca3af"/>
 
                 {/* الوصف */}
-                <Text style={s.inputLabel}>📝 وصف المنتج</Text>
+                <Text style={s.inputLabel}>وصف المنتج</Text>
                 <TextInput
                   style={[s.modalInput, s.textArea]}
-                  placeholder="اكتب وصفاً تفصيلياً للمنتج: المواصفات، الاستخدامات، المميزات..."
+                  placeholder="اكتب وصفاً تفصيلياً للمنتج"
                   value={form.description}
                   onChangeText={v => setForm(p => ({...p, description: v}))}
                   textAlign="right"
@@ -356,30 +356,32 @@ function ProductsTab() {
                   numberOfLines={6}
                   textAlignVertical="top"/>
 
-                {/* التصنيف - استخدام القائمة الموجودة */}
-                <Text style={s.inputLabel}>🗂️ التصنيف</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={s.categoriesScroll}
-                  nestedScrollEnabled={true}>
-                  <View style={{flexDirection:'row', gap:8}}>
-                    {CATEGORIES.map(cat=>(
-                      <TouchableOpacity key={cat}
-                        style={[s.catBtn, form.category===cat && s.catBtnActive]}
-                        onPress={() => setForm(p => ({...p, category: cat}))}>
-                        <Text style={[s.catText, form.category===cat && s.catTextActive]}>{cat}</Text>
+                {/* التصنيف - تم إصلاح المشكلة باستخدام FlatList بدلاً من ScrollView */}
+                <Text style={s.inputLabel}>التصنيف</Text>
+                <View style={{ marginBottom: 16 }}>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={CATEGORIES}
+                    keyExtractor={(item) => item}
+                    renderItem={({ item: cat }) => (
+                      <TouchableOpacity
+                        style={[s.catBtn, form.category === cat && s.catBtnActive]}
+                        onPress={() => setForm(p => ({ ...p, category: cat }))}>
+                        <Text style={[s.catText, form.category === cat && s.catTextActive]}>{cat}</Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+                    )}
+                    contentContainerStyle={{ paddingVertical: 4, paddingHorizontal: 4 }}
+                    style={{ maxHeight: 50 }}
+                  />
+                </View>
 
-                {/* الأسعار - الجزء المحسن الجديد */}
-                <Text style={[s.inputLabel, {marginTop: 20, color: PRIMARY}]}>💰 الأسعار (دينار عراقي)</Text>
+                {/* الأسعار */}
+                <Text style={[s.inputLabel, {marginTop: 20, color: PRIMARY}]}>الأسعار (دينار عراقي)</Text>
                 
                 {/* سعر الشركة (مخفي) */}
                 <View style={{marginBottom: 8}}>
-                  <Text style={s.inputLabel}>🏢 سعر الشركة (مخفي عن التاجر) *</Text>
+                  <Text style={s.inputLabel}>سعر الشركة (مخفي عن التاجر) *</Text>
                   <TextInput
                     style={s.modalInput}
                     placeholder="0"
@@ -393,7 +395,7 @@ function ProductsTab() {
 
                 {/* سعر الجملة للتاجر */}
                 <View style={{marginBottom: 8}}>
-                  <Text style={s.inputLabel}>💼 سعر الجملة للتاجر *</Text>
+                  <Text style={s.inputLabel}>سعر الجملة للتاجر *</Text>
                   <TextInput
                     style={s.modalInput}
                     placeholder="0"
@@ -407,7 +409,7 @@ function ProductsTab() {
 
                 {/* السعر المقترح */}
                 <View style={{marginBottom: 8}}>
-                  <Text style={s.inputLabel}>💰 سعر البيع المقترح *</Text>
+                  <Text style={s.inputLabel}>سعر البيع المقترح *</Text>
                   <TextInput
                     style={s.modalInput}
                     placeholder="0"
@@ -434,7 +436,7 @@ function ProductsTab() {
 
                 {/* الحد الأدنى لسعر البيع */}
                 <View style={{marginBottom: 8}}>
-                  <Text style={s.inputLabel}>📉 الحد الأدنى لسعر البيع (اختياري)</Text>
+                  <Text style={s.inputLabel}>الحد الأدنى لسعر البيع (اختياري)</Text>
                   <TextInput
                     style={s.modalInput}
                     placeholder="اتركه فارغاً لاستخدام سعر التاجر"
@@ -449,7 +451,7 @@ function ProductsTab() {
                 {/* المخزون والخصم */}
                 <View style={s.rowInputs}>
                   <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>📦 المخزون *</Text>
+                    <Text style={s.inputLabel}>المخزون *</Text>
                     <TextInput
                       style={s.modalInput}
                       placeholder="10"
@@ -460,7 +462,7 @@ function ProductsTab() {
                       placeholderTextColor="#9ca3af"/>
                   </View>
                   <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>🏷️ الخصم %</Text>
+                    <Text style={s.inputLabel}>الخصم %</Text>
                     <TextInput
                       style={s.modalInput}
                       placeholder="0"
@@ -473,7 +475,7 @@ function ProductsTab() {
                 </View>
 
                 {/* روابط إعلانية */}
-                <Text style={s.inputLabel}>🔗 روابط إعلانية</Text>
+                <Text style={s.inputLabel}>روابط إعلانية</Text>
                 <TextInput
                   style={s.modalInput}
                   placeholder="https://..."
@@ -491,7 +493,7 @@ function ProductsTab() {
                   </View>
                   <View style={{flex:1}}>
                     <Text style={s.toggleText}>قابل للتجديد</Text>
-                    <Text style={s.toggleSubText}>المنتج قابل لتجديد الكمية لاحقًا...</Text>
+                    <Text style={s.toggleSubText}>المنتج قابل لتجديد الكمية لاحقًا</Text>
                   </View>
                   <Ionicons name="refresh-circle-outline" size={22} color={form.isRenewable ? SUCCESS : '#9ca3af'}/>
                 </TouchableOpacity>
@@ -703,21 +705,21 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      {/* ═══════════════ HEADER ═══════════════ */}
+      {/* HEADER */}
       <LinearGradient colors={[PRIMARY, '#0a5566']} style={s.header} start={{x:0,y:0}} end={{x:1,y:1}}>
         <View style={[s.headerIconBox, {backgroundColor:'rgba(255,255,255,0.15)'}]}>
           <Ionicons name="shield-checkmark" size={20} color="#fff"/>
         </View>
         <View style={s.headerCenter}>
           <Text style={s.headerTitle}>لوحة الإدارة</Text>
-          <Text style={s.headerSub}>مرحباً مدير النظام 👋</Text>
+          <Text style={s.headerSub}>مرحباً مدير النظام</Text>
         </View>
         <TouchableOpacity style={[s.headerIconBox, {backgroundColor:'rgba(255,255,255,0.15)'}]} onPress={onRefresh}>
           <Ionicons name="refresh-outline" size={20} color="#fff"/>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* ═══════════════ STATS ROW ═══════════════ */}
+      {/* STATS ROW */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={s.statsScroll} contentContainerStyle={s.statsContent}>
         {[
@@ -738,7 +740,7 @@ export default function AdminScreen() {
         ))}
       </ScrollView>
 
-      {/* ═══════════════ TABS ═══════════════ */}
+      {/* TABS */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={s.tabsScroll} contentContainerStyle={s.tabsContent}>
         {TABS.map(t=>(
@@ -756,7 +758,7 @@ export default function AdminScreen() {
         ))}
       </ScrollView>
 
-      {/* ═══════════════ SEARCH ═══════════════ */}
+      {/* SEARCH */}
       {(tab==='orders'||tab==='products') && (
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={17} color="#9ca3af"/>
@@ -771,7 +773,7 @@ export default function AdminScreen() {
         </View>
       )}
 
-      {/* ═══════════════ ORDER FILTERS ═══════════════ */}
+      {/* ORDER FILTERS */}
       {tab==='orders' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={s.filtersScroll} contentContainerStyle={s.filtersContent}>
@@ -786,13 +788,13 @@ export default function AdminScreen() {
         </ScrollView>
       )}
 
-      {/* ═══════════════ MAIN SCROLL ═══════════════ */}
+      {/* MAIN CONTENT */}
       <ScrollView style={{flex:1}}
         contentContainerStyle={{padding:14, paddingBottom:50}}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY}/>}
         showsVerticalScrollIndicator={false}>
 
-        {/* ── ORDERS ── */}
+        {/* ORDERS */}
         {tab==='orders' && filteredOrders.length === 0 && (
           <View style={s.emptyBox}>
             <Ionicons name="bag-outline" size={52} color="#d1d5db"/>
@@ -815,9 +817,9 @@ export default function AdminScreen() {
 
             <View style={s.orderBody}>
               {[
-                {l:'👤 الاسم',      v: order.customerName},
-                {l:'📞 الهاتف',     v: order.customerPhone},
-                {l:'📍 العنوان',    v: `${order.province} — ${order.address}`},
+                {l:'الاسم',      v: order.customerName},
+                {l:'الهاتف',     v: order.customerPhone},
+                {l:'العنوان',    v: `${order.province} — ${order.address}`},
               ].map((r,i)=>(
                 <View key={i} style={s.orderRow}>
                   <Text style={s.orderVal}>{r.v}</Text>
@@ -827,11 +829,11 @@ export default function AdminScreen() {
               <View style={s.orderDivider}/>
               <View style={s.orderRow}>
                 <Text style={[s.orderVal, {color:SUCCESS, fontWeight:'bold'}]}>{order.totalProfit?.toLocaleString()} د.ع</Text>
-                <Text style={s.orderLbl}>💰 الربح</Text>
+                <Text style={s.orderLbl}>الربح</Text>
               </View>
               <View style={s.orderRow}>
                 <Text style={[s.orderVal, {color:PRIMARY, fontWeight:'bold', fontSize:15}]}>{order.totalAmount?.toLocaleString()} د.ع</Text>
-                <Text style={s.orderLbl}>🧾 الإجمالي</Text>
+                <Text style={s.orderLbl}>الإجمالي</Text>
               </View>
             </View>
 
@@ -850,10 +852,10 @@ export default function AdminScreen() {
           </View>
         ))}
 
-        {/* ── PRODUCTS ── استخدام ProductsTab الجديد */}
+        {/* PRODUCTS - استخدام ProductsTab الجديد */}
         {tab==='products' && <ProductsTab />}
 
-        {/* ── WITHDRAWALS ── */}
+        {/* WITHDRAWALS */}
         {tab==='withdrawals' && <>
           <View style={s.sectionHeader}>
             <Ionicons name="cash-outline" size={18} color={PRIMARY}/>
@@ -909,7 +911,7 @@ export default function AdminScreen() {
           ))}
         </>}
 
-        {/* ── USERS ── */}
+        {/* USERS */}
         {tab==='users' && <>
           <View style={s.sectionHeader}>
             <Ionicons name="people-outline" size={18} color={PRIMARY}/>
@@ -938,7 +940,7 @@ export default function AdminScreen() {
           ))}
         </>}
 
-        {/* ── PROMOS ── */}
+        {/* PROMOS */}
         {tab==='promos' && <>
           <TouchableOpacity style={s.addBtn} onPress={()=>setShowAddPromo(true)}>
             <LinearGradient colors={[SECONDARY,'#e09000']} style={s.addBtnGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
@@ -965,7 +967,7 @@ export default function AdminScreen() {
                 <Text style={s.promoDiscount}>خصم {p.discountPercent}%</Text>
                 <View style={[s.promoStatusPill, {backgroundColor: p.isActive?'#ecfdf5':'#fef2f2'}]}>
                   <Text style={{fontSize:11, color:p.isActive?SUCCESS:DANGER, fontWeight:'bold'}}>
-                    {p.isActive ? '✅ فعال' : '❌ غير فعال'}
+                    {p.isActive ? 'فعال' : 'غير فعال'}
                   </Text>
                 </View>
               </View>
@@ -978,216 +980,7 @@ export default function AdminScreen() {
 
       </ScrollView>
 
-      {/* ═══════════════ ADD / EDIT PRODUCT MODAL (قديم - يمكن إزالته) ═══════════════ */}
-      {(showAddProduct || showEditProduct) && (
-        <Modal visible transparent animationType="slide" onRequestClose={()=>{setShowAddProduct(false);setShowEditProduct(null);resetForm();}}>
-          <View style={s.modalOverlay}>
-            <View style={s.modalCard}>
-
-              {/* Modal Header */}
-              <LinearGradient colors={[PRIMARY,'#0a8a9f']} style={s.modalHeaderGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-                <TouchableOpacity onPress={()=>{setShowAddProduct(false);setShowEditProduct(null);resetForm();}}>
-                  <Ionicons name="close" size={22} color="rgba(255,255,255,0.8)"/>
-                </TouchableOpacity>
-                <Text style={s.modalTitle}>{showEditProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}</Text>
-                <Ionicons name={showEditProduct?'create-outline':'cube-outline'} size={22} color="rgba(255,255,255,0.8)"/>
-              </LinearGradient>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                contentContainerStyle={s.modalScrollContent}
-                nestedScrollEnabled={true}>
-
-                {/* ── صور المنتج ── */}
-                <Text style={s.inputLabel}>📷 صور المنتج *</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={s.imageUploadContainer}
-                  nestedScrollEnabled={true}>
-                  {form.images.map((url,i)=>(
-                    <View key={i} style={s.imgThumbBox}>
-                      <Image source={{uri:url}} style={s.imgThumb} resizeMode="cover"/>
-                      {i===0 && (
-                        <View style={s.imgMainBadge}>
-                          <Text style={{fontSize:9, color:'#fff', fontWeight:'bold'}}>رئيسية</Text>
-                        </View>
-                      )}
-                      <TouchableOpacity style={s.imgRemoveBtn} onPress={()=>removeImage(i)}>
-                        <Ionicons name="close-circle" size={22} color={DANGER}/>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  {form.images.length < 10 && (
-                    <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImage} disabled={uploadingImgs}>
-                      {uploadingImgs
-                        ? <ActivityIndicator color={PRIMARY}/>
-                        : <>
-                            <Ionicons name="camera-outline" size={26} color={PRIMARY}/>
-                            <Text style={s.imgAddText}>إضافة</Text>
-                            <Text style={s.imgCountText}>{form.images.length}/10</Text>
-                          </>
-                      }
-                    </TouchableOpacity>
-                  )}
-                </ScrollView>
-
-                {/* ── اسم المنتج ── */}
-                <Text style={s.inputLabel}>📦 اسم المنتج *</Text>
-                <TextInput
-                  style={s.modalInput}
-                  placeholder="اسم المنتج"
-                  value={form.name}
-                  onChangeText={v=>setForm(p=>({...p,name:v}))}
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"/>
-
-                {/* ── الوصف (محسّن - النقطة 1) ── */}
-                <Text style={s.inputLabel}>📝 وصف المنتج</Text>
-                <TextInput
-                  style={[s.modalInput, s.textArea]}
-                  placeholder="اكتب وصفاً تفصيلياً للمنتج: المواصفات، الاستخدامات، المميزات..."
-                  value={form.description}
-                  onChangeText={v=>setForm(p=>({...p,description:v}))}
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                  multiline={true}
-                  numberOfLines={6}
-                  textAlignVertical="top"/>
-                <Text style={s.charCount}>{form.description?.length || 0} حرف</Text>
-
-                {/* ── الأسعار ── */}
-                <View style={s.rowInputs}>
-                  <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>💲 سعر الجملة *</Text>
-                    <TextInput
-                      style={s.modalInput}
-                      placeholder="0"
-                      value={form.wholesalePrice}
-                      onChangeText={v=>setForm(p=>({...p,wholesalePrice:v}))}
-                      keyboardType="numeric"
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"/>
-                  </View>
-                  <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>📈 أدنى سعر بيع *</Text>
-                    <TextInput
-                      style={s.modalInput}
-                      placeholder="0"
-                      value={form.sellingPriceMin}
-                      onChangeText={v=>setForm(p=>({...p,sellingPriceMin:v}))}
-                      keyboardType="numeric"
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"/>
-                  </View>
-                </View>
-
-                {/* معاينة الربح */}
-                {form.wholesalePrice && form.sellingPriceMin && (
-                  <View style={s.profitPreview}>
-                    <Ionicons name="calculator-outline" size={16} color={SUCCESS}/>
-                    <Text style={s.profitPreviewText}>
-                      أدنى ربح للتاجر:{' '}
-                      <Text style={{color:SUCCESS, fontWeight:'bold'}}>
-                        {(Number(form.sellingPriceMin)-Number(form.wholesalePrice)).toLocaleString()} د.ع
-                      </Text>
-                    </Text>
-                  </View>
-                )}
-
-                {/* ── المخزون والخصم ── */}
-                <View style={s.rowInputs}>
-                  <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>📦 المخزون</Text>
-                    <TextInput
-                      style={s.modalInput}
-                      placeholder="10"
-                      value={form.stock}
-                      onChangeText={v=>setForm(p=>({...p,stock:v}))}
-                      keyboardType="numeric"
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"/>
-                  </View>
-                  <View style={{flex:1}}>
-                    <Text style={s.inputLabel}>🏷️ الخصم %</Text>
-                    <TextInput
-                      style={s.modalInput}
-                      placeholder="0"
-                      value={form.discount}
-                      onChangeText={v=>setForm(p=>({...p,discount:v}))}
-                      keyboardType="numeric"
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"/>
-                  </View>
-                </View>
-
-                {/* ── روابط إعلانية ── */}
-                <Text style={s.inputLabel}>🔗 روابط إعلانية (افصل بفواصل)</Text>
-                <TextInput
-                  style={s.modalInput}
-                  placeholder="https://..."
-                  value={form.adLinks}
-                  onChangeText={v=>setForm(p=>({...p,adLinks:v}))}
-                  keyboardType="url"
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"/>
-
-                {/* ── التصنيف ── */}
-                <Text style={s.inputLabel}>🗂️ التصنيف</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={s.categoriesScroll}
-                  nestedScrollEnabled={true}>
-                  <View style={{flexDirection:'row', gap:8}}>
-                    {CATEGORIES.map(cat=>(
-                      <TouchableOpacity key={cat}
-                        style={[s.catBtn, form.category===cat && s.catBtnActive]}
-                        onPress={()=>setForm(p=>({...p,category:cat}))}>
-                        <Text style={[s.catText, form.category===cat && s.catTextActive]}>{cat}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-
-                {/* ── قابل للتجديد ── */}
-                <TouchableOpacity style={s.toggleBtn}
-                  onPress={()=>setForm(p=>({...p,isRenewable:!p.isRenewable}))}>
-                  <View style={[s.toggleTrack, form.isRenewable && s.toggleTrackActive]}>
-                    <View style={[s.toggleThumb, form.isRenewable && s.toggleThumbActive]}/>
-                  </View>
-                  <View style={{flex:1}}>
-                    <Text style={s.toggleText}>قابل للتجديد</Text>
-                    <Text style={s.toggleSubText}>المنتج قابل لتجديد الكمية لاحقًا...</Text>
-                  </View>
-                  <Ionicons name="refresh-circle-outline" size={22} color={form.isRenewable?SUCCESS:'#9ca3af'}/>
-                </TouchableOpacity>
-
-              </ScrollView>
-
-              {/* زر الحفظ */}
-              <TouchableOpacity style={s.confirmBtn}
-                onPress={handleSaveProduct}
-                disabled={saveProduct.isPending || uploadingImgs}>
-                <LinearGradient colors={[PRIMARY,'#0a8a9f']} style={s.confirmGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-                  {saveProduct.isPending
-                    ? <ActivityIndicator color="#fff"/>
-                    : <>
-                        <Ionicons name={showEditProduct?'save-outline':'add-circle-outline'} size={20} color="#fff"/>
-                        <Text style={s.confirmText}>{showEditProduct ? 'حفظ التعديلات' : 'إضافة المنتج'}</Text>
-                      </>
-                  }
-                </LinearGradient>
-              </TouchableOpacity>
-
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ═══════════════ ADD PROMO MODAL ═══════════════ */}
+      {/* ADD PROMO MODAL */}
       <Modal visible={showAddPromo} transparent animationType="slide" onRequestClose={()=>setShowAddPromo(false)}>
         <View style={s.modalOverlay}>
           <View style={[s.modalCard, {maxHeight: height * 0.55}]}>
@@ -1207,7 +1000,7 @@ export default function AdminScreen() {
               contentContainerStyle={s.modalScrollContent}
               nestedScrollEnabled={true}>
 
-              <Text style={s.inputLabel}>🎟️ الكود</Text>
+              <Text style={s.inputLabel}>الكود</Text>
               <TextInput
                 style={s.modalInput}
                 placeholder="SAVE10"
@@ -1217,7 +1010,7 @@ export default function AdminScreen() {
                 placeholderTextColor="#9ca3af"
                 autoCapitalize="characters"/>
 
-              <Text style={s.inputLabel}>💯 نسبة الخصم %</Text>
+              <Text style={s.inputLabel}>نسبة الخصم %</Text>
               <TextInput
                 style={s.modalInput}
                 placeholder="10"
@@ -1256,7 +1049,7 @@ export default function AdminScreen() {
 const s = StyleSheet.create({
   container: {flex:1, backgroundColor:'#f0f4f8'},
 
-  // ── Header ──
+  // Header
   header: {flexDirection:'row', alignItems:'center', justifyContent:'space-between',
     paddingHorizontal:16, paddingVertical:14},
   headerIconBox: {width:40, height:40, borderRadius:12, justifyContent:'center', alignItems:'center'},
@@ -1264,7 +1057,7 @@ const s = StyleSheet.create({
   headerTitle: {fontSize:20, fontWeight:'bold', color:'#fff'},
   headerSub: {fontSize:12, color:'rgba(255,255,255,0.8)', marginTop:2},
 
-  // ── Stats ──
+  // Stats
   statsScroll: {maxHeight:105},
   statsContent: {padding:12, gap:10},
   statCard: {backgroundColor:'#fff', borderRadius:20, padding:12, minWidth:105,
@@ -1275,7 +1068,7 @@ const s = StyleSheet.create({
   statValue: {fontSize:17, fontWeight:'bold', color:'#111827'},
   statLabel: {fontSize:10, color:'#6b7280', marginTop:2, textAlign:'center'},
 
-  // ── Tabs ──
+  // Tabs
   tabsScroll: {maxHeight:58},
   tabsContent: {paddingHorizontal:12, gap:10, alignItems:'center'},
   tabBtn: {flexDirection:'row', alignItems:'center', gap:5, paddingHorizontal:14, paddingVertical:9,
@@ -1288,13 +1081,13 @@ const s = StyleSheet.create({
   badgeText: {fontSize:10, color:'#9ca3af', fontWeight:'bold'},
   badgeTextActive: {color:'#fff'},
 
-  // ── Search ──
+  // Search
   searchBox: {flexDirection:'row', alignItems:'center', backgroundColor:'#fff',
     marginHorizontal:14, marginVertical:8, borderRadius:14, paddingHorizontal:14,
     height:46, borderWidth:1.5, borderColor:'#e5e7eb', gap:8},
   searchInput: {flex:1, fontSize:14, color:'#111827'},
 
-  // ── Filters ──
+  // Filters
   filtersScroll: {maxHeight:46, marginBottom:4},
   filtersContent: {gap:8, paddingHorizontal:14, alignItems:'center'},
   filterBtn: {paddingHorizontal:16, paddingVertical:8, borderRadius:22,
@@ -1303,7 +1096,7 @@ const s = StyleSheet.create({
   filterText: {fontSize:13, color:'#6b7280', fontWeight:'600'},
   filterTextActive: {color:'#fff'},
 
-  // ── Order Card ──
+  // Order Card
   orderCard: {backgroundColor:'#fff', borderRadius:22, padding:16, marginBottom:12,
     shadowColor:'#000', shadowOpacity:0.06, shadowRadius:12, shadowOffset:{width:0,height:3}, elevation:4},
   orderHead: {flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12},
@@ -1322,13 +1115,13 @@ const s = StyleSheet.create({
     borderRadius:12, backgroundColor:'#f9fafb', borderWidth:1.5, borderColor:'#e5e7eb'},
   statusBtnText: {fontSize:12, color:'#6b7280', fontWeight:'600'},
 
-  // ── Add Button ──
+  // Add Button
   addBtn: {borderRadius:16, marginBottom:14, overflow:'hidden',
     shadowColor:PRIMARY, shadowOpacity:0.3, shadowRadius:12, shadowOffset:{width:0,height:3}, elevation:5},
   addBtnGrad: {flexDirection:'row', justifyContent:'center', alignItems:'center', height:52, gap:8},
   addBtnText: {color:'#fff', fontWeight:'bold', fontSize:15},
 
-  // ── Product Card ──
+  // Product Card
   productCard: {backgroundColor:'#fff', borderRadius:20, padding:14, flexDirection:'row-reverse',
     gap:12, marginBottom:12, shadowColor:'#000', shadowOpacity:0.06,
     shadowRadius:10, shadowOffset:{width:0,height:3}, elevation:4},
@@ -1338,7 +1131,6 @@ const s = StyleSheet.create({
     paddingVertical:3, alignSelf:'flex-end', marginBottom:5},
   productCatText: {fontSize:11, color:PRIMARY, fontWeight:'bold'},
   productName: {fontSize:14, fontWeight:'bold', color:'#111827', textAlign:'right', marginBottom:2},
-  productDesc: {fontSize:12, color:'#6b7280', textAlign:'right', marginBottom:4, lineHeight:17},
   productPrice: {fontSize:12, color:'#6b7280', textAlign:'right', lineHeight:18},
   stockPill: {borderRadius:8, paddingHorizontal:7, paddingVertical:3},
   stockText: {fontSize:11, fontWeight:'bold'},
@@ -1352,13 +1144,13 @@ const s = StyleSheet.create({
   delBtn: {width:38, height:38, borderRadius:12, backgroundColor:'#fef2f2',
     justifyContent:'center', alignItems:'center'},
 
-  // ── Section Header ──
+  // Section Header
   sectionHeader: {flexDirection:'row', alignItems:'center', gap:8, marginBottom:14},
   sectionTitle: {fontSize:17, fontWeight:'bold', color:'#111827', flex:1, textAlign:'right'},
   sectionCount: {backgroundColor:PRIMARY+'15', borderRadius:10, paddingHorizontal:10, paddingVertical:4},
   sectionCountText: {fontSize:13, color:PRIMARY, fontWeight:'bold'},
 
-  // ── Withdrawal Card ──
+  // Withdrawal Card
   withdrawCard: {backgroundColor:'#fff', borderRadius:22, padding:16, marginBottom:12,
     shadowColor:'#000', shadowOpacity:0.06, shadowRadius:12, shadowOffset:{width:0,height:3}, elevation:4},
   withdrawHead: {flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12},
@@ -1375,7 +1167,7 @@ const s = StyleSheet.create({
     gap:6, paddingVertical:13, borderRadius:14},
   wBtnText: {fontSize:14, fontWeight:'bold'},
 
-  // ── User Card ──
+  // User Card
   userCard: {backgroundColor:'#fff', borderRadius:20, padding:14, flexDirection:'row',
     alignItems:'center', gap:12, marginBottom:12,
     shadowColor:'#000', shadowOpacity:0.06, shadowRadius:10, shadowOffset:{width:0,height:3}, elevation:4},
@@ -1389,7 +1181,7 @@ const s = StyleSheet.create({
   userBalance: {fontSize:15, fontWeight:'bold', textAlign:'right'},
   userBalanceLabel: {fontSize:11, color:'#9ca3af', textAlign:'right'},
 
-  // ── Promo Card ──
+  // Promo Card
   promoCard: {backgroundColor:'#fff', borderRadius:20, padding:16, flexDirection:'row',
     alignItems:'center', gap:12, marginBottom:12,
     shadowColor:'#000', shadowOpacity:0.06, shadowRadius:10, shadowOffset:{width:0,height:3}, elevation:4},
@@ -1400,12 +1192,12 @@ const s = StyleSheet.create({
     justifyContent:'center', alignItems:'center'},
   promoIconBox: {width:52, height:52, borderRadius:16, justifyContent:'center', alignItems:'center'},
 
-  // ── Empty State ──
+  // Empty State
   emptyBox: {justifyContent:'center', alignItems:'center', paddingTop:80, gap:10},
   emptyTitle: {fontSize:17, fontWeight:'bold', color:'#374151'},
   emptyText: {fontSize:14, color:'#9ca3af'},
 
-  // ── Modal ──
+  // Modal
   modalOverlay: {flex:1, backgroundColor:'rgba(0,0,0,0.55)', justifyContent:'flex-end'},
   modalCard: {backgroundColor:'#fff', borderTopLeftRadius:30, borderTopRightRadius:30,
     overflow:'hidden', maxHeight:'92%'},
@@ -1414,19 +1206,17 @@ const s = StyleSheet.create({
   modalTitle: {fontSize:17, fontWeight:'bold', color:'#fff'},
   modalScrollContent: {padding:20, paddingBottom:10},
 
-  // ── Form Inputs ──
+  // Form Inputs
   inputLabel: {fontSize:13, color:'#374151', textAlign:'right', marginBottom:7, marginTop:14, fontWeight:'700'},
   modalInput: {borderWidth:1.5, borderColor:'#e5e7eb', borderRadius:14, padding:13,
     fontSize:14, color:'#111827', backgroundColor:'#f9fafb'},
-  // *** النقطة 1: حقل الوصف محسّن وأكبر ***
   textArea: {
-    minHeight: 160,      // زيادة الارتفاع من 100 → 160
-    maxHeight: 240,      // حد أقصى
+    minHeight: 100,
+    maxHeight: 200,
     textAlignVertical: 'top',
     paddingTop: 13,
     lineHeight: 22,
   },
-  charCount: {fontSize:11, color:'#9ca3af', textAlign:'left', marginTop:4},
   rowInputs: {flexDirection:'row-reverse', gap:10},
 
   // Image Upload
@@ -1443,15 +1233,30 @@ const s = StyleSheet.create({
   imgAddText: {fontSize:11, color:PRIMARY, fontWeight:'600', marginTop:3},
   imgCountText: {fontSize:10, color:'#9ca3af', marginTop:2},
 
-  // Categories
-  categoriesScroll: {marginBottom:4},
-  catBtn: {paddingHorizontal:15, paddingVertical:9, borderRadius:22,
-    backgroundColor:'#f3f4f6', borderWidth:1.5, borderColor:'#e5e7eb'},
-  catBtnActive: {backgroundColor:PRIMARY, borderColor:PRIMARY},
-  catText: {fontSize:13, color:'#6b7280', fontWeight:'600'},
-  catTextActive: {color:'#fff'},
+  // Categories - تم إصلاحها باستخدام FlatList
+  catBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    marginRight: 8,
+  },
+  catBtnActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  catText: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  catTextActive: {
+    color: '#fff',
+  },
 
-  // Toggle (محسّن - النقطة 3: toggle حقيقي بدل الدائرة)
+  // Toggle
   toggleBtn: {flexDirection:'row-reverse', alignItems:'center', gap:12,
     backgroundColor:'#f9fafb', borderRadius:16, padding:14, marginTop:14,
     borderWidth:1.5, borderColor:'#e5e7eb'},
