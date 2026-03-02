@@ -45,6 +45,18 @@ function ProductsTab() {
   });
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
+  const { data: availableCategories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => { 
+      try {
+        const { data } = await api.get('/api/categories'); 
+        return data.map((c: any) => c.name);
+      } catch {
+        return ['إلكترونيات', 'أزياء', 'منزل', 'رياضة', 'كتب'];
+      }
+    },
+  });
+
   const { data: products = [] } = useQuery({
     queryKey: ['admin-products'],
     queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
@@ -125,7 +137,7 @@ function ProductsTab() {
     saveProduct.mutate({
       name: form.name, 
       description: form.description, 
-      category: form.category || 'عام',
+      category: form.categories.join(',') || 'عام',
       companyWholesalePrice: Number(form.companyWholesalePrice),
       wholesalePrice: Number(form.wholesalePrice), 
       suggestedPrice: Number(form.suggestedPrice),
@@ -151,7 +163,7 @@ function ProductsTab() {
     setForm({
       name: p.name,
       description: p.description || '',
-      category: p.category,
+      categories: p.category ? p.category.split(',').filter(Boolean) : [],
       companyWholesalePrice: String(p.companyWholesalePrice || p.wholesalePrice),
       wholesalePrice: String(p.wholesalePrice),
       suggestedPrice: String(p.suggestedPrice || p.wholesalePrice),
@@ -207,7 +219,8 @@ function ProductsTab() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        );
+        }}}
       />
 
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
@@ -243,10 +256,31 @@ function ProductsTab() {
                 onChangeText={v => setForm(p => ({ ...p, description: v }))}
                 multiline textAlign="right" placeholderTextColor="#9ca3af" />
 
-              <Text style={s.inputLabel}>التصنيف</Text>
-              <TextInput style={s.input} placeholder="التصنيف" value={form.category}
-                onChangeText={v => setForm(p => ({ ...p, category: v }))} 
-                textAlign="right" placeholderTextColor="#9ca3af" />
+              <Text style={s.inputLabel}>التصنيفات (اختر واحد أو أكثر)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+              {availableCategories.map((cat: string) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    s.categoryChip,
+                    form.categories.includes(cat) && s.categoryChipActive
+                  ]}
+                  onPress={() => {
+                    setForm(p => ({
+                      ...p,
+                      categories: p.categories.includes(cat)
+                        ? p.categories.filter(c => c !== cat)
+                        : [...p.categories, cat]
+                    }));
+                  }}
+                >
+                  <Text style={[
+                    s.categoryChipText,
+                    form.categories.includes(cat) && s.categoryChipTextActive
+                  ]}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
               <Text style={s.inputLabel}>سعر الشركة (مخفي عن التاجر) *</Text>
               <TextInput style={s.input} placeholder="0" value={form.companyWholesalePrice}
@@ -285,9 +319,9 @@ function ProductsTab() {
                 keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
 
-              <Text style={s.inputLabel}>روابط إعلانية</Text>
+              <Text style={s.inputLabel}>روابط إعلانية (افصل بفاصلة ",")</Text>
               <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]}
-                placeholder="https://example.com"
+                placeholder="https://link1.com,https://link2.com"
                 value={form.adLinks} 
                 onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
                 multiline textAlign="right" placeholderTextColor="#9ca3af"
