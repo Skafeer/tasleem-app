@@ -40,17 +40,9 @@ function ProductsTab() {
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', 
-    description: '', 
-    categories: [] as string[],
-    companyWholesalePrice: '', 
-    wholesalePrice: '', 
-    suggestedPrice: '', 
-    sellingPriceMin: '',
-    stock: '', 
-    discount: '', 
-    adLinks: '', 
-    images: [] as string[]
+    name: '', description: '', categories: [] as string[], 
+    companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
+    stock: '', discount: '', adLinks: '', images: [] as string[]
   });
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
@@ -61,7 +53,7 @@ function ProductsTab() {
         const { data } = await api.get('/api/categories'); 
         return data.map((c: any) => c.name);
       } catch {
-        return CATEGORIES;
+        return ['إلكترونيات', 'أزياء', 'منزل', 'رياضة', 'كتب'];
       }
     },
   });
@@ -71,19 +63,7 @@ function ProductsTab() {
     queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
   });
 
-  const convertToBase64 = async (uri: string) => {
-    try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return `data:image/jpeg;base64,${base64}`;
-    } catch (error) {
-      console.error('Error converting to base64:', error);
-      throw error;
-    }
-  };
-
-    const pickAndUploadImage = async () => {
+  const pickAndUploadImage = async () => {
     if (form.images.length >= 10) { 
       toast.warning('الحد الأقصى 10 صور'); 
       return; 
@@ -122,6 +102,351 @@ function ProductsTab() {
     } finally {
       setUploadingImgs(false);
     }
+  };
+
+  const saveProduct = useMutation({
+    mutationFn: async (data: any) => {
+      if (editingProduct) {
+        const res = await api.put(`/api/products/${editingProduct.id}`, data);
+        return res.data;
+      } else {
+        const res = await api.post('/api/products', data);
+        return res.data;
+      }
+    },
+    onSuccess: () => {
+      toast.success(editingProduct ? 'تم التحديث' : 'تمت الإضافة');
+      qc.invalidateQueries({ queryKey: ['admin-products'] });
+      setShowModal(false);
+      resetForm();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل الحفظ'),
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: async (id: number) => { await api.delete(`/api/products/${id}`); },
+    onSuccess: () => { 
+      toast.success('تم الحذف'); 
+      qc.invalidateQueries({ queryKey: ['admin-products'] }); 
+    },
+  });
+
+  const handleSave = () => {
+    if (!form.name.trim()) { toast.warning('يرجى إدخال اسم المنتج'); return; }
+    if (!form.companyWholesalePrice || Number(form.companyWholesalePrice) <= 0) { 
+      toast.warning('سعر الشركة مطلوب'); 
+      return; 
+    }
+    if (!form.wholesalePrice || Number(form.wholesalePrice) <= 0) { 
+      toast.warning('سعر التاجر مطلوب'); 
+      return; 
+    }
+    if (!form.suggestedPrice || Number(form.suggestedPrice) <= 0) { 
+      toast.warning('السعر المقترح مطلوب'); 
+      return; 
+    }
+    if (!form.stock || Number(form.stock) < 0) { 
+      toast.warning('المخزون مطلوب'); 
+      return; 
+    }
+
+    const minPrice = form.sellingPriceMin.trim() 
+      ? Number(form.sellingPriceMin) 
+      : Number(form.wholesalePrice);
+
+    saveProduct.mutate({
+      name: form.name, 
+      description: form.description, 
+      category: form.categories.join(',') || 'عام',
+      companyWholesalePrice: Number(form.companyWholesalePrice),
+      wholesalePrice: Number(form.wholesalePrice), 
+      suggestedPrice: Number(form.suggestedPrice),
+      sellingPriceMin: minPrice,
+      stock: Number(form.stock), 
+      discount: Number(form.discount) || 0,
+      adLinks: form.adLinks, 
+      images: form.images.join(','),
+    });
+  };
+
+  const resetForm = () => {
+    setForm({ 
+      name: '', description: '', categories: [], 
+      companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
+      stock: '', discount: '', adLinks: '', images: [] 
+    });
+    setEditingProduct(null);
+  };
+
+  const openEdit = (p: any) => {
+    setEditingProduct(p);
+    setForm({
+      name: p.name, 
+      description: p.description || '', 
+      categories: p.category ? p.category.split(',').filter(Boolean) : [],
+      companyWholesalePrice: String(p.companyWholesalePrice || p.wholesalePrice),
+      wholesalePrice: String(p.wholesalePrice), 
+      suggestedPrice: String(p.suggestedPrice || p.wholesalePrice),
+      sellingPriceMin: String(p.sellingPriceMin), 
+      stock: String(p.stock),
+      discount: String(p.discount || 0), 
+      adLinks: p.adLinks || '',
+      images: p.images ? p.images.split(',').filter(Boolean) : []
+    });
+    setShowModal(true);
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={products}
+        keyExtractor={i => i.id.toString()}
+        contentContainerStyle={{ padding: 16 }}
+        ListHeaderComponent={
+          <TouchableOpacity style={s.addBtn} onPress={() => { resetForm(); setShowModal(true); }}>
+            <Ionicons name="add-circle" size={22} color="#fff" />
+            <Text style={s.addBtnText}>إضافة منتج جديد</Text>
+          </TouchableOpacity>
+        }
+        renderItem={({ item: p }) => {
+          const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
+          return (
+            <View style={s.card}>
+              {imgs[0] && (
+                <Image 
+                  source={{ uri: imgs[0] }} 
+                  style={{ width: '100%', height: 150, borderRadius: 10, marginBottom: 10 }} 
+                  resizeMode="cover" 
+                />
+              )}
+              <Text style={s.cardTitle}>{p.name}</Text>
+              <Text style={s.cardMeta}>سعر الشركة (مخفي): {(p.companyWholesalePrice || 0).toLocaleString()} د.ع</Text>
+              <Text style={s.cardMeta}>سعر التاجر: {p.wholesalePrice.toLocaleString()} د.ع</Text>
+              <Text style={s.cardMeta}>سعر مقترح: {(p.suggestedPrice || p.wholesalePrice).toLocaleString()} د.ع</Text>
+              <Text style={s.cardMeta}>الحد الأدنى: {p.sellingPriceMin.toLocaleString()} د.ع</Text>
+              <Text style={s.cardMeta}>المخزون: {p.stock}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <TouchableOpacity style={s.editBtn} onPress={() => openEdit(p)}>
+                  <Ionicons name="create-outline" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={s.deleteBtn} onPress={() => {
+                  Alert.alert('تأكيد', 'حذف المنتج؟', [
+                    { text: 'إلغاء', style: 'cancel' },
+                    { text: 'حذف', onPress: () => deleteProduct.mutate(p.id), style: 'destructive' }
+                  ]);
+                }}>
+                  <Ionicons name="trash-outline" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }}
+      />
+
+      <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
+        <KeyboardAvoidingView 
+          style={{ flex: 1, backgroundColor: '#f9fafb' }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={s.modalHeader}>
+              <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+              <Text style={s.modalTitle}>{editingProduct ? 'تعديل منتج' : 'إضافة منتج'}</Text>
+              <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView 
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={s.inputLabel}>اسم المنتج *</Text>
+              <TextInput style={s.input} placeholder="اسم المنتج" value={form.name}
+                onChangeText={v => setForm(p => ({ ...p, name: v }))} 
+                textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>الوصف</Text>
+              <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} 
+                placeholder="وصف المنتج"
+                value={form.description} 
+                onChangeText={v => setForm(p => ({ ...p, description: v }))}
+                multiline textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>التصنيفات (اختر واحد أو أكثر)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                {availableCategories.map((cat: string) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      s.categoryChip,
+                      form.categories.includes(cat) && s.categoryChipActive
+                    ]}
+                    onPress={() => {
+                      setForm(p => ({
+                        ...p,
+                        categories: p.categories.includes(cat)
+                          ? p.categories.filter(c => c !== cat)
+                          : [...p.categories, cat]
+                      }));
+                    }}
+                  >
+                    <Text style={[
+                      s.categoryChipText,
+                      form.categories.includes(cat) && s.categoryChipTextActive
+                    ]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <Text style={s.inputLabel}>سعر الشركة (مخفي عن التاجر) *</Text>
+              <TextInput style={s.input} placeholder="0" value={form.companyWholesalePrice}
+                onChangeText={v => setForm(p => ({ ...p, companyWholesalePrice: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>سعر الجملة للتاجر *</Text>
+              <TextInput style={s.input} placeholder="0" value={form.wholesalePrice}
+                onChangeText={v => setForm(p => ({ ...p, wholesalePrice: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>سعر البيع المقترح *</Text>
+              <TextInput style={s.input} placeholder="0" value={form.suggestedPrice}
+                onChangeText={v => setForm(p => ({ ...p, suggestedPrice: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>الحد الأدنى (اختياري - يُعتمد سعر التاجر إذا فارغ)</Text>
+              <TextInput style={s.input} placeholder="اتركه فارغاً" 
+                value={form.sellingPriceMin}
+                onChangeText={v => setForm(p => ({ ...p, sellingPriceMin: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>المخزون *</Text>
+              <TextInput style={s.input} placeholder="0" value={form.stock}
+                onChangeText={v => setForm(p => ({ ...p, stock: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>نسبة الخصم (%)</Text>
+              <TextInput style={s.input} placeholder="0" value={form.discount}
+                onChangeText={v => setForm(p => ({ ...p, discount: v }))}
+                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>روابط إعلانية (افصل بفاصلة ",")</Text>
+              <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="https://link1.com,https://link2.com"
+                value={form.adLinks} 
+                onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
+                multiline textAlign="right" placeholderTextColor="#9ca3af" />
+
+              <Text style={s.inputLabel}>صور ({form.images.length}/10)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                {form.images.map((uri, idx) => (
+                  <View key={idx} style={s.imgPreview}>
+                    <Image source={{ uri }} style={s.imgPreviewImg} />
+                    <TouchableOpacity style={s.imgRemove} 
+                      onPress={() => setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))}>
+                      <Ionicons name="close-circle" size={24} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImage} disabled={uploadingImgs}>
+                  {uploadingImgs ? <ActivityIndicator color={PRIMARY} /> :
+                    <Ionicons name="add-circle-outline" size={40} color={PRIMARY} />}
+                </TouchableOpacity>
+              </ScrollView>
+
+              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saveProduct.isPending}>
+                <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.saveGrad}>
+                  {saveProduct.isPending ? <ActivityIndicator color="#fff" /> :
+                    <Text style={s.saveBtnText}>حفظ</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+export default function AdminScreen() {
+  const qc = useQueryClient();
+  const { width, height } = useWindowDimensions();
+  const [tab, setTab] = useState<'orders'|'products'|'users'|'withdrawals'|'promos'>('orders');
+  const [orderFilter, setOrderFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showEditProduct, setShowEditProduct] = useState<any>(null);
+  const [showAddPromo, setShowAddPromo] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [uploadingImgs, setUploadingImgs] = useState(false);
+  const [promoForm, setPromoForm] = useState({ code: '', discountPercent: '' });
+  const [form, setForm] = useState({
+    name:'', description:'', wholesalePrice:'', sellingPriceMin:'',
+    category:'إلكترونيات', images:[] as string[], adLinks:'', stock:'10',
+    isRenewable: false, discount: '0',
+  });
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ['admin-orders'],
+    queryFn: async () => { const { data } = await api.get('/api/orders'); return data; },
+    refetchInterval: 30000,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
+  });
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => { const { data } = await api.get('/api/admin/users'); return data; },
+  });
+  const { data: withdrawals = [] } = useQuery({
+    queryKey: ['admin-withdrawals'],
+    queryFn: async () => { const { data } = await api.get('/api/withdrawals'); return data; },
+  });
+  const { data: promos = [] } = useQuery({
+    queryKey: ['promo-codes'],
+    queryFn: async () => { const { data } = await api.get('/api/promo-codes'); return data; },
+  });
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await qc.invalidateQueries();
+    setRefreshing(false);
+  };
+
+  const resetForm = () => setForm({
+    name:'', description:'', wholesalePrice:'', sellingPriceMin:'',
+    category:'إلكترونيات', images:[], adLinks:'', stock:'10',
+    isRenewable: false, discount: '0',
+  });
+
+  const pickAndUploadImage = async () => {
+    if (form.images.length >= 10) { toast.warning('الحد الأقصى 10 صور'); return; }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { toast.error('يرجى السماح بالوصول للصور'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 10 - form.images.length,
+      quality: 0.8,
+      base64: true,
+    });
+    if (result.canceled) return;
+    setUploadingImgs(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (const asset of result.assets) {
+        const base64 = `data:image/jpeg;base64,${asset.base64}`;
+        const { data } = await api.post('/api/upload', { image: base64 });
+        uploadedUrls.push(data.url);
+      }
+      setForm(p => ({ ...p, images: [...p.images, ...uploadedUrls].slice(0, 10) }));
+      toast.success(`تم رفع ${uploadedUrls.length} صورة ✅`);
+    } catch { toast.error('فشل رفع الصور'); }
+    setUploadingImgs(false);
   };
 
   const removeImage = (idx: number) => {
@@ -657,6 +982,12 @@ const s = StyleSheet.create({
   deleteBtn: {width:36, height:36, borderRadius:10, backgroundColor:DANGER,
     justifyContent:'center', alignItems:'center'},
 
+  // Card style for ProductsTab
+  card: {backgroundColor:'#fff', borderRadius:16, padding:14, marginBottom:12,
+    shadowColor:'#000', shadowOpacity:0.06, shadowRadius:8, elevation:3},
+  cardTitle: {fontSize:18, fontWeight:'bold', color:'#111827', marginBottom:8, textAlign:'right'},
+  cardMeta: {fontSize:13, color:'#6b7280', marginBottom:4, textAlign:'right'},
+
   // Section Header
   sectionHeader: {flexDirection:'row', alignItems:'center', gap:8, marginBottom:14},
   sectionTitle: {fontSize:17, fontWeight:'bold', color:'#111827', flex:1, textAlign:'right'},
@@ -738,27 +1069,26 @@ const s = StyleSheet.create({
   rowInputs: {flexDirection:'row', gap:10, marginBottom:8},
 
   // Category Chips
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    marginRight: 8,
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+  categoryChip: { 
+    paddingHorizontal: 14, 
+    paddingVertical: 8, 
+    borderRadius: 20, 
+    backgroundColor: '#f3f4f6', 
+    marginRight: 8, 
+    borderWidth: 1.5, 
+    borderColor: '#e5e7eb' 
   },
-  categoryChipActive: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
+  categoryChipActive: { 
+    backgroundColor: PRIMARY + '20', 
+    borderColor: PRIMARY 
   },
-  categoryChipText: {
-    fontSize: 13,
-    color: '#6b7280',
-    fontWeight: '600',
+  categoryChipText: { 
+    fontSize: 13, 
+    color: '#6b7280', 
+    fontWeight: '600' 
   },
-  categoryChipTextActive: {
-    color: '#fff',
-    fontWeight: 'bold',
+  categoryChipTextActive: { 
+    color: PRIMARY 
   },
 
   // Image Upload
