@@ -34,10 +34,12 @@ export default function HomeScreen() {
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
   });
 
-  const categories = ['الكل', ...Array.from(new Set(products.map((p: any) => p.category))) as string[]];
+  const allCats = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
+  const categories = ['الكل', ...Array.from(new Set(allCats))];
 
   const filtered = products.filter((p: any) => {
-    const matchCat = activeCategory === 'الكل' || p.category === activeCategory;
+    const productCats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+    const matchCat = activeCategory === 'الكل' || productCats.includes(activeCategory);
     const matchSearch = !search || p.name.includes(search);
     return matchCat && matchSearch;
   });
