@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -39,9 +40,17 @@ function ProductsTab() {
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', description: '', category: '',
-    companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-    stock: '', discount: '', adLinks: '', images: [] as string[]
+    name: '', 
+    description: '', 
+    categories: [] as string[],
+    companyWholesalePrice: '', 
+    wholesalePrice: '', 
+    suggestedPrice: '', 
+    sellingPriceMin: '',
+    stock: '', 
+    discount: '', 
+    adLinks: '', 
+    images: [] as string[]
   });
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
@@ -52,7 +61,7 @@ function ProductsTab() {
         const { data } = await api.get('/api/categories'); 
         return data.map((c: any) => c.name);
       } catch {
-        return ['إلكترونيات', 'أزياء', 'منزل', 'رياضة', 'كتب'];
+        return CATEGORIES;
       }
     },
   });
@@ -62,26 +71,78 @@ function ProductsTab() {
     queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
   });
 
+  const convertToBase64 = async (uri: string) => {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return `data:image/jpeg;base64,${base64}`;
+    } catch (error) {
+      console.error('Error converting to base64:', error);
+      throw error;
+    }
+  };
+
   const pickAndUploadImage = async () => {
-    if (form.images.length >= 10) { toast.warning('الحد الأقصى 10 صور'); return; }
+    if (form.images.length >= 10) { 
+      toast.warning('الحد الأقصى 10 صور'); 
+      return; 
+    }
+    
+    // طلب الإذن
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { 
+      toast.error('يرجى السماح بالوصول للصور'); 
+      return; 
+    }
+    
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.8
+      selectionLimit: 10 - form.images.length,
+      quality: 0.7, // تقليل الجودة قليلاً لتحسين الأداء
+      base64: false, // سنقوم بالتحويل يدوياً
     });
+    
     if (result.canceled) return;
+    
     setUploadingImgs(true);
+    
     try {
       const urls: string[] = [];
+      
       for (const asset of result.assets) {
-        const { data } = await api.post('/api/upload', { image: asset.uri });
-        urls.push(data.url);
+        try {
+          // تحويل الصورة إلى base64
+          const base64Image = await convertToBase64(asset.uri);
+          
+          // رفع الصورة
+          const { data } = await api.post('/api/upload', { image: base64Image });
+          
+          if (data && data.url) {
+            urls.push(data.url);
+          } else {
+            throw new Error('لم يتم استلام رابط الصورة');
+          }
+        } catch (err) {
+          console.error('Error uploading image:', err);
+          toast.error(`فشل رفع الصورة: ${asset.fileName || ''}`);
+        }
       }
-      setForm(p => ({ ...p, images: [...p.images, ...urls].slice(0, 10) }));
-      toast.success('تم رفع الصور');
+      
+      if (urls.length > 0) {
+        setForm(p => ({ 
+          ...p, 
+          images: [...p.images, ...urls].slice(0, 10) 
+        }));
+        toast.success(`تم رفع ${urls.length} صورة بنجاح`);
+      }
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'فشل رفع الصور');
-    } finally { setUploadingImgs(false); }
+      console.error('Upload error:', e);
+      toast.error(e?.response?.data?.message || e?.message || 'فشل رفع الصور');
+    } finally { 
+      setUploadingImgs(false); 
+    }
   };
 
   const saveProduct = useMutation({
@@ -95,38 +156,59 @@ function ProductsTab() {
       }
     },
     onSuccess: () => {
-      toast.success(editingProduct ? 'تم التحديث' : 'تمت الإضافة');
+      toast.success(editingProduct ? 'تم التحديث بنجاح' : 'تمت الإضافة بنجاح');
       qc.invalidateQueries({ queryKey: ['admin-products'] });
       setShowModal(false);
       resetForm();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل الحفظ'),
+    onError: (e: any) => {
+      console.error('Save error:', e);
+      toast.error(e?.response?.data?.message || e?.message || 'فشل الحفظ');
+    },
   });
 
   const deleteProduct = useMutation({
-    mutationFn: async (id: number) => { await api.delete(`/api/products/${id}`); },
+    mutationFn: async (id: number) => { 
+      await api.delete(`/api/products/${id}`); 
+    },
     onSuccess: () => {
-      toast.success('تم الحذف');
+      toast.success('تم الحذف بنجاح');
       qc.invalidateQueries({ queryKey: ['admin-products'] });
+    },
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.message || 'فشل الحذف');
     },
   });
 
   const handleSave = () => {
-    if (!form.name.trim()) { toast.warning('يرجى إدخال اسم المنتج'); return; }
+    // التحقق من المدخلات
+    if (!form.name.trim()) { 
+      toast.warning('يرجى إدخال اسم المنتج'); 
+      return; 
+    }
+    
     if (!form.companyWholesalePrice || Number(form.companyWholesalePrice) <= 0) {
       toast.warning('سعر الشركة مطلوب');
       return;
     }
+    
     if (!form.wholesalePrice || Number(form.wholesalePrice) <= 0) {
       toast.warning('سعر التاجر مطلوب');
       return;
     }
+    
     if (!form.suggestedPrice || Number(form.suggestedPrice) <= 0) {
       toast.warning('السعر المقترح مطلوب');
       return;
     }
+    
     if (!form.stock || Number(form.stock) < 0) {
       toast.warning('المخزون مطلوب');
+      return;
+    }
+
+    if (form.images.length === 0) {
+      toast.warning('يرجى إضافة صورة واحدة على الأقل');
       return;
     }
 
@@ -134,26 +216,38 @@ function ProductsTab() {
       ? Number(form.sellingPriceMin) 
       : Number(form.wholesalePrice);
 
-    saveProduct.mutate({
-      name: form.name, 
-      description: form.description, 
-      category: form.categories.join(',') || 'عام',
+    // تجهيز البيانات للإرسال
+    const productData = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      category: form.categories.length > 0 ? form.categories.join(',') : 'عام',
       companyWholesalePrice: Number(form.companyWholesalePrice),
-      wholesalePrice: Number(form.wholesalePrice), 
+      wholesalePrice: Number(form.wholesalePrice),
       suggestedPrice: Number(form.suggestedPrice),
       sellingPriceMin: minPrice,
-      stock: Number(form.stock), 
+      stock: Number(form.stock),
       discount: Number(form.discount) || 0,
-      adLinks: form.adLinks, 
+      adLinks: form.adLinks.trim(),
+      imageUrl: form.images[0], // الصورة الرئيسية
       images: form.images.join(','),
-    });
+    };
+
+    saveProduct.mutate(productData);
   };
 
   const resetForm = () => {
     setForm({
-      name: '', description: '', category: '',
-      companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-      stock: '', discount: '', adLinks: '', images: []
+      name: '', 
+      description: '', 
+      categories: [],
+      companyWholesalePrice: '', 
+      wholesalePrice: '', 
+      suggestedPrice: '', 
+      sellingPriceMin: '',
+      stock: '', 
+      discount: '', 
+      adLinks: '', 
+      images: []
     });
     setEditingProduct(null);
   };
@@ -161,17 +255,17 @@ function ProductsTab() {
   const openEdit = (p: any) => {
     setEditingProduct(p);
     setForm({
-      name: p.name,
+      name: p.name || '',
       description: p.description || '',
       categories: p.category ? p.category.split(',').filter(Boolean) : [],
-      companyWholesalePrice: String(p.companyWholesalePrice || p.wholesalePrice),
-      wholesalePrice: String(p.wholesalePrice),
-      suggestedPrice: String(p.suggestedPrice || p.wholesalePrice),
-      sellingPriceMin: String(p.sellingPriceMin),
-      stock: String(p.stock),
-      discount: String(p.discount || 0),
+      companyWholesalePrice: String(p.companyWholesalePrice || p.wholesalePrice || ''),
+      wholesalePrice: String(p.wholesalePrice || ''),
+      suggestedPrice: String(p.suggestedPrice || p.wholesalePrice || ''),
+      sellingPriceMin: String(p.sellingPriceMin || ''),
+      stock: String(p.stock || ''),
+      discount: String(p.discount || '0'),
       adLinks: p.adLinks || '',
-      images: p.images ? p.images.split(',').filter(Boolean) : []
+      images: p.images ? p.images.split(',').filter(Boolean) : (p.imageUrl ? [p.imageUrl] : [])
     });
     setShowModal(true);
   };
@@ -183,7 +277,10 @@ function ProductsTab() {
         keyExtractor={i => i.id.toString()}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
-          <TouchableOpacity style={s.addBtn} onPress={() => { resetForm(); setShowModal(true); }}>
+          <TouchableOpacity 
+            style={s.addBtn} 
+            onPress={() => { resetForm(); setShowModal(true); }}
+            activeOpacity={0.8}>
             <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.addBtnGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
               <Ionicons name="add-circle-outline" size={20} color="#fff" />
               <Text style={s.addBtnText}>إضافة منتج جديد</Text>
@@ -199,34 +296,55 @@ function ProductsTab() {
         }
         renderItem={({ item: p }) => (
           <View style={s.productCard}>
-            <Text style={s.productName}>{p.name}</Text>
-            <Text style={s.productMeta}>سعر الشركة (مخفي): {(p.companyWholesalePrice || 0).toLocaleString()} د.ع</Text>
-            <Text style={s.productMeta}>سعر التاجر: {p.wholesalePrice.toLocaleString()} د.ع</Text>
-            <Text style={s.productMeta}>سعر مقترح: {(p.suggestedPrice || p.wholesalePrice).toLocaleString()} د.ع</Text>
-            <Text style={s.productMeta}>الحد الأدنى: {p.sellingPriceMin.toLocaleString()} د.ع</Text>
-            <Text style={s.productMeta}>المخزون: {p.stock}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            {p.images ? (
+              <Image 
+                source={{ uri: p.images.split(',')[0] }} 
+                style={s.productThumb} 
+                resizeMode="cover"
+              />
+            ) : p.imageUrl ? (
+              <Image 
+                source={{ uri: p.imageUrl }} 
+                style={s.productThumb} 
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[s.productThumb, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
+                <Ionicons name="image-outline" size={24} color="#9ca3af" />
+              </View>
+            )}
+            <View style={s.productInfo}>
+              <Text style={s.productName}>{p.name}</Text>
+              <Text style={s.productMeta}>🏢 سعر الشركة: {(p.companyWholesalePrice || 0).toLocaleString()} د.ع</Text>
+              <Text style={s.productMeta}>💼 سعر التاجر: {p.wholesalePrice?.toLocaleString()} د.ع</Text>
+              <Text style={s.productMeta}>💰 سعر مقترح: {(p.suggestedPrice || p.wholesalePrice).toLocaleString()} د.ع</Text>
+              <Text style={s.productMeta}>📉 الحد الأدنى: {p.sellingPriceMin?.toLocaleString()} د.ع</Text>
+              <Text style={s.productMeta}>📦 المخزون: {p.stock}</Text>
+            </View>
+            <View style={s.productActions}>
               <TouchableOpacity style={s.editBtn} onPress={() => openEdit(p)}>
                 <Ionicons name="create-outline" size={18} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity style={s.deleteBtn} onPress={() => {
-                Alert.alert('تأكيد', 'حذف المنتج؟', [
-                  { text: 'إلغاء', style: 'cancel' },
-                  { text: 'حذف', onPress: () => deleteProduct.mutate(p.id), style: 'destructive' }
-                ]);
-              }}>
+              <TouchableOpacity 
+                style={s.deleteBtn} 
+                onPress={() => {
+                  Alert.alert('تأكيد', 'هل أنت متأكد من حذف هذا المنتج؟', [
+                    { text: 'إلغاء', style: 'cancel' },
+                    { text: 'حذف', onPress: () => deleteProduct.mutate(p.id), style: 'destructive' }
+                  ]);
+                }}>
                 <Ionicons name="trash-outline" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
-        );
-        }}}
+        )}
       />
 
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <KeyboardAvoidingView 
           style={{ flex: 1, backgroundColor: '#f9fafb' }} 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <SafeAreaView style={{ flex: 1 }}>
             <View style={s.modalHeader}>
@@ -240,114 +358,227 @@ function ProductsTab() {
             <ScrollView 
               ref={scrollRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <Text style={s.inputLabel}>اسم المنتج *</Text>
-              <TextInput style={s.input} placeholder="اسم المنتج" value={form.name}
-                onChangeText={v => setForm(p => ({ ...p, name: v }))} 
-                textAlign="right" placeholderTextColor="#9ca3af" />
-
-              <Text style={s.inputLabel}>الوصف</Text>
-              <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} 
-                placeholder="وصف المنتج"
-                value={form.description} 
-                onChangeText={v => setForm(p => ({ ...p, description: v }))}
-                multiline textAlign="right" placeholderTextColor="#9ca3af" />
-
-              <Text style={s.inputLabel}>التصنيفات (اختر واحد أو أكثر)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-              {availableCategories.map((cat: string) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    s.categoryChip,
-                    form.categories.includes(cat) && s.categoryChipActive
-                  ]}
-                  onPress={() => {
-                    setForm(p => ({
-                      ...p,
-                      categories: p.categories.includes(cat)
-                        ? p.categories.filter(c => c !== cat)
-                        : [...p.categories, cat]
-                    }));
-                  }}
-                >
-                  <Text style={[
-                    s.categoryChipText,
-                    form.categories.includes(cat) && s.categoryChipTextActive
-                  ]}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-              <Text style={s.inputLabel}>سعر الشركة (مخفي عن التاجر) *</Text>
-              <TextInput style={s.input} placeholder="0" value={form.companyWholesalePrice}
-                onChangeText={v => setForm(p => ({ ...p, companyWholesalePrice: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>سعر الجملة للتاجر *</Text>
-              <TextInput style={s.input} placeholder="0" value={form.wholesalePrice}
-                onChangeText={v => setForm(p => ({ ...p, wholesalePrice: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>سعر البيع المقترح *</Text>
-              <TextInput style={s.input} placeholder="0" value={form.suggestedPrice}
-                onChangeText={v => setForm(p => ({ ...p, suggestedPrice: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>الحد الأدنى (اختياري - يُعتمد سعر التاجر إذا فارغ)</Text>
-              <TextInput style={s.input} placeholder="اتركه فارغاً" 
-                value={form.sellingPriceMin}
-                onChangeText={v => setForm(p => ({ ...p, sellingPriceMin: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>المخزون *</Text>
-              <TextInput style={s.input} placeholder="0" value={form.stock}
-                onChangeText={v => setForm(p => ({ ...p, stock: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>نسبة الخصم (%)</Text>
-              <TextInput style={s.input} placeholder="0" value={form.discount}
-                onChangeText={v => setForm(p => ({ ...p, discount: v }))}
-                keyboardType="number-pad" textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>روابط إعلانية (افصل بفاصلة ",")</Text>
-              <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]}
-                placeholder="https://link1.com,https://link2.com"
-                value={form.adLinks} 
-                onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
-                multiline textAlign="right" placeholderTextColor="#9ca3af"
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} />
-
-              <Text style={s.inputLabel}>صور ({form.images.length}/10)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {/* صور المنتج - مع تحسينات */}
+              <Text style={s.inputLabel}>📷 صور المنتج *</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={{ marginBottom: 16 }}
+                contentContainerStyle={{ paddingVertical: 8 }}
+              >
                 {form.images.map((uri, idx) => (
                   <View key={idx} style={s.imgPreview}>
                     <Image source={{ uri }} style={s.imgPreviewImg} />
-                    <TouchableOpacity style={s.imgRemove} 
-                      onPress={() => setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))}>
-                      <Ionicons name="close-circle" size={24} color="#ef4444" />
+                    <TouchableOpacity 
+                      style={s.imgRemove} 
+                      onPress={() => setForm(p => ({ 
+                        ...p, 
+                        images: p.images.filter((_, i) => i !== idx) 
+                      }))}>
+                      <Ionicons name="close-circle" size={24} color={DANGER} />
                     </TouchableOpacity>
+                    {idx === 0 && (
+                      <View style={s.imgMainBadge}>
+                        <Text style={{ fontSize: 9, color: '#fff' }}>رئيسية</Text>
+                      </View>
+                    )}
                   </View>
                 ))}
-                <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImage} disabled={uploadingImgs}>
-                  {uploadingImgs ? <ActivityIndicator color={PRIMARY} /> :
-                    <Ionicons name="add-circle-outline" size={40} color={PRIMARY} />}
+                <TouchableOpacity 
+                  style={s.imgAddBtn} 
+                  onPress={pickAndUploadImage} 
+                  disabled={uploadingImgs}
+                  activeOpacity={0.7}>
+                  {uploadingImgs ? (
+                    <ActivityIndicator color={PRIMARY} />
+                  ) : (
+                    <>
+                      <Ionicons name="camera-outline" size={32} color={PRIMARY} />
+                      <Text style={s.imgAddText}>إضافة</Text>
+                      <Text style={s.imgCountText}>{form.images.length}/10</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </ScrollView>
 
-              <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saveProduct.isPending}>
-                <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.saveGrad}>
-                  {saveProduct.isPending ? <ActivityIndicator color="#fff" /> :
-                    <Text style={s.saveBtnText}>حفظ</Text>}
+              {/* اسم المنتج */}
+              <Text style={s.inputLabel}>📦 اسم المنتج *</Text>
+              <TextInput 
+                style={s.input} 
+                placeholder="اسم المنتج" 
+                value={form.name}
+                onChangeText={v => setForm(p => ({ ...p, name: v }))} 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af" 
+              />
+
+              {/* الوصف */}
+              <Text style={s.inputLabel}>📝 الوصف</Text>
+              <TextInput 
+                style={[s.input, { height: 100, textAlignVertical: 'top' }]} 
+                placeholder="وصف المنتج"
+                value={form.description} 
+                onChangeText={v => setForm(p => ({ ...p, description: v }))}
+                multiline 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af" 
+              />
+
+              {/* التصنيفات - متعدد الاختيار */}
+              <Text style={s.inputLabel}>🏷️ التصنيفات (اختر واحد أو أكثر)</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={{ marginBottom: 16 }}
+                contentContainerStyle={{ paddingVertical: 4 }}
+              >
+                {(availableCategories.length > 0 ? availableCategories : CATEGORIES).map((cat: string) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      s.categoryChip,
+                      form.categories.includes(cat) && s.categoryChipActive
+                    ]}
+                    onPress={() => {
+                      setForm(p => ({
+                        ...p,
+                        categories: p.categories.includes(cat)
+                          ? p.categories.filter(c => c !== cat)
+                          : [...p.categories, cat]
+                      }));
+                    }}>
+                    <Text style={[
+                      s.categoryChipText,
+                      form.categories.includes(cat) && s.categoryChipTextActive
+                    ]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* الأسعار */}
+              <Text style={[s.inputLabel, { color: PRIMARY, marginTop: 8 }]}>💰 الأسعار (دينار عراقي)</Text>
+              
+              <Text style={s.inputLabel}>🏢 سعر الشركة (مخفي عن التاجر) *</Text>
+              <TextInput 
+                style={s.input} 
+                placeholder="0" 
+                value={form.companyWholesalePrice}
+                onChangeText={v => setForm(p => ({ ...p, companyWholesalePrice: v }))}
+                keyboardType="numeric" 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} 
+              />
+
+              <Text style={s.inputLabel}>💼 سعر الجملة للتاجر *</Text>
+              <TextInput 
+                style={s.input} 
+                placeholder="0" 
+                value={form.wholesalePrice}
+                onChangeText={v => setForm(p => ({ ...p, wholesalePrice: v }))}
+                keyboardType="numeric" 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} 
+              />
+
+              <Text style={s.inputLabel}>💰 سعر البيع المقترح *</Text>
+              <TextInput 
+                style={s.input} 
+                placeholder="0" 
+                value={form.suggestedPrice}
+                onChangeText={v => setForm(p => ({ ...p, suggestedPrice: v }))}
+                keyboardType="numeric" 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} 
+              />
+
+              {/* عرض الربح المتوقع */}
+              {form.wholesalePrice && form.suggestedPrice && (
+                <View style={s.profitPreview}>
+                  <Ionicons name="trending-up-outline" size={16} color={SUCCESS} />
+                  <Text style={s.profitPreviewText}>
+                    الربح المتوقع للتاجر:{' '}
+                    <Text style={{ color: SUCCESS, fontWeight: 'bold' }}>
+                      {(Number(form.suggestedPrice) - Number(form.wholesalePrice)).toLocaleString()} د.ع
+                    </Text>
+                  </Text>
+                </View>
+              )}
+
+              <Text style={s.inputLabel}>📉 الحد الأدنى لسعر البيع (اختياري)</Text>
+              <TextInput 
+                style={s.input} 
+                placeholder="اتركه فارغاً لاستخدام سعر التاجر" 
+                value={form.sellingPriceMin}
+                onChangeText={v => setForm(p => ({ ...p, sellingPriceMin: v }))}
+                keyboardType="numeric" 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af"
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)} 
+              />
+
+              {/* المخزون والخصم */}
+              <View style={s.rowInputs}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.inputLabel}>📦 المخزون *</Text>
+                  <TextInput 
+                    style={s.input} 
+                    placeholder="0" 
+                    value={form.stock}
+                    onChangeText={v => setForm(p => ({ ...p, stock: v }))}
+                    keyboardType="numeric" 
+                    textAlign="right" 
+                    placeholderTextColor="#9ca3af" 
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.inputLabel}>🏷️ الخصم %</Text>
+                  <TextInput 
+                    style={s.input} 
+                    placeholder="0" 
+                    value={form.discount}
+                    onChangeText={v => setForm(p => ({ ...p, discount: v }))}
+                    keyboardType="numeric" 
+                    textAlign="right" 
+                    placeholderTextColor="#9ca3af" 
+                  />
+                </View>
+              </View>
+
+              {/* روابط إعلانية */}
+              <Text style={s.inputLabel}>🔗 روابط إعلانية (افصل بفاصلة)</Text>
+              <TextInput 
+                style={[s.input, { height: 80, textAlignVertical: 'top' }]}
+                placeholder="https://link1.com, https://link2.com"
+                value={form.adLinks} 
+                onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
+                multiline 
+                textAlign="right" 
+                placeholderTextColor="#9ca3af"
+              />
+
+              {/* زر الحفظ */}
+              <TouchableOpacity 
+                style={s.saveBtn} 
+                onPress={handleSave} 
+                disabled={saveProduct.isPending || uploadingImgs}
+                activeOpacity={0.8}>
+                <LinearGradient 
+                  colors={saveProduct.isPending || uploadingImgs ? ['#9ca3af', '#6b7280'] : [PRIMARY, '#0a8a9f']} 
+                  style={s.saveGrad}>
+                  {saveProduct.isPending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={s.saveBtnText}>
+                      {uploadingImgs ? 'جاري رفع الصور...' : editingProduct ? 'تحديث المنتج' : 'إضافة المنتج'}
+                    </Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </ScrollView>
@@ -957,9 +1188,13 @@ const s = StyleSheet.create({
 
   // Product Card (للـ ProductsTab)
   productCard: {backgroundColor:'#fff', borderRadius:14, padding:14, marginBottom:12,
-    shadowColor:'#000', shadowOpacity:0.06, shadowRadius:8, shadowOffset:{width:0,height:2}, elevation:3},
+    flexDirection:'row', shadowColor:'#000', shadowOpacity:0.06, shadowRadius:8,
+    shadowOffset:{width:0,height:2}, elevation:3, gap:12},
+  productThumb: {width:70, height:70, borderRadius:10},
+  productInfo: {flex:1},
   productName: {fontSize:16, fontWeight:'bold', color:'#111827', textAlign:'right', marginBottom:8},
-  productMeta: {fontSize:12, color:'#6b7280', textAlign:'right', marginBottom:4},
+  productMeta: {fontSize:12, color:'#6b7280', textAlign:'right', marginBottom:2, lineHeight:18},
+  productActions: {justifyContent: 'center', gap: 8},
   editBtn: {width:36, height:36, borderRadius:10, backgroundColor:PRIMARY,
     justifyContent:'center', alignItems:'center'},
   deleteBtn: {width:36, height:36, borderRadius:10, backgroundColor:DANGER,
@@ -1030,23 +1265,44 @@ const s = StyleSheet.create({
   modalScrollContent: {padding:20, paddingBottom:10},
 
   // Form Inputs
-  inputLabel: {fontSize:13, color:'#374151', textAlign:'right', marginBottom:7, marginTop:14, fontWeight:'700'},
+  inputLabel: {fontSize:13, color:'#374151', textAlign:'right', marginBottom:7, marginTop:10, fontWeight:'700'},
   input: {borderWidth:1.5, borderColor:'#e5e7eb', borderRadius:14, padding:13,
     fontSize:14, color:'#111827', backgroundColor:'#f9fafb', marginBottom:12},
   modalInput: {borderWidth:1.5, borderColor:'#e5e7eb', borderRadius:14, padding:13,
     fontSize:14, color:'#111827', backgroundColor:'#f9fafb'},
   textArea: {
-    minHeight: 160,
-    maxHeight: 240,
+    minHeight: 120,
+    maxHeight: 200,
     textAlignVertical: 'top',
     paddingTop: 13,
     lineHeight: 22,
   },
   charCount: {fontSize:11, color:'#9ca3af', textAlign:'left', marginTop:4},
-  rowInputs: {flexDirection:'row-reverse', gap:10},
-  saveBtn: {borderRadius:16, overflow:'hidden', marginTop:16},
-  saveGrad: {height:50, justifyContent:'center', alignItems:'center'},
-  saveBtnText: {color:'#fff', fontWeight:'bold', fontSize:16},
+  rowInputs: {flexDirection:'row', gap:10, marginBottom:8},
+
+  // Category Chips
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  categoryChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  categoryChipTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 
   // Image Upload
   imageUploadContainer: {gap:10, paddingBottom:8, paddingTop:4},
@@ -1066,7 +1322,7 @@ const s = StyleSheet.create({
   imgRemove: {position:'absolute', top:-6, right:-6},
 
   // Toggle
-  toggleBtn: {flexDirection:'row-reverse', alignItems:'center', gap:12,
+  toggleBtn: {flexDirection:'row', alignItems:'center', gap:12,
     backgroundColor:'#f9fafb', borderRadius:16, padding:14, marginTop:14,
     borderWidth:1.5, borderColor:'#e5e7eb'},
   toggleTrack: {width:48, height:28, borderRadius:14, backgroundColor:'#e5e7eb',
@@ -1075,18 +1331,21 @@ const s = StyleSheet.create({
   toggleThumb: {width:24, height:24, borderRadius:12, backgroundColor:'#fff',
     shadowColor:'#000', shadowOpacity:0.2, shadowRadius:3, shadowOffset:{width:0,height:1}},
   toggleThumbActive: {alignSelf:'flex-end'},
-  toggleText: {fontSize:14, color:'#374151', fontWeight:'700', textAlign:'right'},
+  toggleText: {fontSize:14, color:'#374151', fontWeight:'700', textAlign:'right', flex:1},
   toggleSubText: {fontSize:12, color:'#9ca3af', textAlign:'right', marginTop:2},
 
   // Profit Preview
-  profitPreview: {backgroundColor:'#f0fdf4', borderRadius:14, padding:14, marginTop:10,
-    flexDirection:'row-reverse', alignItems:'center', gap:8,
+  profitPreview: {backgroundColor:'#f0fdf4', borderRadius:14, padding:14, marginBottom:12,
+    flexDirection:'row', alignItems:'center', gap:8,
     borderWidth:1, borderColor:'#bbf7d0'},
-  profitPreviewText: {fontSize:14, color:'#374151', textAlign:'right'},
+  profitPreviewText: {fontSize:14, color:'#374151', textAlign:'right', flex:1},
 
   // Confirm Button
   confirmBtn: {borderRadius:16, overflow:'hidden', margin:16, marginTop:12,
     shadowColor:PRIMARY, shadowOpacity:0.3, shadowRadius:12, shadowOffset:{width:0,height:3}, elevation:5},
   confirmGrad: {height:54, flexDirection:'row', justifyContent:'center', alignItems:'center', gap:8},
   confirmText: {color:'#fff', fontWeight:'bold', fontSize:16},
+  saveBtn: {borderRadius:16, overflow:'hidden', marginTop:16, marginBottom:8},
+  saveGrad: {height:50, justifyContent:'center', alignItems:'center'},
+  saveBtnText: {color:'#fff', fontWeight:'bold', fontSize:16},
 });
