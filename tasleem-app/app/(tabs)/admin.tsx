@@ -12,7 +12,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
-import ProductsTab from './_admin/ProductsTab';
+import ProductsTab from '../admin-components/ProductsTab';
+
 
 const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
