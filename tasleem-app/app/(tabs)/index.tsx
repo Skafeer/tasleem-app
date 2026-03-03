@@ -23,7 +23,7 @@ export default function HomeScreen() {
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
-    queryFn: async () => { const { data } = await api.get("/api/products"); return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); },
+    queryFn: async () => { const { data } = await api.get("/api/products?activeOnly=true"); return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); },
   });
 
   // إخفاء المنتجات المنتهية
