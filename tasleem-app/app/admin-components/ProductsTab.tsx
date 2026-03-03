@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, FlatList, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, FlatList, Alert, KeyboardAvoidingView, Platform, Image, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,10 +17,13 @@ export default function ProductsTab() {
   const scrollRef = useRef<ScrollView>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('الكل');
   const [form, setForm] = useState({
     name: '', description: '', categories: [] as string[], 
     companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-    stock: '', discount: '', adLinks: '', images: [] as string[]
+    stock: '', discount: '', adLinks: '', images: [] as string[], 
+    isActive: true
   });
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
@@ -38,10 +41,22 @@ export default function ProductsTab() {
 
   const { data: products = [] } = useQuery({
     queryKey: ['admin-products'],
-    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
+    queryFn: async () => { 
+      const { data } = await api.get('/api/products'); 
+      // ترتيب حسب الأحدث
+      return data.sort((a: any, b: any) => b.id - a.id);
+    },
   });
 
-  const pickAndUploadImage = async () => {
+  // فلترة المنتجات
+  const filteredProducts = products.filter((p: any) => {
+    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchCategory = selectedCategory === 'الكل' || 
+      (p.category && p.category.split(',').includes(selectedCategory));
+    return matchSearch && matchCategory;
+  });
+
+  const pickAndUploadImages = async () => {
     if (form.images.length >= 10) { 
       toast.warning('الحد الأقصى 10 صور'); 
       return; 
@@ -50,39 +65,50 @@ export default function ProductsTab() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
+        selectionLimit: 10 - form.images.length,
         quality: 0.6,
       });
       
-      if (result.canceled || !result.assets[0]) return;
+      if (result.canceled || !result.assets.length) return;
       
       setUploadingImgs(true);
       
-      const uri = result.assets[0].uri;
+      const uploadedUrls: string[] = [];
       
-      // تحويل الصورة لـ base64 باستخدام fetch
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      for (const asset of result.assets) {
+        try {
+          const uri = asset.uri;
+          
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          
+          const uploadResponse = await api.post('/api/upload', { image: base64 });
+          
+          if (uploadResponse.data?.url) {
+            uploadedUrls.push(uploadResponse.data.url);
+          }
+        } catch (err) {
+          console.error('خطأ في رفع صورة:', err);
+        }
+      }
       
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      
-      // رفع الصورة
-      const uploadResponse = await api.post('/api/upload', { image: base64 });
-      
-      if (uploadResponse.data?.url) {
-        setForm(p => ({ ...p, images: [...p.images, uploadResponse.data.url] }));
-        toast.success('تم رفع الصورة ✅');
+      if (uploadedUrls.length > 0) {
+        setForm(p => ({ ...p, images: [...p.images, ...uploadedUrls] }));
+        toast.success(`تم رفع ${uploadedUrls.length} صورة ✅`);
       } else {
-        throw new Error('لم يتم استلام رابط');
+        toast.error('فشل رفع الصور');
       }
     } catch (e: any) {
-      console.error('رفع الصورة:', e);
-      toast.error(e.response?.data?.message || 'فشل رفع الصورة');
+      console.error('رفع الصور:', e);
+      toast.error(e.response?.data?.message || 'فشل رفع الصور');
     } finally {
       setUploadingImgs(false);
     }
@@ -150,6 +176,7 @@ export default function ProductsTab() {
       discount: Number(form.discount) || 0,
       adLinks: form.adLinks, 
       images: form.images.join(','),
+      isActive: form.isActive,
     });
   };
 
@@ -157,7 +184,7 @@ export default function ProductsTab() {
     setForm({ 
       name: '', description: '', categories: [], 
       companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-      stock: '', discount: '', adLinks: '', images: [] 
+      stock: '', discount: '', adLinks: '', images: [], isActive: true
     });
     setEditingProduct(null);
   };
@@ -175,15 +202,43 @@ export default function ProductsTab() {
       stock: String(p.stock),
       discount: String(p.discount || 0), 
       adLinks: p.adLinks || '',
-      images: p.images ? p.images.split(',').filter(Boolean) : []
+      images: p.images ? p.images.split(',').filter(Boolean) : [],
+      isActive: p.isActive !== false,
     });
     setShowModal(true);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <View style={s.searchSection}>
+        <View style={s.searchBox}>
+          <Ionicons name="search" size={20} color="#9ca3af" />
+          <TextInput 
+            style={s.searchInput}
+            placeholder="ابحث عن منتج..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+          {['الكل', ...availableCategories].map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[s.filterChip, selectedCategory === cat && s.filterChipActive]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text style={[s.filterChipText, selectedCategory === cat && s.filterChipTextActive]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       <FlatList
-        data={products}
+        data={filteredProducts}
         keyExtractor={i => i.id.toString()}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
@@ -198,7 +253,7 @@ export default function ProductsTab() {
               end={{x: 1, y: 1}}
               style={s.addBtnGrad}
             >
-              <Ionicons name="add-circle-outline" size={24} color="#fff" />
+              <Ionicons name="add-circle-outline" size={22} color="#fff" />
               <Text style={s.addBtnText}>إضافة منتج جديد</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -213,91 +268,82 @@ export default function ProductsTab() {
               onPress={() => openEdit(p)}
               activeOpacity={0.95}
             >
-              {imgs[0] ? (
-                <Image 
-                  source={{ uri: imgs[0] }} 
-                  style={s.productImage} 
-                  resizeMode="cover" 
-                />
-              ) : (
-                <View style={s.productImagePlaceholder}>
-                  <Ionicons name="image-outline" size={48} color="#d1d5db" />
-                </View>
-              )}
+              <View style={{ flexDirection: 'row-reverse', gap: 12 }}>
+                {imgs[0] ? (
+                  <Image 
+                    source={{ uri: imgs[0] }} 
+                    style={s.productImage} 
+                    resizeMode="cover" 
+                  />
+                ) : (
+                  <View style={s.productImagePlaceholder}>
+                    <Ionicons name="image-outline" size={32} color="#d1d5db" />
+                  </View>
+                )}
 
-              <View style={s.productContent}>
-                <View style={s.productHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
-                    
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-                      {categories.map((cat, idx) => (
-                        <View key={idx} style={s.categoryBadge}>
-                          <Text style={s.categoryBadgeText}>{cat}</Text>
-                        </View>
-                      ))}
-                    </ScrollView>
+                <View style={{ flex: 1 }}>
+                  <View style={s.productHeader}>
+                    <Text style={s.productName} numberOfLines={1}>{p.name}</Text>
+                    {!p.isActive && (
+                      <View style={s.inactiveBadge}>
+                        <Text style={s.inactiveBadgeText}>مخفي</Text>
+                      </View>
+                    )}
                   </View>
 
-                  <View style={[s.stockBadge, p.stock > 10 ? s.stockHigh : p.stock > 0 ? s.stockMed : s.stockLow]}>
-                    <Text style={s.stockText}>{p.stock}</Text>
-                  </View>
-                </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
+                    {categories.map((cat, idx) => (
+                      <View key={idx} style={s.categoryBadge}>
+                        <Text style={s.categoryBadgeText}>{cat}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
 
-                <View style={s.pricesGrid}>
-                  <View style={s.priceItem}>
-                    <Ionicons name="business-outline" size={16} color="#6b7280" />
-                    <Text style={s.priceLabel}>الشركة</Text>
-                    <Text style={s.priceValue}>{(p.companyWholesalePrice || 0).toLocaleString()}</Text>
-                  </View>
-
-                  <View style={s.priceItem}>
-                    <Ionicons name="storefront-outline" size={16} color="#6b7280" />
-                    <Text style={s.priceLabel}>التاجر</Text>
-                    <Text style={[s.priceValue, { color: PRIMARY }]}>{p.wholesalePrice.toLocaleString()}</Text>
-                  </View>
-
-                  <View style={s.priceItem}>
-                    <Ionicons name="sparkles-outline" size={16} color="#6b7280" />
-                    <Text style={s.priceLabel}>مقترح</Text>
-                    <Text style={[s.priceValue, { color: ACCENT }]}>{(p.suggestedPrice || p.wholesalePrice).toLocaleString()}</Text>
-                  </View>
-
-                  <View style={s.priceItem}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#6b7280" />
-                    <Text style={s.priceLabel}>أدنى</Text>
-                    <Text style={[s.priceValue, { color: '#ef4444' }]}>{p.sellingPriceMin.toLocaleString()}</Text>
+                  <View style={s.pricesRow}>
+                    <View style={s.priceTag}>
+                      <Text style={s.priceTagLabel}>التاجر</Text>
+                      <Text style={s.priceTagValue}>{p.wholesalePrice.toLocaleString()}</Text>
+                    </View>
+                    <View style={[s.priceTag, { backgroundColor: '#10b98110' }]}>
+                      <Text style={s.priceTagLabel}>مقترح</Text>
+                      <Text style={[s.priceTagValue, { color: ACCENT }]}>
+                        {(p.suggestedPrice || p.wholesalePrice).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={[s.stockBadge, p.stock > 10 ? s.stockHigh : p.stock > 0 ? s.stockMed : s.stockLow]}>
+                      <Text style={s.stockText}>{p.stock}</Text>
+                    </View>
                   </View>
                 </View>
+              </View>
 
-                <View style={s.actionsRow}>
-                  <TouchableOpacity 
-                    style={s.actionBtn}
-                    onPress={(e) => { 
-                      e.stopPropagation(); 
-                      openEdit(p); 
-                    }}
-                  >
-                    <Ionicons name="create-outline" size={18} color={SECONDARY} />
-                    <Text style={[s.actionBtnText, { color: SECONDARY }]}>تعديل</Text>
-                  </TouchableOpacity>
+              <View style={s.actionsRow}>
+                <TouchableOpacity 
+                  style={s.actionBtn}
+                  onPress={(e) => { 
+                    e.stopPropagation(); 
+                    openEdit(p); 
+                  }}
+                >
+                  <Ionicons name="create-outline" size={16} color={SECONDARY} />
+                  <Text style={[s.actionBtnText, { color: SECONDARY }]}>تعديل</Text>
+                </TouchableOpacity>
 
-                  <View style={s.actionDivider} />
+                <View style={s.actionDivider} />
 
-                  <TouchableOpacity 
-                    style={s.actionBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      Alert.alert('تأكيد الحذف', `هل تريد حذف "${p.name}"؟`, [
-                        { text: 'إلغاء', style: 'cancel' },
-                        { text: 'حذف', onPress: () => deleteProduct.mutate(p.id), style: 'destructive' }
-                      ]);
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                    <Text style={[s.actionBtnText, { color: '#ef4444' }]}>حذف</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity 
+                  style={s.actionBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert('تأكيد الحذف', `هل تريد حذف "${p.name}"؟`, [
+                      { text: 'إلغاء', style: 'cancel' },
+                      { text: 'حذف', onPress: () => deleteProduct.mutate(p.id), style: 'destructive' }
+                    ]);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                  <Text style={[s.actionBtnText, { color: '#ef4444' }]}>حذف</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           );
@@ -325,14 +371,26 @@ export default function ProductsTab() {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
+              <View style={s.switchRow}>
+                <Switch 
+                  value={form.isActive}
+                  onValueChange={v => setForm(p => ({ ...p, isActive: v }))}
+                  trackColor={{ false: '#d1d5db', true: PRIMARY + '50' }}
+                  thumbColor={form.isActive ? PRIMARY : '#f3f4f6'}
+                />
+                <Text style={s.switchLabel}>
+                  {form.isActive ? '🟢 المنتج ظاهر' : '🔴 المنتج مخفي'}
+                </Text>
+              </View>
+
               <Text style={s.inputLabel}>اسم المنتج *</Text>
               <TextInput style={s.input} placeholder="اسم المنتج" value={form.name}
                 onChangeText={v => setForm(p => ({ ...p, name: v }))} 
                 textAlign="right" placeholderTextColor="#9ca3af" />
 
               <Text style={s.inputLabel}>الوصف</Text>
-              <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} 
-                placeholder="وصف المنتج"
+              <TextInput style={[s.input, { height: 120, textAlignVertical: 'top' }]} 
+                placeholder="وصف المنتج بالتفصيل..."
                 value={form.description} 
                 onChangeText={v => setForm(p => ({ ...p, description: v }))}
                 multiline textAlign="right" placeholderTextColor="#9ca3af" />
@@ -412,9 +470,9 @@ export default function ProductsTab() {
                     </TouchableOpacity>
                   </View>
                 ))}
-                <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImage} disabled={uploadingImgs}>
+                <TouchableOpacity style={s.imgAddBtn} onPress={pickAndUploadImages} disabled={uploadingImgs}>
                   {uploadingImgs ? <ActivityIndicator color={PRIMARY} /> :
-                    <Ionicons name="camera-outline" size={40} color={PRIMARY} />}
+                    <Ionicons name="images-outline" size={40} color={PRIMARY} />}
                 </TouchableOpacity>
               </ScrollView>
 
@@ -437,41 +495,58 @@ export default function ProductsTab() {
 }
 
 const s = StyleSheet.create({
-  addBtn: { borderRadius: 16, overflow: 'hidden', marginBottom: 20, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12 },
-  addBtnGrad: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  addBtnText: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
+  searchSection: { backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  searchBox: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f9fafb', 
+    borderRadius: 12, paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, textAlign: 'right', color: '#111827' },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: '#f3f4f6', 
+    marginRight: 8, borderWidth: 1.5, borderColor: '#e5e7eb' },
+  filterChipActive: { backgroundColor: PRIMARY + '20', borderColor: PRIMARY },
+  filterChipText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  filterChipTextActive: { color: PRIMARY },
   
-  productCard: { backgroundColor: '#fff', borderRadius: 20, marginBottom: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  productImage: { width: '100%', height: 140, backgroundColor: '#f3f4f6' },
-  productImagePlaceholder: { width: '100%', height: 140, backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
-  productContent: { padding: 16 },
+  addBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 16 },
+  addBtnGrad: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  addBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   
-  productHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 12 },
-  productName: { fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'right', lineHeight: 24 },
+  productCard: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 3 },
+  productImage: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#f3f4f6' },
+  productImagePlaceholder: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#f9fafb', 
+    justifyContent: 'center', alignItems: 'center' },
   
-  categoryBadge: { backgroundColor: PRIMARY + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 6 },
-  categoryBadgeText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
+  productHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 4 },
+  productName: { flex: 1, fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
+  inactiveBadge: { backgroundColor: '#ef444420', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  inactiveBadgeText: { fontSize: 10, color: '#ef4444', fontWeight: '700' },
   
-  stockBadge: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
+  categoryBadge: { backgroundColor: PRIMARY + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginRight: 4 },
+  categoryBadgeText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
+  
+  pricesRow: { flexDirection: 'row-reverse', gap: 6, marginTop: 6 },
+  priceTag: { flex: 1, backgroundColor: '#f9fafb', borderRadius: 8, padding: 6 },
+  priceTagLabel: { fontSize: 9, color: '#6b7280', textAlign: 'right', fontWeight: '600' },
+  priceTagValue: { fontSize: 13, fontWeight: 'bold', color: PRIMARY, textAlign: 'right' },
+  
+  stockBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   stockHigh: { backgroundColor: '#10b98115' },
   stockMed: { backgroundColor: '#f5a00615' },
   stockLow: { backgroundColor: '#ef444415' },
-  stockText: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  stockText: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
   
-  pricesGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginVertical: 12 },
-  priceItem: { flex: 1, minWidth: '45%', backgroundColor: '#f9fafb', borderRadius: 12, padding: 12, gap: 4 },
-  priceLabel: { fontSize: 11, color: '#6b7280', textAlign: 'right', fontWeight: '600' },
-  priceValue: { fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  
-  actionsRow: { flexDirection: 'row-reverse', borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12, marginTop: 8 },
-  actionBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
-  actionBtnText: { fontSize: 14, fontWeight: '600' },
-  actionDivider: { width: 1, backgroundColor: '#e5e7eb', marginHorizontal: 8 },
+  actionsRow: { flexDirection: 'row-reverse', borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 8, marginTop: 8 },
+  actionBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6 },
+  actionBtnText: { fontSize: 13, fontWeight: '600' },
+  actionDivider: { width: 1, backgroundColor: '#e5e7eb', marginHorizontal: 6 },
   
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  
+  switchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', 
+    padding: 14, borderRadius: 12, marginBottom: 16, borderWidth: 2, borderColor: '#e5e7eb' },
+  switchLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  
   inputLabel: { fontSize: 13, color: '#374151', textAlign: 'right', marginBottom: 6, marginTop: 14, fontWeight: '700' },
   input: { borderWidth: 2, borderColor: '#e5e7eb', borderRadius: 14, padding: 14,
     fontSize: 15, color: '#111827', backgroundColor: '#fff', marginBottom: 10 },
