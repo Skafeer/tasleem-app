@@ -223,7 +223,7 @@ export default function ProductsTab() {
         </View>
         
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
-          {['الكل', ...availableCategories].map((cat) => (
+          {['الكل', ...availableCategories].map((cat: string) => (
             <TouchableOpacity
               key={cat}
               style={[s.filterChip, selectedCategory === cat && s.filterChipActive]}
@@ -292,7 +292,7 @@ export default function ProductsTab() {
                   </View>
 
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                    {categories.map((cat, idx) => (
+                    {categories.map((cat: string, idx: number) => (
                       <View key={idx} style={s.categoryBadge}>
                         <Text style={s.categoryBadgeText}>{cat}</Text>
                       </View>
