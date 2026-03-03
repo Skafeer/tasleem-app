@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -48,39 +47,42 @@ export default function ProductsTab() {
       return; 
     }
     
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
-      quality: 0.6,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    
-    if (result.canceled || !result.assets[0]) return;
-    
-    setUploadingImgs(true);
-    
     try {
-      const uri = result.assets[0].uri;
-      
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.6,
       });
       
-      const imageData = `data:image/jpeg;base64,${base64}`;
+      if (result.canceled || !result.assets[0]) return;
       
-      const response = await api.post('/api/upload', { image: imageData });
+      setUploadingImgs(true);
       
-      if (response.data?.url) {
-        setForm(p => ({ ...p, images: [...p.images, response.data.url] }));
+      const uri = result.assets[0].uri;
+      
+      // تحويل الصورة لـ base64 باستخدام fetch
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      
+      // رفع الصورة
+      const uploadResponse = await api.post('/api/upload', { image: base64 });
+      
+      if (uploadResponse.data?.url) {
+        setForm(p => ({ ...p, images: [...p.images, uploadResponse.data.url] }));
         toast.success('تم رفع الصورة ✅');
       } else {
-        throw new Error('لم يتم استلام رابط الصورة');
+        throw new Error('لم يتم استلام رابط');
       }
     } catch (e: any) {
-      console.error('Upload error:', e);
-      const errorMsg = e.response?.data?.message || e.message || 'فشل رفع الصورة';
-      toast.error(errorMsg);
+      console.error('رفع الصورة:', e);
+      toast.error(e.response?.data?.message || 'فشل رفع الصورة');
     } finally {
       setUploadingImgs(false);
     }
