@@ -57,6 +57,24 @@ export default function MerchantsTab() {
     setEditUser(u);
   };
 
+
+  const deleteMerchant = useMutation({
+    mutationFn: async (id: number) => { await api.delete(`/api/admin/users/${id}`); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('تم حذف حساب التاجر'); },
+    onError: () => toast.error('فشل حذف الحساب'),
+  });
+
+  const confirmDelete = (u: any) => {
+    Alert.alert(
+      'حذف الحساب',
+      `هل تريد حذف حساب "${u.storeName}" نهائياً؟`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حذف', style: 'destructive', onPress: () => deleteMerchant.mutate(u.id) },
+      ]
+    );
+  };
+
   const handleSave = () => {
     if (!editForm.storeName.trim()) { toast.warning('يرجى إدخال اسم المتجر'); return; }
     if (!editForm.phone.trim())     { toast.warning('يرجى إدخال رقم الهاتف'); return; }
@@ -116,10 +134,16 @@ export default function MerchantsTab() {
 
             {/* رأس الكارد */}
             <View style={s.cardHeader}>
-              <TouchableOpacity style={s.editBtn} onPress={() => openEdit(u)}>
-                <Ionicons name="create-outline" size={14} color={PRIMARY} />
-                <Text style={s.editBtnTxt}>تعديل</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(u)}>
+                  <Ionicons name="trash-outline" size={14} color={DANGER} />
+                  <Text style={s.deleteBtnTxt}>حذف</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.editBtn} onPress={() => openEdit(u)}>
+                  <Ionicons name="create-outline" size={14} color={PRIMARY} />
+                  <Text style={s.editBtnTxt}>تعديل</Text>
+                </TouchableOpacity>
+              </View>
               <View style={s.avatarRow}>
                 <View style={s.avatar}>
                   <Text style={s.avatarTxt}>{u.storeName?.charAt(0) || '؟'}</Text>
@@ -304,5 +328,7 @@ const s = StyleSheet.create({
   passToggle: { width: 42, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb' },
 
   saveBtn:    { backgroundColor: PRIMARY, borderRadius: 14, height: 50, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  deleteBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: DANGER + '12', borderWidth: 1, borderColor: DANGER + '30' },
+  deleteBtnTxt: { fontSize: 12, fontWeight: '700', color: DANGER },
   saveBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });
