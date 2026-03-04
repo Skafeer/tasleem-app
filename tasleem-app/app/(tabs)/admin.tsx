@@ -61,7 +61,7 @@ export default function AdminScreen() {
   const currentTab = TABS.find(t => t.key === tab);
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.container} edges={["bottom"]}>
 
       {/* HEADER */}
       <LinearGradient colors={[PRIMARY, '#085e72']} style={s.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>

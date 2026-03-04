@@ -104,7 +104,7 @@ export default function WalletScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.container} edges={["bottom"]}>
 
       {/* Header */}
       <View style={s.header}>
