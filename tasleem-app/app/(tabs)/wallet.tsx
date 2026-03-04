@@ -30,11 +30,13 @@ export default function WalletScreen() {
 
   const { data: user } = useQuery({
     queryKey: ['user'],
+    refetchInterval: 15000,
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
   });
 
   const { data: withdrawals = [], isLoading } = useQuery({
     queryKey: ['withdrawals'],
+    refetchInterval: 15000,
     queryFn: async () => {
       const { data } = await api.get('/api/withdrawals');
       return Array.isArray(data)
