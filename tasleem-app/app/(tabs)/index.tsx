@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
-  ScrollView, Dimensions,
+  ScrollView, Dimensions, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,10 +10,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 
-const PRIMARY   = '#0c6679';
-const SECONDARY = '#f5a006';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BANNER_HEIGHT = 160;
+const PRIMARY        = '#0c6679';
+const SECONDARY      = '#f5a006';
+const { width: SW }  = Dimensions.get('window');
+const BANNER_W       = SW - 32;
+const BANNER_H       = 170;
+const AUTO_INTERVAL  = 3500;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -24,7 +26,10 @@ export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('الكل');
   const [refreshing, setRefreshing]        = useState(false);
   const [activeBanner, setActiveBanner]    = useState(0);
-  const bannerRef = useRef<ScrollView>(null);
+  const bannerRef   = useRef<ScrollView>(null);
+  const timerRef    = useRef<any>(null);
+  const isManual    = useRef(false);
+  const dotAnim     = useRef(new Animated.Value(0)).current;
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
@@ -47,13 +52,12 @@ export default function HomeScreen() {
     },
   });
 
-  const products      = (allProducts as any[]).filter((p: any) => p.stock > 0);
-  const allCats       = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
-  const categories    = ['الكل', ...Array.from(new Set(allCats))];
-  const filtered      = products.filter((p: any) => {
-    const productCats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
-    return (activeCategory === 'الكل' || productCats.includes(activeCategory)) &&
-           (!search || p.name.includes(search));
+  const products   = (allProducts as any[]).filter((p: any) => p.stock > 0);
+  const allCats    = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
+  const categories = ['الكل', ...Array.from(new Set(allCats))];
+  const filtered   = products.filter((p: any) => {
+    const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+    return (activeCategory === 'الكل' || cats.includes(activeCategory)) && (!search || p.name.includes(search));
   });
 
   const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
@@ -63,9 +67,87 @@ export default function HomeScreen() {
     return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
   };
 
+  const scrollTo = useCallback((idx: number) => {
+    const total = (banners as any[]).length;
+    if (!total) return;
+    const next = (idx + total) % total;
+    bannerRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
+    setActiveBanner(next);
+    Animated.spring(dotAnim, { toValue: next, useNativeDriver: false }).start();
+  }, [banners, dotAnim]);
+
+  // Auto-play
+  useEffect(() => {
+    const total = (banners as any[]).length;
+    if (total <= 1) return;
+    timerRef.current = setInterval(() => {
+      if (!isManual.current) {
+        setActiveBanner(prev => {
+          const next = (prev + 1) % total;
+          bannerRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
+          Animated.spring(dotAnim, { toValue: next, useNativeDriver: false }).start();
+          return next;
+        });
+      }
+    }, AUTO_INTERVAL);
+    return () => clearInterval(timerRef.current);
+  }, [banners]);
+
   const handleBannerScroll = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
     setActiveBanner(idx);
+    Animated.spring(dotAnim, { toValue: idx, useNativeDriver: false }).start();
+  };
+
+  const onScrollBegin = () => { isManual.current = true; };
+  const onScrollEnd   = (e: any) => {
+    handleBannerScroll(e);
+    isManual.current = false;
+  };
+
+  const BannerSlider = () => {
+    const total = (banners as any[]).length;
+    if (!total) return null;
+    return (
+      <View style={s.bannerContainer}>
+        <ScrollView
+          ref={bannerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScrollBeginDrag={onScrollBegin}
+          onMomentumScrollEnd={onScrollEnd}
+          snapToInterval={BANNER_W}
+          decelerationRate="fast"
+          style={s.bannerScroll}
+        >
+          {(banners as any[]).map((b: any, i: number) => (
+            <View key={i} style={s.bannerSlide}>
+              <Image source={{ uri: b.imageUrl }} style={s.bannerImg} resizeMode="cover" />
+              {b.title ? (
+                <View style={s.bannerTitleBox}>
+                  <Text style={s.bannerTitleTxt}>{b.title}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Dots */}
+        {total > 1 && (
+          <View style={s.dotsRow}>
+            {(banners as any[]).map((_: any, i: number) => {
+              const isActive = activeBanner === i;
+              return (
+                <TouchableOpacity key={i} onPress={() => scrollTo(i)}>
+                  <View style={[s.dot, isActive && s.dotActive]} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -107,38 +189,7 @@ export default function HomeScreen() {
 
         ListHeaderComponent={
           <>
-            {/* Banners Slider */}
-            {(banners as any[]).length > 0 && (
-              <View style={s.bannerWrap}>
-                <ScrollView
-                  ref={bannerRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onMomentumScrollEnd={handleBannerScroll}
-                  style={s.bannerScroll}
-                >
-                  {(banners as any[]).map((b: any, i: number) => (
-                    <Image
-                      key={i}
-                      source={{ uri: b.imageUrl }}
-                      style={s.bannerImg}
-                      resizeMode="cover"
-                    />
-                  ))}
-                </ScrollView>
-                {/* Dots */}
-                {(banners as any[]).length > 1 && (
-                  <View style={s.dotsRow}>
-                    {(banners as any[]).map((_: any, i: number) => (
-                      <View key={i} style={[s.dot, activeBanner === i && s.dotActive]} />
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Categories */}
+            {/* Categories أولاً */}
             <View style={s.categoriesWrapper}>
               <FlatList
                 horizontal
@@ -156,6 +207,9 @@ export default function HomeScreen() {
                 )}
               />
             </View>
+
+            {/* البنرات بعد التصنيفات */}
+            <BannerSlider />
           </>
         }
 
@@ -169,7 +223,7 @@ export default function HomeScreen() {
         renderItem={({ item: p }: any) => {
           const imgs        = getImages(p);
           const hasDiscount = p.discount > 0;
-          const discountedPrice = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
+          const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
 
           return (
             <TouchableOpacity
@@ -182,12 +236,8 @@ export default function HomeScreen() {
                       <Ionicons name="image-outline" size={28} color="#d1d5db" />
                     </View>
                 }
-                {p.isRenewable && (
-                  <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>
-                )}
-                {hasDiscount && (
-                  <View style={s.discountBadge}><Text style={s.discountText}>خصم {p.discount}%</Text></View>
-                )}
+                {p.isRenewable && <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>}
+                {hasDiscount   && <View style={s.discountBadge}><Text style={s.discountText}>خصم {p.discount}%</Text></View>}
                 {imgs.length > 1 && (
                   <View style={s.imgCount}>
                     <Ionicons name="images-outline" size={11} color="#fff" />
@@ -199,7 +249,7 @@ export default function HomeScreen() {
                 <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
                 <View style={s.priceRow}>
                   {hasDiscount && <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>}
-                  <Text style={s.price}>{Math.round(discountedPrice).toLocaleString()} د.ع</Text>
+                  <Text style={s.price}>{Math.round(discounted).toLocaleString()} د.ع</Text>
                 </View>
                 <View style={s.bottomRow}>
                   <View style={s.catPill}>
@@ -219,57 +269,60 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container:    { flex: 1, backgroundColor: '#f8fafc' },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
   headerCenter: { flex: 1, alignItems: 'center' },
-  greeting: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  subtitle: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
-  logo: { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
-  logoText: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
-  cartBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  greeting:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  subtitle:     { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  logo:         { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
+  logoText:     { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  cartBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
 
-  searchBox: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
-
-  // Banner
-  bannerWrap:   { marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
-  bannerScroll: { width: SCREEN_WIDTH - 24 },
-  bannerImg:    { width: SCREEN_WIDTH - 24, height: BANNER_HEIGHT },
-  dotsRow:      { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 8 },
-  dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
-  dotActive:    { backgroundColor: PRIMARY, width: 18 },
+  searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
+  searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
 
   // Categories
-  categoriesWrapper: { marginBottom: 12 },
-  catList: { maxHeight: 44 },
-  catListContent: { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
-  catBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  catText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  catTextActive: { color: '#fff' },
+  categoriesWrapper: { marginBottom: 14, marginTop: 4 },
+  catList:           { maxHeight: 44 },
+  catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
+  catBtn:            { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
+  catBtnActive:      { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  catTextActive:     { color: '#fff' },
+
+  // Banner
+  bannerContainer: { marginBottom: 14 },
+  bannerScroll:    { borderRadius: 16, overflow: 'hidden' },
+  bannerSlide:     { width: BANNER_W, height: BANNER_H, borderRadius: 16, overflow: 'hidden', position: 'relative' },
+  bannerImg:       { width: '100%', height: '100%' },
+  bannerTitleBox:  { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
+  bannerTitleTxt:  { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
+  dotsRow:         { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot:             { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
+  dotActive:       { backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
 
   // Product Card
-  card: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  imgBox: { position: 'relative', overflow: 'hidden' },
-  img: { width: '100%', height: '100%' },
-  imgPlaceholder: { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  renewBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: PRIMARY, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  renewText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  imgBox:        { position: 'relative', overflow: 'hidden' },
+  img:           { width: '100%', height: '100%' },
+  imgPlaceholder:{ backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  renewBadge:    { position: 'absolute', top: 8, right: 8, backgroundColor: PRIMARY, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  renewText:     { fontSize: 9, color: '#fff', fontWeight: 'bold' },
   discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  discountText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  imgCount: { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  imgCountText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-  cardBody: { padding: 10, gap: 6 },
-  productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  priceRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  price: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
-  oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
-  bottomRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
-  catPillText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
-  stockText: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
+  discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  imgCount:      { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  imgCountText:  { fontSize: 10, color: '#fff', fontWeight: 'bold' },
+  cardBody:      { padding: 10, gap: 6 },
+  productName:   { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
+  priceRow:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  price:         { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
+  oldPrice:      { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
+  bottomRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  catPill:       { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
+  catPillText:   { fontSize: 10, color: PRIMARY, fontWeight: '600' },
+  stockText:     { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
 
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+  empty:         { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyText:     { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
 });
