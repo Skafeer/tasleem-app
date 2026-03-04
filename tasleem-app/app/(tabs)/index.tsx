@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
-  ScrollView, Dimensions, Animated,
+  ScrollView, Dimensions, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,26 +10,25 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 
-const PRIMARY        = '#0c6679';
-const SECONDARY      = '#f5a006';
-const { width: SW }  = Dimensions.get('window');
-const BANNER_W       = SW - 32;
-const BANNER_H       = 170;
-const AUTO_INTERVAL  = 3500;
+const PRIMARY       = '#0c6679';
+const { width: SW } = Dimensions.get('window');
+const BANNER_W      = SW - 32;
+const BANNER_H      = 170;
+const AUTO_INTERVAL = 3500;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const CARD_WIDTH = (width - 48) / 2;
 
-  const [search, setSearch]               = useState('');
+  const [search, setSearch]                 = useState('');
   const [activeCategory, setActiveCategory] = useState('الكل');
-  const [refreshing, setRefreshing]        = useState(false);
-  const [activeBanner, setActiveBanner]    = useState(0);
-  const bannerRef   = useRef<ScrollView>(null);
-  const timerRef    = useRef<any>(null);
-  const isManual    = useRef(false);
-  const dotAnim     = useRef(new Animated.Value(0)).current;
+  const [refreshing, setRefreshing]         = useState(false);
+  const [activeBanner, setActiveBanner]     = useState(0);
+
+  const bannerRef  = useRef<ScrollView>(null);
+  const isManual   = useRef(false);
+  const currentIdx = useRef(0);
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
@@ -44,13 +43,15 @@ export default function HomeScreen() {
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
   });
 
-  const { data: banners = [] } = useQuery({
+  const { data: rawBanners = [] } = useQuery({
     queryKey: ['banners'],
     queryFn: async () => {
       const { data } = await api.get('/api/banners');
       return (data as any[]).filter((b: any) => b.isActive);
     },
   });
+
+  const banners = rawBanners as any[];
 
   const products   = (allProducts as any[]).filter((p: any) => p.stock > 0);
   const allCats    = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
@@ -68,46 +69,38 @@ export default function HomeScreen() {
   };
 
   const scrollTo = useCallback((idx: number) => {
-    const total = (banners as any[]).length;
+    const total = banners.length;
     if (!total) return;
-    const next = (idx + total) % total;
+    const next = ((idx % total) + total) % total;
     bannerRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
+    currentIdx.current = next;
     setActiveBanner(next);
-    Animated.spring(dotAnim, { toValue: next, useNativeDriver: false }).start();
-  }, [banners, dotAnim]);
+  }, [banners]);
 
   // Auto-play
   useEffect(() => {
-    const total = (banners as any[]).length;
-    if (total <= 1) return;
-    timerRef.current = setInterval(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
       if (!isManual.current) {
-        setActiveBanner(prev => {
-          const next = (prev + 1) % total;
-          bannerRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
-          Animated.spring(dotAnim, { toValue: next, useNativeDriver: false }).start();
-          return next;
-        });
+        scrollTo(currentIdx.current + 1);
       }
     }, AUTO_INTERVAL);
-    return () => clearInterval(timerRef.current);
-  }, [banners]);
+    return () => clearInterval(timer);
+  }, [banners, scrollTo]);
 
-  const handleBannerScroll = (e: any) => {
+  const handleScrollEnd = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
+    currentIdx.current = idx;
     setActiveBanner(idx);
-    Animated.spring(dotAnim, { toValue: idx, useNativeDriver: false }).start();
-  };
-
-  const onScrollBegin = () => { isManual.current = true; };
-  const onScrollEnd   = (e: any) => {
-    handleBannerScroll(e);
     isManual.current = false;
   };
 
+  const handleBannerPress = (b: any) => {
+    if (b.link) Linking.openURL(b.link).catch(() => {});
+  };
+
   const BannerSlider = () => {
-    const total = (banners as any[]).length;
-    if (!total) return null;
+    if (!banners.length) return null;
     return (
       <View style={s.bannerContainer}>
         <ScrollView
@@ -115,35 +108,42 @@ export default function HomeScreen() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          onScrollBeginDrag={onScrollBegin}
-          onMomentumScrollEnd={onScrollEnd}
-          snapToInterval={BANNER_W}
+          onScrollBeginDrag={() => { isManual.current = true; }}
+          onMomentumScrollEnd={handleScrollEnd}
           decelerationRate="fast"
-          style={s.bannerScroll}
+          snapToInterval={BANNER_W}
+          contentContainerStyle={{ gap: 0 }}
         >
-          {(banners as any[]).map((b: any, i: number) => (
-            <View key={i} style={s.bannerSlide}>
+          {banners.map((b: any, i: number) => (
+            <TouchableOpacity
+              key={i}
+              activeOpacity={b.link ? 0.85 : 1}
+              onPress={() => handleBannerPress(b)}
+              style={s.bannerSlide}
+            >
               <Image source={{ uri: b.imageUrl }} style={s.bannerImg} resizeMode="cover" />
               {b.title ? (
                 <View style={s.bannerTitleBox}>
                   <Text style={s.bannerTitleTxt}>{b.title}</Text>
                 </View>
               ) : null}
-            </View>
+              {b.link ? (
+                <View style={s.bannerLinkBadge}>
+                  <Ionicons name="link-outline" size={10} color="#fff" />
+                </View>
+              ) : null}
+            </TouchableOpacity>
           ))}
         </ScrollView>
 
         {/* Dots */}
-        {total > 1 && (
+        {banners.length > 1 && (
           <View style={s.dotsRow}>
-            {(banners as any[]).map((_: any, i: number) => {
-              const isActive = activeBanner === i;
-              return (
-                <TouchableOpacity key={i} onPress={() => scrollTo(i)}>
-                  <View style={[s.dot, isActive && s.dotActive]} />
-                </TouchableOpacity>
-              );
-            })}
+            {banners.map((_: any, i: number) => (
+              <TouchableOpacity key={i} onPress={() => scrollTo(i)}>
+                <View style={[s.dot, activeBanner === i && s.dotActive]} />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
       </View>
@@ -186,10 +186,9 @@ export default function HomeScreen() {
         columnWrapperStyle={{ gap: 12, flexDirection: 'row-reverse' }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
-
         ListHeaderComponent={
           <>
-            {/* Categories أولاً */}
+            {/* التصنيفات أولاً */}
             <View style={s.categoriesWrapper}>
               <FlatList
                 horizontal
@@ -207,24 +206,20 @@ export default function HomeScreen() {
                 )}
               />
             </View>
-
             {/* البنرات بعد التصنيفات */}
             <BannerSlider />
           </>
         }
-
         ListEmptyComponent={
           <View style={s.empty}>
             <Ionicons name="cube-outline" size={56} color="#d1d5db" />
             <Text style={s.emptyText}>لا توجد منتجات</Text>
           </View>
         }
-
         renderItem={({ item: p }: any) => {
           const imgs        = getImages(p);
           const hasDiscount = p.discount > 0;
           const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
-
           return (
             <TouchableOpacity
               style={[s.card, { width: CARD_WIDTH }]}
@@ -232,9 +227,7 @@ export default function HomeScreen() {
               <View style={[s.imgBox, { height: CARD_WIDTH }]}>
                 {imgs[0]
                   ? <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
-                  : <View style={[s.img, s.imgPlaceholder]}>
-                      <Ionicons name="image-outline" size={28} color="#d1d5db" />
-                    </View>
+                  : <View style={[s.img, s.imgPlaceholder]}><Ionicons name="image-outline" size={28} color="#d1d5db" /></View>
                 }
                 {p.isRenewable && <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>}
                 {hasDiscount   && <View style={s.discountBadge}><Text style={s.discountText}>خصم {p.discount}%</Text></View>}
@@ -252,9 +245,7 @@ export default function HomeScreen() {
                   <Text style={s.price}>{Math.round(discounted).toLocaleString()} د.ع</Text>
                 </View>
                 <View style={s.bottomRow}>
-                  <View style={s.catPill}>
-                    <Text style={s.catPillText} numberOfLines={1}>{p.category}</Text>
-                  </View>
+                  <View style={s.catPill}><Text style={s.catPillText} numberOfLines={1}>{p.category}</Text></View>
                   <Text style={[s.stockText, p.stock < 5 && { color: '#ef4444' }]}>
                     {p.stock < 5 ? '⚠️' : ''} {p.stock}
                   </Text>
@@ -270,7 +261,6 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
-
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
   headerCenter: { flex: 1, alignItems: 'center' },
   greeting:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
@@ -278,11 +268,9 @@ const s = StyleSheet.create({
   logo:         { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
   logoText:     { fontSize: 20, fontWeight: 'bold', color: '#fff' },
   cartBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
   searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
 
-  // Categories
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList:           { maxHeight: 44 },
   catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
@@ -291,18 +279,16 @@ const s = StyleSheet.create({
   catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   catTextActive:     { color: '#fff' },
 
-  // Banner
-  bannerContainer: { marginBottom: 14 },
-  bannerScroll:    { borderRadius: 16, overflow: 'hidden' },
-  bannerSlide:     { width: BANNER_W, height: BANNER_H, borderRadius: 16, overflow: 'hidden', position: 'relative' },
-  bannerImg:       { width: '100%', height: '100%' },
-  bannerTitleBox:  { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
-  bannerTitleTxt:  { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
-  dotsRow:         { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot:             { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
-  dotActive:       { backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
+  bannerContainer:  { marginBottom: 14 },
+  bannerSlide:      { width: BANNER_W, height: BANNER_H, borderRadius: 16, overflow: 'hidden' },
+  bannerImg:        { width: '100%', height: '100%' },
+  bannerTitleBox:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
+  bannerTitleTxt:   { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
+  bannerLinkBadge:  { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 5 },
+  dotsRow:          { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot:              { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
+  dotActive:        { backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
 
-  // Product Card
   card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   imgBox:        { position: 'relative', overflow: 'hidden' },
   img:           { width: '100%', height: '100%' },
@@ -322,7 +308,6 @@ const s = StyleSheet.create({
   catPill:       { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
   catPillText:   { fontSize: 10, color: PRIMARY, fontWeight: '600' },
   stockText:     { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
-
   empty:         { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyText:     { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
 });
