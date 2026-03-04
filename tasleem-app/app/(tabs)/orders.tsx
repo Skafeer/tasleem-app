@@ -200,7 +200,7 @@ export default function OrdersScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={["bottom"]}>
+    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
 
       {/* Header */}
       <View style={s.header}>

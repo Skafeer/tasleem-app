@@ -61,7 +61,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthGuard>
-          <StatusBar backgroundColor="#ffffff" translucent={false} barStyle="dark-content" />
+          <StatusBar backgroundColor="transparent" translucent={true} barStyle="dark-content" />
           <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="auth" />
             <Stack.Screen name="(tabs)" />

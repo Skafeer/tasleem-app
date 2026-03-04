@@ -32,7 +32,7 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={s.container} edges={["bottom"]}>
+    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
       <Text style={s.title}>الإعدادات</Text>
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
