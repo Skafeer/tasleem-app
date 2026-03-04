@@ -14,6 +14,7 @@ import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 import ProductsTab from '../admin-components/ProductsTab';
 import OrdersTab from '../admin-components/OrdersTab';
+import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 
 
 const PRIMARY = '#0c6679';
@@ -312,61 +313,7 @@ export default function AdminScreen() {
         {/* PRODUCTS - استخدام ProductsTab من الملف المنفصل */}
         {tab==='products' && <ProductsTab />}
 
-        {/* WITHDRAWALS */}
-        {tab==='withdrawals' && <>
-          <View style={s.sectionHeader}>
-            <Ionicons name="cash-outline" size={18} color={PRIMARY}/>
-            <Text style={s.sectionTitle}>طلبات السحب</Text>
-            <View style={s.sectionCount}>
-              <Text style={s.sectionCountText}>{withdrawals.length}</Text>
-            </View>
-          </View>
-
-          {withdrawals.length === 0 && (
-            <View style={s.emptyBox}>
-              <Ionicons name="cash-outline" size={52} color="#d1d5db"/>
-              <Text style={s.emptyTitle}>لا توجد طلبات سحب</Text>
-              <Text style={s.emptyText}>ستظهر هنا عند وجود طلبات</Text>
-            </View>
-          )}
-
-          {withdrawals.map((w:any)=>(
-            <View key={w.id} style={s.withdrawCard}>
-              <View style={s.withdrawHead}>
-                <View style={[s.wStatusPill, {backgroundColor:W_STATUS[w.status]?.bg}]}>
-                  <Text style={[s.wStatusText, {color:W_STATUS[w.status]?.color}]}>{W_STATUS[w.status]?.label}</Text>
-                </View>
-                <View style={{alignItems:'flex-end'}}>
-                  <Text style={s.withdrawAmount}>{w.amount?.toLocaleString()} د.ع</Text>
-                  <Text style={s.withdrawDate}>{new Date(w.createdAt).toLocaleDateString('ar-IQ')}</Text>
-                </View>
-              </View>
-              <View style={s.withdrawInfo}>
-                <View style={{flexDirection:'row', justifyContent:'space-between'}}>
-                  <Text style={s.withdrawMethod}>{w.method}</Text>
-                  <Text style={s.withdrawMethodLabel}>طريقة السحب</Text>
-                </View>
-                {w.accountDetails && (
-                  <Text style={s.withdrawAccount}>{w.accountDetails}</Text>
-                )}
-              </View>
-              {w.status==='pending' && (
-                <View style={s.withdrawBtns}>
-                  <TouchableOpacity style={[s.wBtn, {backgroundColor:'#fef2f2'}]}
-                    onPress={()=>updateWithdrawal.mutate({id:w.id, status:'rejected'})}>
-                    <Ionicons name="close-circle-outline" size={17} color={DANGER}/>
-                    <Text style={[s.wBtnText, {color:DANGER}]}>رفض</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.wBtn, {backgroundColor:'#ecfdf5'}]}
-                    onPress={()=>updateWithdrawal.mutate({id:w.id, status:'approved'})}>
-                    <Ionicons name="checkmark-circle-outline" size={17} color={SUCCESS}/>
-                    <Text style={[s.wBtnText, {color:SUCCESS}]}>موافقة</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))}
-        </>}
+        {tab==='withdrawals' && <WithdrawalsTab />}
 
         {/* USERS */}
         {tab==='users' && <>
