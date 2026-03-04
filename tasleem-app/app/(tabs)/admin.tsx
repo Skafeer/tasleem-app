@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 import ProductsTab from '../admin-components/ProductsTab';
+import OrdersTab from '../admin-components/OrdersTab';
 
 
 const PRIMARY = '#0c6679';
@@ -306,62 +307,7 @@ export default function AdminScreen() {
         showsVerticalScrollIndicator={false}>
 
         {/* ORDERS */}
-        {tab==='orders' && filteredOrders.length === 0 && (
-          <View style={s.emptyBox}>
-            <Ionicons name="bag-outline" size={52} color="#d1d5db"/>
-            <Text style={s.emptyTitle}>لا توجد طلبات</Text>
-            <Text style={s.emptyText}>لم يتم العثور على طلبات مطابقة</Text>
-          </View>
-        )}
-        {tab==='orders' && filteredOrders.map((order:any)=>(
-          <View key={order.id} style={s.orderCard}>
-            <View style={s.orderHead}>
-              <View style={[s.statusPill, {backgroundColor:STATUS[order.status]?.bg}]}>
-                <Ionicons name={STATUS[order.status]?.icon} size={12} color={STATUS[order.status]?.color}/>
-                <Text style={[s.statusPillText, {color:STATUS[order.status]?.color}]}>{STATUS[order.status]?.label}</Text>
-              </View>
-              <View style={{alignItems:'flex-end'}}>
-                <Text style={s.orderId}>طلب #{order.id}</Text>
-                <Text style={s.orderDate}>{new Date(order.createdAt).toLocaleDateString('ar-IQ')}</Text>
-              </View>
-            </View>
-
-            <View style={s.orderBody}>
-              {[
-                {l:'👤 الاسم',      v: order.customerName},
-                {l:'📞 الهاتف',     v: order.customerPhone},
-                {l:'📍 العنوان',    v: `${order.province} — ${order.address}`},
-              ].map((r,i)=>(
-                <View key={i} style={s.orderRow}>
-                  <Text style={s.orderVal}>{r.v}</Text>
-                  <Text style={s.orderLbl}>{r.l}</Text>
-                </View>
-              ))}
-              <View style={s.orderDivider}/>
-              <View style={s.orderRow}>
-                <Text style={[s.orderVal, {color:SUCCESS, fontWeight:'bold'}]}>{order.totalProfit?.toLocaleString()} د.ع</Text>
-                <Text style={s.orderLbl}>💰 الربح</Text>
-              </View>
-              <View style={s.orderRow}>
-                <Text style={[s.orderVal, {color:PRIMARY, fontWeight:'bold', fontSize:15}]}>{order.totalAmount?.toLocaleString()} د.ع</Text>
-                <Text style={s.orderLbl}>🧾 الإجمالي</Text>
-              </View>
-            </View>
-
-            <Text style={s.statusChangeLabel}>تغيير الحالة:</Text>
-            <View style={s.statusBtns}>
-              {Object.entries(STATUS).map(([key,val]:any)=>(
-                <TouchableOpacity key={key}
-                  style={[s.statusBtn, order.status===key && {backgroundColor:val.color, borderColor:val.color}]}
-                  onPress={()=>updateStatus.mutate({id:order.id, status:key})}
-                  disabled={updateStatus.isPending}>
-                  <Ionicons name={val.icon} size={12} color={order.status===key?'#fff':'#6b7280'}/>
-                  <Text style={[s.statusBtnText, order.status===key && {color:'#fff'}]}>{val.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
+        {tab==='orders' && <OrdersTab />}
 
         {/* PRODUCTS - استخدام ProductsTab من الملف المنفصل */}
         {tab==='products' && <ProductsTab />}
