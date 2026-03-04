@@ -27,6 +27,7 @@ const TABS = [
   { key: 'withdrawals', label: 'السحوبات',  icon: 'cash-outline',           activeIcon: 'cash' },
   { key: 'users',       label: 'التجار',    icon: 'people-outline',         activeIcon: 'people' },
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
+  { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات', icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
 ];
 
