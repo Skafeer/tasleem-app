@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, FlatList, Image, Clipboard,
+  TextInput, ActivityIndicator, FlatList, Image,
+  Clipboard, Modal, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -47,6 +48,8 @@ export default function OrdersTab() {
   const [filter, setFilter]         = useState('all');
   const [expanded, setExpanded]     = useState<number | null>(null);
   const [dropdownId, setDropdownId] = useState<number | null>(null);
+  const [editOrder, setEditOrder]   = useState<any>(null);
+  const [editForm, setEditForm]     = useState<any>({});
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['admin-orders'],
@@ -77,6 +80,28 @@ export default function OrdersTab() {
     onError: () => toast.error('فشل تحديث الحالة'),
   });
 
+  const updateOrder = useMutation({
+    mutationFn: async ({ id, data }: any) => {
+      const res = await api.put(`/api/orders/${id}`, data);
+      return res.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      setEditOrder(null);
+      toast.success('تم تعديل الطلب');
+    },
+    onError: () => toast.error('فشل تعديل الطلب'),
+  });
+
+  const deleteOrder = useMutation({
+    mutationFn: async (id: number) => { await api.delete(`/api/orders/${id}`); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast.success('تم حذف الطلب');
+    },
+    onError: () => toast.error('فشل حذف الطلب'),
+  });
+
   const getMerchant = (merchantId: number) =>
     users.find((u: any) => u.id === merchantId);
 
@@ -91,6 +116,45 @@ export default function OrdersTab() {
     const date = dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
     const time = dt.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
     return `${date}  ${time}`;
+  };
+
+  const openEdit = (o: any) => {
+    setEditForm({
+      customerName:  o.customerName  || '',
+      customerPhone: o.customerPhone || '',
+      province:      o.province      || '',
+      address:       o.address       || '',
+      notes:         o.notes         || '',
+      items: (o.items || []).map((i: any) => ({
+        productId:   i.productId,
+        productName: i.product?.name || `منتج #${i.productId}`,
+        quantity:    String(i.quantity),
+        price:       String(i.price),
+      })),
+    });
+    setEditOrder(o);
+  };
+
+  const confirmDelete = (o: any) => {
+    Alert.alert(
+      'حذف الطلب',
+      `هل أنت متأكد من حذف الطلب #${o.id}؟\nلا يمكن التراجع عن هذا الإجراء.`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حذف', style: 'destructive', onPress: () => deleteOrder.mutate(o.id) },
+      ]
+    );
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.customerName.trim()) { toast.warning('يرجى إدخال اسم الزبون'); return; }
+    if (!editForm.customerPhone.trim()) { toast.warning('يرجى إدخال رقم الهاتف'); return; }
+    const items = editForm.items.map((i: any) => ({
+      productId: i.productId,
+      quantity:  Number(i.quantity),
+      price:     Number(i.price),
+    }));
+    updateOrder.mutate({ id: editOrder.id, data: { ...editForm, items } });
   };
 
   const filtered = orders.filter((o: any) => {
@@ -116,6 +180,8 @@ export default function OrdersTab() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+
+      {/* شريط البحث والفلاتر */}
       <View style={s.topBar}>
         <View style={s.searchRow}>
           <Ionicons name="search-outline" size={17} color="#9ca3af" />
@@ -151,6 +217,7 @@ export default function OrdersTab() {
         </ScrollView>
       </View>
 
+      {/* قائمة الطلبات */}
       <FlatList
         data={filtered}
         keyExtractor={i => i.id.toString()}
@@ -187,6 +254,18 @@ export default function OrdersTab() {
                   <Ionicons name="chevron-down" size={11} color={st.color} />
                   <Ionicons name={st.icon} size={13} color={st.color} />
                   <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* أزرار التعديل والحذف */}
+              <View style={s.actionRow}>
+                <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(o)}>
+                  <Ionicons name="trash-outline" size={14} color={DANGER} />
+                  <Text style={[s.actionBtnTxt, { color: DANGER }]}>حذف</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.editBtn} onPress={() => openEdit(o)}>
+                  <Ionicons name="create-outline" size={14} color={PRIMARY} />
+                  <Text style={[s.actionBtnTxt, { color: PRIMARY }]}>تعديل</Text>
                 </TouchableOpacity>
               </View>
 
@@ -271,7 +350,7 @@ export default function OrdersTab() {
                 </>
               )}
 
-              {/* إجمالي الطلب + التوصيل */}
+              {/* الأسعار */}
               <View style={s.divider} />
               <View style={s.priceRow}>
                 <View style={s.priceBox}>
@@ -308,8 +387,6 @@ export default function OrdersTab() {
               {/* التفاصيل الموسعة */}
               {isOpen && (
                 <View style={s.details}>
-
-                  {/* المنتجات */}
                   {items.length > 0 && (
                     <View style={s.itemsBox}>
                       <View style={s.sectionLabelRow}>
@@ -358,7 +435,6 @@ export default function OrdersTab() {
                     </View>
                   )}
 
-                  {/* الملخص المالي */}
                   <View style={s.finBox}>
                     {o.shippingCost > 0 && (
                       <View style={s.finRow}>
@@ -383,20 +459,124 @@ export default function OrdersTab() {
                     </View>
                   </View>
 
-                  {/* الملاحظات */}
                   {o.notes ? (
                     <View style={s.notesBox}>
                       <Ionicons name="chatbubble-ellipses-outline" size={14} color="#92400e" />
                       <Text style={s.notesTxt}>{o.notes}</Text>
                     </View>
                   ) : null}
-
                 </View>
               )}
             </View>
           );
         }}
       />
+
+      {/* Modal التعديل */}
+      <Modal visible={!!editOrder} transparent animationType="slide">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+
+              <View style={s.modalHeader}>
+                <TouchableOpacity onPress={() => setEditOrder(null)} style={s.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color="#6b7280" />
+                </TouchableOpacity>
+                <Text style={s.modalTitle}>تعديل الطلب #{editOrder?.id}</Text>
+              </View>
+
+              <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
+
+                <Text style={s.modalSection}>معلومات الزبون</Text>
+
+                <Text style={s.inputLabel}>الاسم</Text>
+                <TextInput style={s.input} value={editForm.customerName}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, customerName: v }))}
+                  placeholder="اسم الزبون" placeholderTextColor="#9ca3af" textAlign="right" />
+
+                <Text style={s.inputLabel}>رقم الهاتف</Text>
+                <TextInput style={s.input} value={editForm.customerPhone}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, customerPhone: v }))}
+                  placeholder="رقم الهاتف" placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad" textAlign="right" />
+
+                <Text style={s.inputLabel}>المحافظة</Text>
+                <TextInput style={s.input} value={editForm.province}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, province: v }))}
+                  placeholder="المحافظة" placeholderTextColor="#9ca3af" textAlign="right" />
+
+                <Text style={s.inputLabel}>العنوان</Text>
+                <TextInput style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]}
+                  value={editForm.address}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, address: v }))}
+                  placeholder="العنوان التفصيلي" placeholderTextColor="#9ca3af"
+                  multiline textAlign="right" />
+
+                <Text style={s.inputLabel}>ملاحظات</Text>
+                <TextInput style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]}
+                  value={editForm.notes}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, notes: v }))}
+                  placeholder="ملاحظات (اختياري)" placeholderTextColor="#9ca3af"
+                  multiline textAlign="right" />
+
+                <Text style={s.modalSection}>المنتجات</Text>
+
+                {(editForm.items || []).map((item: any, idx: number) => (
+                  <View key={idx} style={s.editItemRow}>
+                    <TouchableOpacity
+                      style={s.removeItemBtn}
+                      onPress={() => {
+                        const newItems = editForm.items.filter((_: any, i: number) => i !== idx);
+                        setEditForm((p: any) => ({ ...p, items: newItems }));
+                      }}
+                    >
+                      <Ionicons name="close-circle" size={20} color={DANGER} />
+                    </TouchableOpacity>
+                    <View style={s.editItemInfo}>
+                      <Text style={s.editItemName} numberOfLines={1}>{item.productName}</Text>
+                      <View style={s.editItemFields}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.inputLabel}>سعر البيع</Text>
+                          <TextInput style={s.inputSm} value={item.price}
+                            onChangeText={v => {
+                              const newItems = [...editForm.items];
+                              newItems[idx] = { ...newItems[idx], price: v };
+                              setEditForm((p: any) => ({ ...p, items: newItems }));
+                            }}
+                            keyboardType="numeric" textAlign="right" placeholderTextColor="#9ca3af" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.inputLabel}>الكمية</Text>
+                          <TextInput style={s.inputSm} value={item.quantity}
+                            onChangeText={v => {
+                              const newItems = [...editForm.items];
+                              newItems[idx] = { ...newItems[idx], quantity: v };
+                              setEditForm((p: any) => ({ ...p, items: newItems }));
+                            }}
+                            keyboardType="numeric" textAlign="right" placeholderTextColor="#9ca3af" />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+
+              </ScrollView>
+
+              <View style={s.modalFooter}>
+                <TouchableOpacity style={s.saveBtn} onPress={handleSaveEdit} disabled={updateOrder.isPending}>
+                  {updateOrder.isPending
+                    ? <ActivityIndicator color="#fff" />
+                    : <><Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                        <Text style={s.saveBtnTxt}>حفظ التعديلات</Text></>
+                  }
+                </TouchableOpacity>
+              </View>
+
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </View>
   );
 }
@@ -405,64 +585,86 @@ const s = StyleSheet.create({
   center:     { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
   emptyTxt:   { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
-  topBar: { backgroundColor: '#fff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  searchRow: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 12, paddingHorizontal: 12, gap: 8, borderWidth: 1.5, borderColor: '#e5e7eb' },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: '#f3f4f6', marginRight: 7, borderWidth: 1.5, borderColor: '#e5e7eb' },
-  chipActive: { backgroundColor: PRIMARY + '18', borderColor: PRIMARY },
-  chipTxt: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  chipTxtActive: { color: PRIMARY },
-  chipBadge: { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
-  chipBadgeActive: { backgroundColor: PRIMARY },
-  chipBadgeTxt: { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
+  topBar:     { backgroundColor: '#fff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  searchRow:  { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 12, paddingHorizontal: 12, gap: 8, borderWidth: 1.5, borderColor: '#e5e7eb' },
+  searchInput:{ flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' },
+  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: '#f3f4f6', marginRight: 7, borderWidth: 1.5, borderColor: '#e5e7eb' },
+  chipActive:     { backgroundColor: PRIMARY + '18', borderColor: PRIMARY },
+  chipTxt:        { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  chipTxtActive:  { color: PRIMARY },
+  chipBadge:      { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  chipBadgeActive:{ backgroundColor: PRIMARY },
+  chipBadgeTxt:   { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
   chipBadgeTxtActive: { color: '#fff' },
-  card: { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, paddingBottom: 12 },
+  card:       { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, paddingBottom: 10 },
   orderIdRow: { alignItems: 'flex-end', gap: 4 },
-  orderId: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  dateRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  dateTxt: { fontSize: 11, color: '#9ca3af' },
+  orderId:    { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  dateRow:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  dateTxt:    { fontSize: 11, color: '#9ca3af' },
   statusPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20 },
-  statusTxt: { fontSize: 12, fontWeight: 'bold' },
-  dropdown: { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
+  statusTxt:  { fontSize: 12, fontWeight: 'bold' },
+  actionRow:    { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  editBtn:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: PRIMARY + '12', borderWidth: 1, borderColor: PRIMARY + '30' },
+  deleteBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: DANGER + '10', borderWidth: 1, borderColor: DANGER + '30' },
+  actionBtnTxt: { fontSize: 12, fontWeight: '700' },
+  dropdown:     { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
   dropdownItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  dropdownTxt: { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
-  divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
-  section: { paddingHorizontal: 14, paddingVertical: 12 },
+  dropdownTxt:  { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  divider:      { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
+  section:         { paddingHorizontal: 14, paddingVertical: 12 },
   sectionLabelRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 8 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: PRIMARY },
+  sectionLabel:    { fontSize: 12, fontWeight: '700', color: PRIMARY },
   infoBlock: { gap: 6 },
-  infoLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  infoVal: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  infoSub: { fontSize: 13, color: '#6b7280', flex: 1, textAlign: 'right' },
-  copyBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-  priceRow: { flexDirection: 'row-reverse', backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
-  priceBox: { flex: 1, alignItems: 'center', gap: 3 },
+  infoLine:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  infoVal:   { fontSize: 14, fontWeight: '700', color: '#111827' },
+  infoSub:   { fontSize: 13, color: '#6b7280', flex: 1, textAlign: 'right' },
+  copyBtn:   { width: 28, height: 28, borderRadius: 8, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  priceRow:     { flexDirection: 'row-reverse', backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
+  priceBox:     { flex: 1, alignItems: 'center', gap: 3 },
   priceDivider: { width: 1, backgroundColor: '#e5e7eb' },
-  priceLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
-  priceVal: { fontSize: 13, fontWeight: 'bold' },
+  priceLabel:   { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  priceVal:     { fontSize: 13, fontWeight: 'bold' },
   expandBtn: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 11, borderTopWidth: 1, borderTopColor: '#f3f4f6', backgroundColor: PRIMARY + '06' },
   expandTxt: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
-  details: { padding: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  itemsBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 2 },
-  productRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 12, paddingVertical: 10 },
-  productBorder: { borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  productImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: '#f3f4f6' },
+  details:   { padding: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  itemsBox:  { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 2 },
+  productRow:            { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 12, paddingVertical: 10 },
+  productBorder:         { borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  productImg:            { width: 64, height: 64, borderRadius: 12, backgroundColor: '#f3f4f6' },
   productImgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  productInfo: { flex: 1, gap: 6 },
-  productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 19 },
-  productPriceRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  qtyBadge: { backgroundColor: PRIMARY + '15', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  qtyTxt: { fontSize: 12, color: PRIMARY, fontWeight: 'bold' },
-  priceBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, backgroundColor: '#fef2f2', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  productInfo:           { flex: 1, gap: 6 },
+  productName:           { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 19 },
+  productPriceRow:       { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  qtyBadge:        { backgroundColor: PRIMARY + '15', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  qtyTxt:          { fontSize: 12, color: PRIMARY, fontWeight: 'bold' },
+  priceBadge:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, backgroundColor: '#fef2f2', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   priceBadgeLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
-  priceBadgeVal: { fontSize: 12, fontWeight: 'bold' },
-  itemTotal: { fontSize: 11, color: '#6b7280', textAlign: 'right' },
-  finBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 8 },
-  finRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  priceBadgeVal:   { fontSize: 12, fontWeight: 'bold' },
+  itemTotal:       { fontSize: 11, color: '#6b7280', textAlign: 'right' },
+  finBox:   { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 8 },
+  finRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   finTotal: { borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8, marginTop: 2 },
   finLabel: { flex: 1, fontSize: 13, color: '#6b7280', textAlign: 'right' },
-  finVal: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  finVal:   { fontSize: 13, fontWeight: '600', color: '#374151' },
   notesBox: { flexDirection: 'row-reverse', gap: 8, backgroundColor: '#fffbeb', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#fde68a' },
   notesTxt: { flex: 1, fontSize: 13, color: '#92400e', textAlign: 'right', lineHeight: 20 },
+  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalCard:     { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
+  modalHeader:   { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  modalTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  modalCloseBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  modalBody:     { padding: 20, paddingBottom: 10 },
+  modalSection:  { fontSize: 14, fontWeight: 'bold', color: PRIMARY, textAlign: 'right', marginTop: 16, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 6 },
+  modalFooter:   { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  inputLabel: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 4, fontWeight: '600' },
+  input:      { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 11, fontSize: 14, color: '#111827', backgroundColor: '#f9fafb', marginBottom: 10 },
+  inputSm:    { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 10, padding: 9, fontSize: 13, color: '#111827', backgroundColor: '#f9fafb' },
+  editItemRow:    { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginBottom: 10, flexDirection: 'row-reverse', gap: 10, alignItems: 'flex-start' },
+  removeItemBtn:  { paddingTop: 2 },
+  editItemInfo:   { flex: 1 },
+  editItemName:   { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', marginBottom: 8 },
+  editItemFields: { flexDirection: 'row-reverse', gap: 10 },
+  saveBtn:    { backgroundColor: PRIMARY, borderRadius: 14, height: 50, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  saveBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });
