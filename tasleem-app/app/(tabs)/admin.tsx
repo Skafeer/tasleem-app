@@ -16,6 +16,7 @@ import ProductsTab from '../admin-components/ProductsTab';
 import OrdersTab from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab from '../admin-components/MerchantsTab';
+import PromosTab from '../admin-components/PromosTab';
 
 
 const PRIMARY = '#0c6679';
@@ -320,103 +321,9 @@ export default function AdminScreen() {
         {tab==='users' && <MerchantsTab />}
 
         {/* PROMOS */}
-        {tab==='promos' && <>
-          <TouchableOpacity style={s.addBtn} onPress={()=>setShowAddPromo(true)}>
-            <LinearGradient colors={[SECONDARY,'#e09000']} style={s.addBtnGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-              <Ionicons name="add-circle-outline" size={20} color="#fff"/>
-              <Text style={s.addBtnText}>إضافة كود خصم جديد</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          {promos.length === 0 && (
-            <View style={s.emptyBox}>
-              <Ionicons name="pricetag-outline" size={52} color="#d1d5db"/>
-              <Text style={s.emptyTitle}>لا توجد أكواد خصم</Text>
-              <Text style={s.emptyText}>أضف كوداً للبدء</Text>
-            </View>
-          )}
-          {promos.map((p:any)=>(
-            <View key={p.id} style={s.promoCard}>
-              <TouchableOpacity style={s.promoDelBtn} onPress={()=>deletePromo.mutate(p.id)}>
-                <Ionicons name="trash-outline" size={16} color={DANGER}/>
-              </TouchableOpacity>
-              <View style={{flex:1}}>
-                <Text style={s.promoCode}>{p.code}</Text>
-                <Text style={s.promoDiscount}>خصم {p.discountPercent}%</Text>
-                <View style={[s.promoStatusPill, {backgroundColor: p.isActive?'#ecfdf5':'#fef2f2'}]}>
-                  <Text style={{fontSize:11, color:p.isActive?SUCCESS:DANGER, fontWeight:'bold'}}>
-                    {p.isActive ? '✅ فعال' : '❌ غير فعال'}
-                  </Text>
-                </View>
-              </View>
-              <View style={[s.promoIconBox, {backgroundColor: p.isActive?'#ecfdf5':'#f3f4f6'}]}>
-                <Ionicons name="pricetag-outline" size={28} color={p.isActive?SUCCESS:'#9ca3af'}/>
-              </View>
-            </View>
-          ))}
-        </>}
+        {tab==='promos' && <PromosTab />}
       </ScrollView>
 
-      {/* ADD PROMO MODAL */}
-      <Modal visible={showAddPromo} transparent animationType="slide" onRequestClose={()=>setShowAddPromo(false)}>
-        <View style={s.modalOverlay}>
-          <View style={[s.modalCard, {maxHeight: height * 0.55}]}>
-
-            <LinearGradient colors={[SECONDARY,'#e09000']} style={s.modalHeaderGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-              <TouchableOpacity onPress={()=>setShowAddPromo(false)}>
-                <Ionicons name="close" size={22} color="rgba(255,255,255,0.8)"/>
-              </TouchableOpacity>
-              <Text style={s.modalTitle}>إضافة كود خصم</Text>
-              <Ionicons name="pricetag-outline" size={22} color="rgba(255,255,255,0.8)"/>
-            </LinearGradient>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              contentContainerStyle={s.modalScrollContent}
-              nestedScrollEnabled={true}>
-
-              <Text style={s.inputLabel}>🎟️ الكود</Text>
-              <TextInput
-                style={s.modalInput}
-                placeholder="SAVE10"
-                value={promoForm.code}
-                onChangeText={v=>setPromoForm(p=>({...p,code:v.toUpperCase()}))}
-                textAlign="right"
-                placeholderTextColor="#9ca3af"
-                autoCapitalize="characters"/>
-
-              <Text style={s.inputLabel}>💯 نسبة الخصم %</Text>
-              <TextInput
-                style={s.modalInput}
-                placeholder="10"
-                value={promoForm.discountPercent}
-                onChangeText={v=>setPromoForm(p=>({...p,discountPercent:v}))}
-                keyboardType="numeric"
-                textAlign="right"
-                placeholderTextColor="#9ca3af"/>
-
-              <TouchableOpacity
-                style={[s.confirmBtn, {marginTop:16}]}
-                onPress={()=>{
-                  if(!promoForm.code || !promoForm.discountPercent) {
-                    toast.warning('يرجى ملء الحقول'); return;
-                  }
-                  addPromo.mutate({code:promoForm.code, discountPercent:Number(promoForm.discountPercent)});
-                }}
-                disabled={addPromo.isPending}>
-                <LinearGradient colors={[SECONDARY,'#e09000']} style={s.confirmGrad} start={{x:0,y:0}} end={{x:1,y:0}}>
-                  {addPromo.isPending
-                    ? <ActivityIndicator color="#fff"/>
-                    : <Text style={s.confirmText}>إضافة الكود</Text>
-                  }
-                </LinearGradient>
-              </TouchableOpacity>
-
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
     </SafeAreaView>
   );
