@@ -128,10 +128,12 @@ export default function CheckoutScreen() {
     });
   };
 
-  const subtotal = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
-  const discount = (subtotal * promoDiscount) / 100;
+  const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
+  const costTotal = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
+  const discount = (sellingTotal * promoDiscount) / 100;
   const shipping = province === 'البصرة' ? 3000 : 5000;
-  const total = subtotal - discount + shipping;
+  const total = sellingTotal - discount + shipping;
+  const profit = sellingTotal - costTotal - discount;
 
   return (
     <SafeAreaView style={s.container}>
@@ -222,8 +224,12 @@ export default function CheckoutScreen() {
           <Text style={s.summaryTitle}>ملخص الطلب</Text>
         </View>
           <View style={s.summaryRow}>
-            <Text style={s.summaryVal}>{subtotal.toLocaleString()} د.ع</Text>
+            <Text style={s.summaryVal}>{sellingTotal.toLocaleString()} د.ع</Text>
             <Text style={s.summaryLabel}>المجموع الفرعي</Text>
+          </View>
+          <View style={s.summaryRow}>
+            <Text style={[s.summaryVal, { color: "#10b981", fontWeight: "bold" }]}>{profit.toLocaleString()} د.ع</Text>
+            <Text style={s.summaryLabel}>ربحك المتوقع 💰</Text>
           </View>
           {promoDiscount > 0 && (
             <View style={s.summaryRow}>
