@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager, Platform, StatusBar } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
@@ -61,6 +61,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthGuard>
+          <StatusBar backgroundColor="#ffffff" translucent={false} barStyle="dark-content" />
           <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
             <Stack.Screen name="auth" />
             <Stack.Screen name="(tabs)" />
