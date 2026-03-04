@@ -14,6 +14,7 @@ import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab   from '../admin-components/MerchantsTab';
 import PromosTab      from '../admin-components/PromosTab';
 import StatsTab       from '../admin-components/StatsTab';
+import BannersTab     from '../admin-components/BannersTab';
 
 const PRIMARY   = '#0c6679';
 const SECONDARY = '#f5a006';
@@ -124,6 +125,7 @@ export default function AdminScreen() {
         {tab === 'withdrawals' && <WithdrawalsTab />}
         {tab === 'users'       && <MerchantsTab />}
         {tab === 'promos'      && <PromosTab />}
+        {tab === 'banners'     && <BannersTab />}
         {tab === 'stats'       && <StatsTab />}
 
       </ScrollView>
