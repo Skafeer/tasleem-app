@@ -459,12 +459,24 @@ export default function ProductsTab() {
                 onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
                 multiline textAlign="right" placeholderTextColor="#9ca3af" />
 
-              <Text style={s.inputLabel}>صور ({form.images.length}/10)</Text>
+              <Text style={s.inputLabel}>صور ({form.images.length}/10) — اضغط على الصورة لتعيينها رئيسية</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
                 {form.images.map((uri, idx) => (
                   <View key={idx} style={s.imgPreview}>
-                    <Image source={{ uri }} style={s.imgPreviewImg} />
-                    <TouchableOpacity style={s.imgRemove} 
+                    <TouchableOpacity onPress={() => {
+                      const newImgs = [...form.images];
+                      newImgs.splice(idx, 1);
+                      newImgs.unshift(uri);
+                      setForm(p => ({ ...p, images: newImgs }));
+                    }}>
+                      <Image source={{ uri }} style={[s.imgPreviewImg, idx === 0 && { borderWidth: 3, borderColor: '#f5a006' }]} />
+                      {idx === 0 && (
+                        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(245,160,6,0.85)', borderBottomLeftRadius: 12, borderBottomRightRadius: 12, alignItems: 'center', paddingVertical: 3 }}>
+                          <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>رئيسية ⭐</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.imgRemove}
                       onPress={() => setForm(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))}>
                       <Ionicons name="close-circle" size={24} color="#ef4444" />
                     </TouchableOpacity>
