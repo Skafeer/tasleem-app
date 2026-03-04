@@ -17,6 +17,7 @@ import OrdersTab from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab from '../admin-components/MerchantsTab';
 import PromosTab from '../admin-components/PromosTab';
+import StatsTab from '../admin-components/StatsTab';
 
 
 const PRIMARY = '#0c6679';
@@ -42,7 +43,7 @@ const CATEGORIES = ['إلكترونيات','ملابس','مستحضرات','أج
 export default function AdminScreen() {
   const qc = useQueryClient();
   const { width, height } = useWindowDimensions();
-  const [tab, setTab] = useState<'orders'|'products'|'users'|'withdrawals'|'promos'>('orders');
+  const [tab, setTab] = useState<'orders'|'products'|'users'|'withdrawals'|'promos'|'stats'>('orders');
   const [orderFilter, setOrderFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -216,6 +217,7 @@ export default function AdminScreen() {
     {key:'withdrawals', label:'السحوبات',   icon:'cash-outline',         count:pendingWithdrawals},
     {key:'users',       label:'التجار',     icon:'people-outline',       count:merchantCount},
     {key:'promos',      label:'الأكواد',    icon:'pricetag-outline',     count:promos.length},
+    {key:'stats', label:'إحصائيات', icon:'bar-chart-outline', count:0},
   ];
 
   return (
@@ -322,6 +324,8 @@ export default function AdminScreen() {
 
         {/* PROMOS */}
         {tab==='promos' && <PromosTab />}
+
+        {tab==='stats' && <StatsTab />}
       </ScrollView>
 
 
