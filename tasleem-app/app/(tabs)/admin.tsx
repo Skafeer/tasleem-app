@@ -15,6 +15,7 @@ import { toast } from '../../src/lib/toast';
 import ProductsTab from '../admin-components/ProductsTab';
 import OrdersTab from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
+import MerchantsTab from '../admin-components/MerchantsTab';
 
 
 const PRIMARY = '#0c6679';
@@ -316,33 +317,7 @@ export default function AdminScreen() {
         {tab==='withdrawals' && <WithdrawalsTab />}
 
         {/* USERS */}
-        {tab==='users' && <>
-          <View style={s.sectionHeader}>
-            <Ionicons name="people-outline" size={18} color={PRIMARY}/>
-            <Text style={s.sectionTitle}>التجار المسجلون</Text>
-            <View style={s.sectionCount}>
-              <Text style={s.sectionCountText}>{merchantCount}</Text>
-            </View>
-          </View>
-          {users.filter((u:any)=>u.role!=='admin').map((u:any)=>(
-            <View key={u.id} style={s.userCard}>
-              <View style={{alignItems:'flex-end'}}>
-                <Text style={[s.userBalance, {color:SUCCESS}]}>{u.balance?.toLocaleString()} د.ع</Text>
-                <Text style={s.userBalanceLabel}>متاح</Text>
-                <Text style={[s.userBalance, {color:SECONDARY, fontSize:12, marginTop:4}]}>{u.pendingBalance?.toLocaleString()} د.ع</Text>
-                <Text style={s.userBalanceLabel}>معلق</Text>
-              </View>
-              <View style={s.userInfo}>
-                <Text style={s.userName}>{u.storeName}</Text>
-                <Text style={s.userPhone}>{u.phone}</Text>
-                <Text style={s.userId}># {u.merchantId}</Text>
-              </View>
-              <View style={s.userAvatar}>
-                <Text style={s.userAvatarText}>{u.storeName?.charAt(0) || '؟'}</Text>
-              </View>
-            </View>
-          ))}
-        </>}
+        {tab==='users' && <MerchantsTab />}
 
         {/* PROMOS */}
         {tab==='promos' && <>
@@ -352,7 +327,6 @@ export default function AdminScreen() {
               <Text style={s.addBtnText}>إضافة كود خصم جديد</Text>
             </LinearGradient>
           </TouchableOpacity>
-
           {promos.length === 0 && (
             <View style={s.emptyBox}>
               <Ionicons name="pricetag-outline" size={52} color="#d1d5db"/>
@@ -360,7 +334,6 @@ export default function AdminScreen() {
               <Text style={s.emptyText}>أضف كوداً للبدء</Text>
             </View>
           )}
-
           {promos.map((p:any)=>(
             <View key={p.id} style={s.promoCard}>
               <TouchableOpacity style={s.promoDelBtn} onPress={()=>deletePromo.mutate(p.id)}>
@@ -381,7 +354,6 @@ export default function AdminScreen() {
             </View>
           ))}
         </>}
-
       </ScrollView>
 
       {/* ADD PROMO MODAL */}
