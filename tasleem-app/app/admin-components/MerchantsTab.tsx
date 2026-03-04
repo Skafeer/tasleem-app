@@ -134,25 +134,25 @@ export default function MerchantsTab() {
 
             {/* رأس الكارد */}
             <View style={s.cardHeader}>
-              <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
-                <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(u)}>
-                  <Ionicons name="trash-outline" size={14} color={DANGER} />
-                  <Text style={s.deleteBtnTxt}>حذف</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.editBtn} onPress={() => openEdit(u)}>
-                  <Ionicons name="create-outline" size={14} color={PRIMARY} />
-                  <Text style={s.editBtnTxt}>تعديل</Text>
-                </TouchableOpacity>
-              </View>
               <View style={s.avatarRow}>
                 <View style={s.avatar}>
                   <Text style={s.avatarTxt}>{u.storeName?.charAt(0) || '؟'}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ alignItems: 'flex-end', flex: 1 }}>
                   <Text style={s.storeName}>{u.storeName}</Text>
                   <Text style={s.merchantId}>رقم التاجر: #{u.merchantId || u.id}</Text>
                 </View>
               </View>
+            </View>
+            <View style={s.actionsRow}>
+              <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(u)}>
+                <Ionicons name="trash-outline" size={14} color={DANGER} />
+                <Text style={s.deleteBtnTxt}>حذف</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.editBtn} onPress={() => openEdit(u)}>
+                <Ionicons name="create-outline" size={14} color={PRIMARY} />
+                <Text style={s.editBtnTxt}>تعديل</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={s.divider} />
@@ -297,6 +297,7 @@ const s = StyleSheet.create({
   avatarTxt:  { fontSize: 20, fontWeight: 'bold', color: PRIMARY },
   storeName:  { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   merchantId: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  actionsRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
   editBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: PRIMARY + '12', borderWidth: 1, borderColor: PRIMARY + '30' },
   editBtnTxt: { fontSize: 12, fontWeight: '700', color: PRIMARY },
 
