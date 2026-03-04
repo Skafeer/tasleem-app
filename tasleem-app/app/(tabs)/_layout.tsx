@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs } from 'expo-router';
 import api from '../../src/lib/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 I18nManager.allowRTL(true);
 I18nManager.forceRTL(true);
@@ -21,6 +22,7 @@ export default function TabsLayout() {
   });
 
   const isAdmin = user?.role === 'admin';
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -32,8 +34,8 @@ export default function TabsLayout() {
           backgroundColor: '#fff',
           borderTopWidth: 1,
           borderTopColor: '#f3f4f6',
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
