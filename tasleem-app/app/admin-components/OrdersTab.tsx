@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, FlatList, Image,
-  Clipboard,
+  TextInput, ActivityIndicator, FlatList, Image, Clipboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
-const PRIMARY   = '#0c6679';
-const SUCCESS   = '#10b981';
-const DANGER    = '#ef4444';
+const PRIMARY = '#0c6679';
+const SUCCESS = '#10b981';
+const DANGER  = '#ef4444';
 
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   pending:    { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
@@ -35,6 +34,12 @@ const FILTERS = [
   { key: 'returned',   label: 'راجع' },
   { key: 'postponed',  label: 'مؤجل' },
 ];
+
+const getFirstImage = (product: any) => {
+  if (!product) return null;
+  const imgs = product.images ? product.images.split(',').filter(Boolean) : [];
+  return imgs.length > 0 ? imgs[0] : (product.imageUrl || null);
+};
 
 export default function OrdersTab() {
   const qc = useQueryClient();
@@ -117,10 +122,8 @@ export default function OrdersTab() {
           <TextInput
             style={s.searchInput}
             placeholder="ابحث برقم الطلب أو اسم الزبون..."
-            value={search}
-            onChangeText={setSearch}
-            placeholderTextColor="#9ca3af"
-            textAlign="right"
+            value={search} onChangeText={setSearch}
+            placeholderTextColor="#9ca3af" textAlign="right"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
@@ -167,6 +170,8 @@ export default function OrdersTab() {
 
           return (
             <View style={s.card}>
+
+              {/* رأس الكارد */}
               <View style={s.cardHeader}>
                 <View style={s.orderIdRow}>
                   <Text style={s.orderId}>#{o.id}</Text>
@@ -185,6 +190,7 @@ export default function OrdersTab() {
                 </TouchableOpacity>
               </View>
 
+              {/* Dropdown الحالات */}
               {dropdownId === o.id && (
                 <View style={s.dropdown}>
                   {Object.entries(STATUS).map(([key, val]) => (
@@ -209,6 +215,7 @@ export default function OrdersTab() {
 
               <View style={s.divider} />
 
+              {/* معلومات الزبون */}
               <View style={s.section}>
                 <View style={s.sectionLabelRow}>
                   <Ionicons name="person-outline" size={13} color={PRIMARY} />
@@ -238,6 +245,7 @@ export default function OrdersTab() {
                 </View>
               </View>
 
+              {/* معلومات التاجر */}
               {merchant && (
                 <>
                   <View style={s.divider} />
@@ -263,19 +271,20 @@ export default function OrdersTab() {
                 </>
               )}
 
+              {/* إجمالي الطلب + التوصيل */}
               <View style={s.divider} />
               <View style={s.priceRow}>
                 <View style={s.priceBox}>
-                  <Text style={s.priceLabel}>سعر الجملة</Text>
-                  <Text style={[s.priceVal, { color: DANGER }]}>
-                    {o.wholesaleTotal?.toLocaleString() ?? '—'} د.ع
+                  <Text style={s.priceLabel}>إجمالي الطلب</Text>
+                  <Text style={[s.priceVal, { color: PRIMARY }]}>
+                    {o.totalAmount?.toLocaleString() ?? '—'} د.ع
                   </Text>
                 </View>
                 <View style={s.priceDivider} />
                 <View style={s.priceBox}>
-                  <Text style={s.priceLabel}>سعر البيع</Text>
-                  <Text style={[s.priceVal, { color: PRIMARY }]}>
-                    {o.totalAmount?.toLocaleString()} د.ع
+                  <Text style={s.priceLabel}>التوصيل</Text>
+                  <Text style={[s.priceVal, { color: '#06b6d4' }]}>
+                    {o.shippingCost?.toLocaleString() ?? '—'} د.ع
                   </Text>
                 </View>
                 <View style={s.priceDivider} />
@@ -287,6 +296,7 @@ export default function OrdersTab() {
                 </View>
               </View>
 
+              {/* زر التفاصيل */}
               <TouchableOpacity
                 style={s.expandBtn}
                 onPress={() => setExpanded(isOpen ? null : o.id)}
@@ -295,53 +305,60 @@ export default function OrdersTab() {
                 <Text style={s.expandTxt}>{isOpen ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}</Text>
               </TouchableOpacity>
 
+              {/* التفاصيل الموسعة */}
               {isOpen && (
                 <View style={s.details}>
+
+                  {/* المنتجات */}
                   {items.length > 0 && (
                     <View style={s.itemsBox}>
                       <View style={s.sectionLabelRow}>
                         <Ionicons name="cube-outline" size={13} color={PRIMARY} />
                         <Text style={s.sectionLabel}>المنتجات ({items.length})</Text>
                       </View>
-                      {items.map((item: any, idx: number) => (
-                        <View key={idx} style={[s.productRow, idx < items.length - 1 && s.productBorder]}>
-                          {item.product?.images ? item.product.images.split(",").filter(Boolean)[0] : item.product?.imageUrl ? (
-                            <Image source={{ uri: item.product.imageUrl }} style={s.productImg} resizeMode="cover" />
-                          ) : (
-                            <View style={[s.productImg, s.productImgPlaceholder]}>
-                              <Ionicons name="image-outline" size={20} color="#d1d5db" />
+                      {items.map((item: any, idx: number) => {
+                        const imgUri = getFirstImage(item.product);
+                        return (
+                          <View key={idx} style={[s.productRow, idx < items.length - 1 && s.productBorder]}>
+                            {imgUri ? (
+                              <Image source={{ uri: imgUri }} style={s.productImg} resizeMode="cover" />
+                            ) : (
+                              <View style={[s.productImg, s.productImgPlaceholder]}>
+                                <Ionicons name="image-outline" size={20} color="#d1d5db" />
+                              </View>
+                            )}
+                            <View style={s.productInfo}>
+                              <Text style={s.productName} numberOfLines={2}>
+                                {item.product?.name || `منتج #${item.productId}`}
+                              </Text>
+                              <View style={s.productPriceRow}>
+                                <View style={s.qtyBadge}>
+                                  <Text style={s.qtyTxt}>×{item.quantity}</Text>
+                                </View>
+                                <View style={s.priceBadge}>
+                                  <Text style={s.priceBadgeLabel}>جملة</Text>
+                                  <Text style={[s.priceBadgeVal, { color: DANGER }]}>
+                                    {item.cost?.toLocaleString() ?? '—'}
+                                  </Text>
+                                </View>
+                                <View style={[s.priceBadge, { backgroundColor: PRIMARY + '10' }]}>
+                                  <Text style={s.priceBadgeLabel}>بيع</Text>
+                                  <Text style={[s.priceBadgeVal, { color: PRIMARY }]}>
+                                    {item.price?.toLocaleString()}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={s.itemTotal}>
+                                الإجمالي: {(item.price * item.quantity)?.toLocaleString()} د.ع
+                              </Text>
                             </View>
-                          )}
-                          <View style={s.productInfo}>
-                            <Text style={s.productName} numberOfLines={2}>
-                              {item.product?.name || `منتج #${item.productId}`}
-                            </Text>
-                            <View style={s.productPriceRow}>
-                              <View style={s.qtyBadge}>
-                                <Text style={s.qtyTxt}>×{item.quantity}</Text>
-                              </View>
-                              <View style={s.priceBadge}>
-                                <Text style={s.priceBadgeLabel}>جملة</Text>
-                                <Text style={[s.priceBadgeVal, { color: DANGER }]}>
-                                  {item.cost?.toLocaleString() ?? '—'}
-                                </Text>
-                              </View>
-                              <View style={[s.priceBadge, { backgroundColor: PRIMARY + '10' }]}>
-                                <Text style={s.priceBadgeLabel}>بيع</Text>
-                                <Text style={[s.priceBadgeVal, { color: PRIMARY }]}>
-                                  {item.price?.toLocaleString()}
-                                </Text>
-                              </View>
-                            </View>
-                            <Text style={s.itemTotal}>
-                              الإجمالي: {(item.price * item.quantity)?.toLocaleString()} د.ع
-                            </Text>
                           </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   )}
 
+                  {/* الملخص المالي */}
                   <View style={s.finBox}>
                     {o.shippingCost > 0 && (
                       <View style={s.finRow}>
@@ -366,12 +383,14 @@ export default function OrdersTab() {
                     </View>
                   </View>
 
+                  {/* الملاحظات */}
                   {o.notes ? (
                     <View style={s.notesBox}>
                       <Ionicons name="chatbubble-ellipses-outline" size={14} color="#92400e" />
                       <Text style={s.notesTxt}>{o.notes}</Text>
                     </View>
                   ) : null}
+
                 </View>
               )}
             </View>
