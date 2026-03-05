@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
-  ScrollView, Dimensions, Linking,
+  FlatList as RNFlatList, Dimensions, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +26,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing]         = useState(false);
   const [activeBanner, setActiveBanner]     = useState(0);
 
-  const bannerRef   = useRef<ScrollView>(null);
+  const bannerRef   = useRef<any>(null);
   const isManual    = useRef(false);
   const dirRef      = useRef(1); // 1 = forward, -1 = backward
   const idxRef      = useRef(0);
@@ -71,7 +71,7 @@ export default function HomeScreen() {
   };
 
   const scrollTo = (idx: number) => {
-    bannerRef.current?.scrollTo({ x: idx * BANNER_W, animated: true });
+    (bannerRef.current as any)?.scrollToIndex({ index: idx, animated: true });
     idxRef.current = idx;
     setActiveBanner(idx);
   };
@@ -95,32 +95,27 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [banners.length]);
 
-  const handleScrollEnd = (e: any) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
-    idxRef.current = idx;
-    setActiveBanner(idx);
-    isManual.current = false;
-  };
-
-  const BannerSlider = () => {
+  const BannerSlider = useCallback(() => {
     if (!banners.length) return null;
     return (
       <View style={s.bannerContainer}>
-        <ScrollView
-          ref={bannerRef}
+        <RNFlatList
+          ref={bannerRef as any}
+          data={banners}
           horizontal
+          pagingEnabled
           showsHorizontalScrollIndicator={false}
-          snapToInterval={BANNER_W}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          disableIntervalMomentum={true}
+          keyExtractor={(item: any) => String(item.id)}
+          getItemLayout={(_: any, index: number) => ({ length: BANNER_W, offset: BANNER_W * index, index })}
           onScrollBeginDrag={() => { isManual.current = true; }}
-          onMomentumScrollEnd={handleScrollEnd}
-          style={{ width: BANNER_W }}
-        >
-          {banners.map((b: any, i: number) => (
+          onMomentumScrollEnd={(e: any) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
+            idxRef.current = idx;
+            setActiveBanner(idx);
+            isManual.current = false;
+          }}
+          renderItem={({ item: b }: any) => (
             <TouchableOpacity
-              key={b.id}
               activeOpacity={b.link ? 0.85 : 1}
               onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
               style={s.bannerSlide}
@@ -137,14 +132,17 @@ export default function HomeScreen() {
                 </View>
               ) : null}
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Dots */}
+          )}
+        />
         {banners.length > 1 && (
           <View style={s.dotsRow}>
             {banners.map((_: any, i: number) => (
-              <TouchableOpacity key={i} onPress={() => { isManual.current = true; scrollTo(i); }}>
+              <TouchableOpacity key={i} onPress={() => {
+                isManual.current = true;
+                (bannerRef.current as any)?.scrollToIndex({ index: i, animated: true });
+                idxRef.current = i;
+                setActiveBanner(i);
+              }}>
                 <View style={[s.dot, activeBanner === i && s.dotActive]} />
               </TouchableOpacity>
             ))}
@@ -152,7 +150,7 @@ export default function HomeScreen() {
         )}
       </View>
     );
-  };
+  }, [banners, activeBanner, BANNER_W]);
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
