@@ -36,6 +36,14 @@
         {
           "photosPermission": "السماح لتسليم بالوصول إلى صورك لرفع صور المنتجات"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0c6679",
+          "sounds": []
+        }
       ]
     ],
     "scheme": "tasleem",

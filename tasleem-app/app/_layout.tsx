@@ -5,6 +5,7 @@ import { I18nManager, Platform, StatusBar } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
+import { useNotifications } from './hooks/useNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,6 +22,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const [isReady, setIsReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useNotifications(isLoggedIn);
 
   useEffect(() => {
     checkAuth();
@@ -33,6 +36,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       
       if (token) {
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setIsLoggedIn(true);
         if (inAuth) {
           router.replace('/(tabs)');
         }

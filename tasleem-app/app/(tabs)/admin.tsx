@@ -14,6 +14,7 @@ import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab   from '../admin-components/MerchantsTab';
 import PromosTab      from '../admin-components/PromosTab';
 import StatsTab       from '../admin-components/StatsTab';
+import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
 
 const PRIMARY   = '#0c6679';
@@ -29,6 +30,7 @@ const TABS = [
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات', icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
+  { key: 'notifications', label: 'الإشعارات',  icon: 'notifications-outline',  activeIcon: 'notifications' },
 ];
 
 export default function AdminScreen() {
@@ -128,6 +130,7 @@ export default function AdminScreen() {
         {tab === 'promos'      && <PromosTab />}
         {tab === 'banners'     && <BannersTab />}
         {tab === 'stats'       && <StatsTab />}
+        {tab === 'notifications' && <NotificationsTab />}
 
       </ScrollView>
 
