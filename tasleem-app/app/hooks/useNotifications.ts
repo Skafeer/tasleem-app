@@ -35,10 +35,8 @@ export function useNotifications(isLoggedIn: boolean) {
 async function registerForPushNotifications() {
   try {
     console.log('🔔 Starting push registration...');
-    console.log('📱 Is device:', Device.isDevice);
     if (!Device.isDevice) {
-      console.log('⚠️ Not a physical device, skipping');
-      return;
+        return;
     }
     const { status: existing } = await Notifications.getPermissionsAsync();
     let final = existing;
