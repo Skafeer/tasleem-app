@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
-  FlatList as RNFlatList, Dimensions, Linking,
+  ScrollView, Dimensions, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,25 +11,119 @@ import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 
 const PRIMARY       = '#0c6679';
-const { width: SW } = Dimensions.get('window');
 const BANNER_H      = 170;
-const AUTO_INTERVAL = 3000;
+const AUTO_INTERVAL = 3500;
 
+// ── مكون البنر منفصل تماماً ──
+function BannerSlider({ banners }: { banners: any[] }) {
+  const { width } = useWindowDimensions();
+  const scrollRef  = useRef<ScrollView>(null);
+  const idxRef     = useRef(0);
+  const dirRef     = useRef(1);
+  const isManual   = useRef(false);
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    idxRef.current = 0;
+    dirRef.current = 1;
+    setActive(0);
+
+    const timer = setInterval(() => {
+      if (isManual.current) return;
+      let next = idxRef.current + dirRef.current;
+      if (next >= banners.length) { dirRef.current = -1; next = banners.length - 2; }
+      if (next < 0)               { dirRef.current =  1; next = 1; }
+      scrollRef.current?.scrollTo({ x: next * width, animated: true });
+      idxRef.current = next;
+      setActive(next);
+    }, AUTO_INTERVAL);
+
+    return () => clearInterval(timer);
+  }, [banners.length, width]);
+
+  if (!banners.length) return null;
+
+  return (
+    <View style={[bs.wrap, { marginHorizontal: 12 }]}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={() => { isManual.current = true; }}
+        onMomentumScrollEnd={e => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+          idxRef.current = idx;
+          setActive(idx);
+          isManual.current = false;
+        }}
+      >
+        {banners.map((b: any) => (
+          <TouchableOpacity
+            key={b.id}
+            activeOpacity={b.link ? 0.85 : 1}
+            onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
+            style={[bs.slide, { width, height: BANNER_H }]}
+          >
+            <Image source={{ uri: b.imageUrl }} style={bs.img} resizeMode="cover" />
+            {b.title ? (
+              <View style={bs.titleBox}>
+                <Text style={bs.titleTxt}>{b.title}</Text>
+              </View>
+            ) : null}
+            {b.link ? (
+              <View style={bs.linkBadge}>
+                <Ionicons name="link-outline" size={10} color="#fff" />
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {banners.length > 1 && (
+        <View style={bs.dots}>
+          {banners.map((_: any, i: number) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => {
+                isManual.current = true;
+                scrollRef.current?.scrollTo({ x: i * width, animated: true });
+                idxRef.current = i;
+                setActive(i);
+              }}
+            >
+              <View style={[bs.dot, active === i && bs.dotActive]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const bs = StyleSheet.create({
+  wrap:     { borderRadius: 16, overflow: 'hidden', marginBottom: 14 },
+  slide:    { overflow: 'hidden' },
+  img:      { width: '100%', height: '100%' },
+  titleBox: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
+  titleTxt: { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
+  linkBadge:{ position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 5 },
+  dots:     { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10, paddingBottom: 2 },
+  dot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
+  dotActive:{ backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
+});
+
+// ── الصفحة الرئيسية ──
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const CARD_WIDTH = (width - 48) / 2;
-  const BANNER_W   = width - 24; // 12 padding on each side from FlatList
 
   const [search, setSearch]                 = useState('');
   const [activeCategory, setActiveCategory] = useState('الكل');
   const [refreshing, setRefreshing]         = useState(false);
-  const [activeBanner, setActiveBanner]     = useState(0);
-
-  const bannerRef   = useRef<any>(null);
-  const isManual    = useRef(false);
-  const dirRef      = useRef(1); // 1 = forward, -1 = backward
-  const idxRef      = useRef(0);
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
@@ -48,18 +142,15 @@ export default function HomeScreen() {
     queryKey: ['banners'],
     queryFn: async () => {
       const { data } = await api.get('/api/banners');
-      return (data as any[])
-        .filter((b: any) => b.isActive)
-        .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+      return (data as any[]).filter((b: any) => b.isActive).sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     },
   });
 
-  const banners = rawBanners as any[];
-
-  const products   = (allProducts as any[]).filter((p: any) => p.stock > 0);
-  const allCats    = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
+  const banners  = rawBanners as any[];
+  const products = (allProducts as any[]).filter((p: any) => p.stock > 0);
+  const allCats  = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
   const categories = ['الكل', ...Array.from(new Set(allCats))];
-  const filtered   = products.filter((p: any) => {
+  const filtered = products.filter((p: any) => {
     const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
     return (activeCategory === 'الكل' || cats.includes(activeCategory)) && (!search || p.name.includes(search));
   });
@@ -70,90 +161,9 @@ export default function HomeScreen() {
     return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
   };
 
-  const scrollTo = (idx: number) => {
-    (bannerRef.current as any)?.scrollToIndex({ index: idx, animated: true });
-    idxRef.current = idx;
-    setActiveBanner(idx);
-  };
-
-  // Auto-play بحركة عكسية (bounce)
-  useEffect(() => {
-    const total = banners.length;
-    if (total <= 1) return;
-    idxRef.current  = 0;
-    dirRef.current  = 1;
-    setActiveBanner(0);
-
-    const timer = setInterval(() => {
-      if (isManual.current) return;
-      let next = idxRef.current + dirRef.current;
-      if (next >= total) { dirRef.current = -1; next = total - 2; }
-      if (next < 0)      { dirRef.current =  1; next = 1; }
-      scrollTo(next);
-    }, AUTO_INTERVAL);
-
-    return () => clearInterval(timer);
-  }, [banners.length]);
-
-  const BannerSlider = useCallback(() => {
-    if (!banners.length) return null;
-    return (
-      <View style={s.bannerContainer}>
-        <RNFlatList
-          ref={bannerRef as any}
-          data={banners}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item: any) => String(item.id)}
-          getItemLayout={(_: any, index: number) => ({ length: BANNER_W, offset: BANNER_W * index, index })}
-          onScrollBeginDrag={() => { isManual.current = true; }}
-          onMomentumScrollEnd={(e: any) => {
-            const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
-            idxRef.current = idx;
-            setActiveBanner(idx);
-            isManual.current = false;
-          }}
-          renderItem={({ item: b }: any) => (
-            <TouchableOpacity
-              activeOpacity={b.link ? 0.85 : 1}
-              onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
-              style={s.bannerSlide}
-            >
-              <Image source={{ uri: b.imageUrl }} style={s.bannerImg} resizeMode="cover" />
-              {b.title ? (
-                <View style={s.bannerTitleBox}>
-                  <Text style={s.bannerTitleTxt}>{b.title}</Text>
-                </View>
-              ) : null}
-              {b.link ? (
-                <View style={s.bannerLinkBadge}>
-                  <Ionicons name="link-outline" size={10} color="#fff" />
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          )}
-        />
-        {banners.length > 1 && (
-          <View style={s.dotsRow}>
-            {banners.map((_: any, i: number) => (
-              <TouchableOpacity key={i} onPress={() => {
-                isManual.current = true;
-                (bannerRef.current as any)?.scrollToIndex({ index: i, animated: true });
-                idxRef.current = i;
-                setActiveBanner(i);
-              }}>
-                <View style={[s.dot, activeBanner === i && s.dotActive]} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  }, [banners, activeBanner, BANNER_W]);
-
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
@@ -189,6 +199,7 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
         ListHeaderComponent={
           <>
+            {/* التصنيفات */}
             <View style={s.categoriesWrapper}>
               <FlatList
                 horizontal data={categories as string[]}
@@ -204,7 +215,8 @@ export default function HomeScreen() {
                 )}
               />
             </View>
-            <BannerSlider />
+            {/* البنرات */}
+            <BannerSlider banners={banners} />
           </>
         }
         ListEmptyComponent={
@@ -272,15 +284,6 @@ const s = StyleSheet.create({
   catBtnActive:      { backgroundColor: PRIMARY, borderColor: PRIMARY },
   catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   catTextActive:     { color: '#fff' },
-  bannerContainer:  { marginBottom: 14 },
-  bannerSlide:      { width: SW - 24, height: BANNER_H, borderRadius: 16, overflow: 'hidden' },
-  bannerImg:        { width: '100%', height: '100%' },
-  bannerTitleBox:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
-  bannerTitleTxt:   { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
-  bannerLinkBadge:  { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 5 },
-  dotsRow:          { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot:              { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
-  dotActive:        { backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
   card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   imgBox:        { position: 'relative', overflow: 'hidden' },
   img:           { width: '100%', height: '100%' },
