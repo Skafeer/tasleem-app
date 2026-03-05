@@ -73,18 +73,18 @@ export default function StatsTab() {
   const deliveryRate   = allOrders.length > 0 ? Math.round((delivered.length / allOrders.length) * 100) : 0;
 
   // ── الإيرادات (من سعر جملة التاجر = totalAmount) ──
-  const totalRevenue   = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
+  const totalRevenue   = delivered.reduce((s, o) => s + ((o.totalAmount || 0) - (o.shippingCost || 0)), 0);
   // ── الأرباح (الفرق بين سعر الشركة وسعر التاجر = totalProfit) ──
   const totalProfit    = delivered.reduce((s, o) => s + (o.totalProfit || 0), 0);
 
   // الإيرادات الشهرية (هذا الشهر)
   const monthDelivered = monthOrders.filter(o => o.status === 'delivered');
-  const monthRevenue   = monthDelivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
+  const monthRevenue   = monthDelivered.reduce((s, o) => s + ((o.totalAmount || 0) - (o.shippingCost || 0)), 0);
   const monthProfit    = monthDelivered.reduce((s, o) => s + (o.totalProfit || 0), 0);
 
   // الإيرادات السنوية
   const yearDelivered  = delivered.filter(o => new Date(o.createdAt).getFullYear() === thisYear);
-  const yearRevenue    = yearDelivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
+  const yearRevenue    = yearDelivered.reduce((s, o) => s + ((o.totalAmount || 0) - (o.shippingCost || 0)), 0);
   const yearProfit     = yearDelivered.reduce((s, o) => s + (o.totalProfit || 0), 0);
 
   // ── المستخدمين ──
@@ -104,7 +104,7 @@ export default function StatsTab() {
     }
     merchantMap[o.merchantId].count++;
     if (o.status === 'delivered') {
-      merchantMap[o.merchantId].revenue += (o.totalAmount || 0);
+      merchantMap[o.merchantId].revenue += ((o.totalAmount || 0) - (o.shippingCost || 0));
       merchantMap[o.merchantId].profit  += (o.totalProfit || 0);
     }
   });
@@ -119,7 +119,7 @@ export default function StatsTab() {
     const mo = delivered.filter(o => { const od = new Date(o.createdAt); return od.getMonth()===m && od.getFullYear()===y; });
     last6.push({
       label: MONTHS[m],
-      revenue: mo.reduce((s, o) => s + (o.totalAmount || 0), 0),
+      revenue: mo.reduce((s, o) => s + ((o.totalAmount || 0) - (o.shippingCost || 0)), 0),
       profit:  mo.reduce((s, o) => s + (o.totalProfit || 0), 0),
     });
   }
