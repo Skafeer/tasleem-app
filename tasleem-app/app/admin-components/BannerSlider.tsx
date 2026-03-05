@@ -1,15 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Image,
-  Text, Linking, useWindowDimensions,
+  Text, Linking, useWindowDimensions, ScrollView,
 } from 'react-native';
-import Animated, {
-  scrollTo,
-  useAnimatedRef,
-  useAnimatedScrollHandler,
-  useDerivedValue,
-  useSharedValue,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
 const PRIMARY       = '#0c6679';
@@ -20,42 +13,39 @@ type Banner = { id: number; imageUrl: string; title?: string; link?: string; isA
 
 export default function BannerSlider({ banners }: { banners: Banner[] }) {
   const { width }  = useWindowDimensions();
-  const offset     = useSharedValue(0);
-  const ref        = useAnimatedRef<Animated.ScrollView>();
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
-  const [activeIdx, setActiveIdx]   = useState(0);
-
-  const onScroll = useAnimatedScrollHandler({
-    onMomentumEnd: (e) => { offset.value = e.contentOffset.x; },
-  });
-
-  useDerivedValue(() => { scrollTo(ref, offset.value, 0, true); });
+  const scrollRef  = useRef<ScrollView>(null);
+  const idxRef     = useRef(0);
+  const isManual   = useRef(false);
+  const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
-    if (!isAutoPlay || banners.length <= 1) return;
+    if (banners.length <= 1) return;
+    idxRef.current = 0;
+    setActiveIdx(0);
     const timer = setInterval(() => {
-      const next = (Math.round(offset.value / width) + 1) % banners.length;
-      offset.value = next * width;
+      if (isManual.current) return;
+      const next = (idxRef.current + 1) % banners.length;
+      scrollRef.current?.scrollTo({ x: next * width, animated: true });
+      idxRef.current = next;
       setActiveIdx(next);
     }, AUTO_INTERVAL);
     return () => clearInterval(timer);
-  }, [isAutoPlay, banners.length, width]);
+  }, [banners.length, width]);
 
   if (!banners.length) return null;
 
   return (
     <View style={s.container}>
-      <Animated.ScrollView
-        ref={ref}
+      <ScrollView
+        ref={scrollRef}
         horizontal pagingEnabled scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        onScrollBeginDrag={() => setIsAutoPlay(false)}
+        onScrollBeginDrag={() => { isManual.current = true; }}
         onMomentumScrollEnd={(e) => {
           const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-          offset.value = idx * width;
+          idxRef.current = idx;
           setActiveIdx(idx);
-          setIsAutoPlay(true);
+          isManual.current = false;
         }}
       >
         {banners.map((b) => (
@@ -69,12 +59,16 @@ export default function BannerSlider({ banners }: { banners: Banner[] }) {
             {b.link  ? <View style={s.linkBadge}><Ionicons name="link-outline" size={10} color="#fff" /></View> : null}
           </TouchableOpacity>
         ))}
-      </Animated.ScrollView>
-
+      </ScrollView>
       {banners.length > 1 && (
         <View style={s.dots}>
           {banners.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => { offset.value = i * width; setActiveIdx(i); }}>
+            <TouchableOpacity key={i} onPress={() => {
+              isManual.current = true;
+              scrollRef.current?.scrollTo({ x: i * width, animated: true });
+              idxRef.current = i;
+              setActiveIdx(i);
+            }}>
               <View style={[s.dot, activeIdx === i && s.dotActive]} />
             </TouchableOpacity>
           ))}
