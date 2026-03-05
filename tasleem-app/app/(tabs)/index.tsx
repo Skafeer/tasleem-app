@@ -115,7 +115,7 @@ export default function HomeScreen() {
               />
             </View>
             {/* البنرات */}
-            <BannerSlider banners={banners} />
+            <BannerSlider banners={banners} containerWidth={width} />
           </>
         }
         ListEmptyComponent={

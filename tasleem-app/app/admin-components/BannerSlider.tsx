@@ -11,8 +11,9 @@ const AUTO_INTERVAL = 3500;
 
 type Banner = { id: number; imageUrl: string; title?: string; link?: string; isActive: boolean; sortOrder: number; };
 
-export default function BannerSlider({ banners }: { banners: Banner[] }) {
-  const { width }  = useWindowDimensions();
+export default function BannerSlider({ banners, containerWidth }: { banners: Banner[]; containerWidth?: number }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const width = (containerWidth ?? screenWidth) - 24;
   const scrollRef  = useRef<ScrollView>(null);
   const idxRef     = useRef(0);
   const isManual   = useRef(false);
