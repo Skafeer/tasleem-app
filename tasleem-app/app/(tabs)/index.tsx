@@ -1,119 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
-  ScrollView, Dimensions, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
+import BannerSlider from '../admin-components/BannerSlider';
 
 const PRIMARY       = '#0c6679';
 const BANNER_H      = 170;
 const AUTO_INTERVAL = 3500;
-
-// ── مكون البنر منفصل تماماً ──
-function BannerSlider({ banners }: { banners: any[] }) {
-  const { width } = useWindowDimensions();
-  const scrollRef  = useRef<ScrollView>(null);
-  const idxRef     = useRef(0);
-  const dirRef     = useRef(1);
-  const isManual   = useRef(false);
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    idxRef.current = 0;
-    dirRef.current = 1;
-    setActive(0);
-
-    const timer = setInterval(() => {
-      if (isManual.current) return;
-      let next = idxRef.current + dirRef.current;
-      if (next >= banners.length) { dirRef.current = -1; next = banners.length - 2; }
-      if (next < 0)               { dirRef.current =  1; next = 1; }
-      scrollRef.current?.scrollTo({ x: next * width, animated: true });
-      idxRef.current = next;
-      setActive(next);
-    }, AUTO_INTERVAL);
-
-    return () => clearInterval(timer);
-  }, [banners.length, width]);
-
-  if (!banners.length) return null;
-
-  return (
-    <View style={[bs.wrap, { marginHorizontal: 12 }]}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        scrollEventThrottle={16}
-        showsHorizontalScrollIndicator={false}
-        onScrollBeginDrag={() => { isManual.current = true; }}
-        onMomentumScrollEnd={e => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-          idxRef.current = idx;
-          setActive(idx);
-          isManual.current = false;
-        }}
-      >
-        {banners.map((b: any) => (
-          <TouchableOpacity
-            key={b.id}
-            activeOpacity={b.link ? 0.85 : 1}
-            onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
-            style={[bs.slide, { width, height: BANNER_H }]}
-          >
-            <Image source={{ uri: b.imageUrl }} style={bs.img} resizeMode="cover" />
-            {b.title ? (
-              <View style={bs.titleBox}>
-                <Text style={bs.titleTxt}>{b.title}</Text>
-              </View>
-            ) : null}
-            {b.link ? (
-              <View style={bs.linkBadge}>
-                <Ionicons name="link-outline" size={10} color="#fff" />
-              </View>
-            ) : null}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {banners.length > 1 && (
-        <View style={bs.dots}>
-          {banners.map((_: any, i: number) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => {
-                isManual.current = true;
-                scrollRef.current?.scrollTo({ x: i * width, animated: true });
-                idxRef.current = i;
-                setActive(i);
-              }}
-            >
-              <View style={[bs.dot, active === i && bs.dotActive]} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-const bs = StyleSheet.create({
-  wrap:     { borderRadius: 16, overflow: 'hidden', marginBottom: 14 },
-  slide:    { overflow: 'hidden' },
-  img:      { width: '100%', height: '100%' },
-  titleBox: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
-  titleTxt: { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
-  linkBadge:{ position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 8, padding: 5 },
-  dots:     { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10, paddingBottom: 2 },
-  dot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
-  dotActive:{ backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
-});
 
 // ── الصفحة الرئيسية ──
 export default function HomeScreen() {

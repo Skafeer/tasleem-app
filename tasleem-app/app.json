@@ -36,7 +36,8 @@
         {
           "photosPermission": "السماح لتسليم بالوصول إلى صورك لرفع صور المنتجات"
         }
-      ]
+      ],
+      "react-native-reanimated"
     ],
     "scheme": "tasleem",
     "extra": {
