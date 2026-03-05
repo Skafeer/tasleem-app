@@ -34,14 +34,23 @@ export function useNotifications(isLoggedIn: boolean) {
 
 async function registerForPushNotifications() {
   try {
-    if (!Device.isDevice) return;
+    console.log('🔔 Starting push registration...');
+    console.log('📱 Is device:', Device.isDevice);
+    if (!Device.isDevice) {
+      console.log('⚠️ Not a physical device, skipping');
+      return;
+    }
     const { status: existing } = await Notifications.getPermissionsAsync();
     let final = existing;
     if (existing !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       final = status;
     }
-    if (final !== 'granted') return;
+    console.log('🔑 Permission status:', final);
+    if (final !== 'granted') {
+      console.log('❌ Permission not granted');
+      return;
+    }
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
