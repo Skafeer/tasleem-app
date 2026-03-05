@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions,
@@ -14,7 +14,7 @@ const PRIMARY       = '#0c6679';
 const { width: SW } = Dimensions.get('window');
 const BANNER_W      = SW - 32;
 const BANNER_H      = 170;
-const AUTO_INTERVAL = 3500;
+const AUTO_INTERVAL = 3000;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -26,9 +26,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing]         = useState(false);
   const [activeBanner, setActiveBanner]     = useState(0);
 
-  const bannerRef  = useRef<ScrollView>(null);
-  const isManual   = useRef(false);
-  const currentIdx = useRef(0);
+  const bannerRef   = useRef<ScrollView>(null);
+  const isManual    = useRef(false);
+  const dirRef      = useRef(1); // 1 = forward, -1 = backward
+  const idxRef      = useRef(0);
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
@@ -47,7 +48,9 @@ export default function HomeScreen() {
     queryKey: ['banners'],
     queryFn: async () => {
       const { data } = await api.get('/api/banners');
-      return (data as any[]).filter((b: any) => b.isActive);
+      return (data as any[])
+        .filter((b: any) => b.isActive)
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     },
   });
 
@@ -62,41 +65,41 @@ export default function HomeScreen() {
   });
 
   const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
-
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
     return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
   };
 
-  const scrollTo = useCallback((idx: number) => {
-    const total = banners.length;
-    if (!total) return;
-    const next = ((idx % total) + total) % total;
-    bannerRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
-    currentIdx.current = next;
-    setActiveBanner(next);
-  }, [banners]);
+  const scrollTo = (idx: number) => {
+    bannerRef.current?.scrollTo({ x: idx * BANNER_W, animated: true });
+    idxRef.current = idx;
+    setActiveBanner(idx);
+  };
 
-  // Auto-play
+  // Auto-play بحركة عكسية (bounce)
   useEffect(() => {
-    if (banners.length <= 1) return;
+    const total = banners.length;
+    if (total <= 1) return;
+    idxRef.current  = 0;
+    dirRef.current  = 1;
+    setActiveBanner(0);
+
     const timer = setInterval(() => {
-      if (!isManual.current) {
-        scrollTo(currentIdx.current + 1);
-      }
+      if (isManual.current) return;
+      let next = idxRef.current + dirRef.current;
+      if (next >= total) { dirRef.current = -1; next = total - 2; }
+      if (next < 0)      { dirRef.current =  1; next = 1; }
+      scrollTo(next);
     }, AUTO_INTERVAL);
+
     return () => clearInterval(timer);
-  }, [banners, scrollTo]);
+  }, [banners.length]);
 
   const handleScrollEnd = (e: any) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_W);
-    currentIdx.current = idx;
+    idxRef.current = idx;
     setActiveBanner(idx);
     isManual.current = false;
-  };
-
-  const handleBannerPress = (b: any) => {
-    if (b.link) Linking.openURL(b.link).catch(() => {});
   };
 
   const BannerSlider = () => {
@@ -108,17 +111,16 @@ export default function HomeScreen() {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          snapToInterval={BANNER_W}
+          decelerationRate="fast"
           onScrollBeginDrag={() => { isManual.current = true; }}
           onMomentumScrollEnd={handleScrollEnd}
-          decelerationRate="fast"
-          snapToInterval={BANNER_W}
-          contentContainerStyle={{ gap: 0 }}
         >
           {banners.map((b: any, i: number) => (
             <TouchableOpacity
-              key={i}
+              key={b.id}
               activeOpacity={b.link ? 0.85 : 1}
-              onPress={() => handleBannerPress(b)}
+              onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
               style={s.bannerSlide}
             >
               <Image source={{ uri: b.imageUrl }} style={s.bannerImg} resizeMode="cover" />
@@ -140,7 +142,7 @@ export default function HomeScreen() {
         {banners.length > 1 && (
           <View style={s.dotsRow}>
             {banners.map((_: any, i: number) => (
-              <TouchableOpacity key={i} onPress={() => scrollTo(i)}>
+              <TouchableOpacity key={i} onPress={() => { isManual.current = true; scrollTo(i); }}>
                 <View style={[s.dot, activeBanner === i && s.dotActive]} />
               </TouchableOpacity>
             ))}
@@ -152,7 +154,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
@@ -188,14 +189,11 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
         ListHeaderComponent={
           <>
-            {/* التصنيفات أولاً */}
             <View style={s.categoriesWrapper}>
               <FlatList
-                horizontal
-                data={categories as string[]}
+                horizontal data={categories as string[]}
                 showsHorizontalScrollIndicator={false}
-                style={s.catList}
-                contentContainerStyle={s.catListContent}
+                style={s.catList} contentContainerStyle={s.catListContent}
                 keyExtractor={i => i}
                 renderItem={({ item }) => (
                   <TouchableOpacity
@@ -206,7 +204,6 @@ export default function HomeScreen() {
                 )}
               />
             </View>
-            {/* البنرات بعد التصنيفات */}
             <BannerSlider />
           </>
         }
@@ -217,13 +214,11 @@ export default function HomeScreen() {
           </View>
         }
         renderItem={({ item: p }: any) => {
-          const imgs        = getImages(p);
+          const imgs = getImages(p);
           const hasDiscount = p.discount > 0;
           const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
           return (
-            <TouchableOpacity
-              style={[s.card, { width: CARD_WIDTH }]}
-              onPress={() => router.push(`/products/${p.id}`)}>
+            <TouchableOpacity style={[s.card, { width: CARD_WIDTH }]} onPress={() => router.push(`/products/${p.id}`)}>
               <View style={[s.imgBox, { height: CARD_WIDTH }]}>
                 {imgs[0]
                   ? <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
@@ -270,7 +265,6 @@ const s = StyleSheet.create({
   cartBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
   searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
-
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList:           { maxHeight: 44 },
   catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
@@ -278,7 +272,6 @@ const s = StyleSheet.create({
   catBtnActive:      { backgroundColor: PRIMARY, borderColor: PRIMARY },
   catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   catTextActive:     { color: '#fff' },
-
   bannerContainer:  { marginBottom: 14 },
   bannerSlide:      { width: BANNER_W, height: BANNER_H, borderRadius: 16, overflow: 'hidden' },
   bannerImg:        { width: '100%', height: '100%' },
@@ -288,7 +281,6 @@ const s = StyleSheet.create({
   dotsRow:          { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot:              { width: 6, height: 6, borderRadius: 3, backgroundColor: '#d1d5db' },
   dotActive:        { backgroundColor: PRIMARY, width: 20, borderRadius: 3 },
-
   card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   imgBox:        { position: 'relative', overflow: 'hidden' },
   img:           { width: '100%', height: '100%' },
