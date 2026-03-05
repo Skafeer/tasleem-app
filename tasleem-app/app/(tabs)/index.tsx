@@ -12,7 +12,6 @@ import api from '../../src/lib/api';
 
 const PRIMARY       = '#0c6679';
 const { width: SW } = Dimensions.get('window');
-const BANNER_W      = SW - 32;
 const BANNER_H      = 170;
 const AUTO_INTERVAL = 3000;
 
@@ -20,6 +19,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const CARD_WIDTH = (width - 48) / 2;
+  const BANNER_W   = width - 24; // 12 padding on each side from FlatList
 
   const [search, setSearch]                 = useState('');
   const [activeCategory, setActiveCategory] = useState('الكل');
@@ -109,12 +109,14 @@ export default function HomeScreen() {
         <ScrollView
           ref={bannerRef}
           horizontal
-          pagingEnabled
           showsHorizontalScrollIndicator={false}
           snapToInterval={BANNER_W}
+          snapToAlignment="start"
           decelerationRate="fast"
+          disableIntervalMomentum={true}
           onScrollBeginDrag={() => { isManual.current = true; }}
           onMomentumScrollEnd={handleScrollEnd}
+          style={{ width: BANNER_W }}
         >
           {banners.map((b: any, i: number) => (
             <TouchableOpacity
@@ -273,7 +275,7 @@ const s = StyleSheet.create({
   catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   catTextActive:     { color: '#fff' },
   bannerContainer:  { marginBottom: 14 },
-  bannerSlide:      { width: BANNER_W, height: BANNER_H, borderRadius: 16, overflow: 'hidden' },
+  bannerSlide:      { width: SW - 24, height: BANNER_H, borderRadius: 16, overflow: 'hidden' },
   bannerImg:        { width: '100%', height: '100%' },
   bannerTitleBox:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 8 },
   bannerTitleTxt:   { color: '#fff', fontWeight: '700', fontSize: 14, textAlign: 'right' },
