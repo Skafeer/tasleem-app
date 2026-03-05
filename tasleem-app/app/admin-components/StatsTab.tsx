@@ -16,7 +16,7 @@ const { width } = Dimensions.get('window');
 const BAR_W = width - 80;
 
 const fmt  = (n: number) => n.toLocaleString('ar-IQ');
-const fmtK = (n: number) => n >= 1_000_000 ? `${(n/1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n/1_000).toFixed(1)}k` : String(Math.round(n));
+const fmtK = (n: number) => Math.round(n).toLocaleString('ar-IQ');
 
 const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
