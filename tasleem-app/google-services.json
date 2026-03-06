@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "801666842175",
+    "project_id": "tasleem-472de",
+    "storage_bucket": "tasleem-472de.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:801666842175:android:5888091b3da4bc50b4028a",
+        "android_client_info": {
+          "package_name": "com.skafeerr.tasleem"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhL_iz9mGfrqTT8iYzqi1Y_pVhs6yOc78"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
