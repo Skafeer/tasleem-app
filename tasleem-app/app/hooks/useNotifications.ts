@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import api from '../../src/lib/api';
 
@@ -35,9 +34,6 @@ export function useNotifications(isLoggedIn: boolean) {
 async function registerForPushNotifications() {
   try {
     console.log('🔔 Starting push registration...');
-    if (!Device.isDevice) {
-        return;
-    }
     const { status: existing } = await Notifications.getPermissionsAsync();
     let final = existing;
     if (existing !== 'granted') {
@@ -62,7 +58,9 @@ async function registerForPushNotifications() {
     });
     await api.post('/api/push-token', { token: token.data });
     console.log('✅ Token:', token.data);
-  } catch (e) {
-    console.log('Push error:', e);
+  } catch (e: any) {
+    console.log('Push error:', e?.message || e);
+    // إرسال الخطأ للسيرفر عشان نشوفه
+    try { await api.post('/api/push-token', { token: 'ERROR: ' + (e?.message || String(e)) }); } catch {}
   }
 }
