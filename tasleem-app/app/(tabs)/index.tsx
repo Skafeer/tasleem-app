@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
@@ -14,12 +14,35 @@ const PRIMARY       = '#0c6679';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { width } = useWindowDimensions();
   const CARD_WIDTH = (width - 48) / 2;
 
   const [search, setSearch]                 = useState('');
   const [activeCategory, setActiveCategory] = useState('الكل');
   const [refreshing, setRefreshing]         = useState(false);
+
+  const { data: favoriteIds = [] } = useQuery({
+    queryKey: ['favorites'],
+    queryFn: async () => { const { data } = await api.get('/api/favorites'); return data as number[]; },
+  });
+
+  const toggleFav = useMutation({
+    mutationFn: async ({ id, isFav }: { id: number; isFav: boolean }) => {
+      if (isFav) await api.delete(`/api/favorites/${id}`);
+      else       await api.post(`/api/favorites/${id}`);
+    },
+    onMutate: async ({ id, isFav }) => {
+      await qc.cancelQueries({ queryKey: ['favorites'] });
+      const prev = qc.getQueryData<number[]>(['favorites']) || [];
+      qc.setQueryData(['favorites'], isFav ? prev.filter(x => x !== id) : [...prev, id]);
+      return { prev };
+    },
+    onError: (_: any, __: any, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(['favorites'], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
+  });
 
   const { data: allProducts = [], refetch } = useQuery({
     queryKey: ['products'],
@@ -141,6 +164,15 @@ export default function HomeScreen() {
                     <Text style={s.imgCountText}>{imgs.length}</Text>
                   </View>
                 )}
+                <TouchableOpacity
+                  style={s.favBtn}
+                  onPress={() => toggleFav.mutate({ id: p.id, isFav: (favoriteIds as number[]).includes(p.id) })}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons
+                    name={(favoriteIds as number[]).includes(p.id) ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={(favoriteIds as number[]).includes(p.id) ? '#ef4444' : '#fff'} />
+                </TouchableOpacity>
               </View>
               <View style={s.cardBody}>
                 <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
@@ -189,6 +221,8 @@ const s = StyleSheet.create({
   renewText:     { fontSize: 9, color: '#fff', fontWeight: 'bold' },
   discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  favBtn:       { position: 'absolute', top: 8, left: 8, width: 32, height: 32, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
   imgCount:      { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 3 },
   imgCountText:  { fontSize: 10, color: '#fff', fontWeight: 'bold' },
   cardBody:      { padding: 10, gap: 6 },

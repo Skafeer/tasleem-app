@@ -25,6 +25,7 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { key: 'profile-edit', label: 'الملف الشخصي', icon: 'person-outline', color: '#3b82f6', bg: '#dbeafe', route: '/profile-edit' },
+    { key: 'favorites', label: 'المنتجات المفضلة', icon: 'heart-outline', color: '#ef4444', bg: '#fee2e2', route: '/favorites' },
     { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', color: '#8b5cf6', bg: '#ede9fe', route: '/withdraw-history' },
     { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', color: '#10b981', bg: '#d1fae5', route: '/stats' },
     { key: 'privacy', label: 'سياسة الخصوصية والشروط', icon: 'shield-checkmark-outline', color: '#f59e0b', bg: '#fef3c7', route: '/privacy' },
