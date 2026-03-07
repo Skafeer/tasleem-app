@@ -48,7 +48,7 @@ export default function AdminsTab() {
   const adminIds = new Set((admins as any[]).map((a: any) => a.id));
   const merchants = (allUsers as any[]).filter((u: any) => u.role === 'merchant');
   const filteredMerchants = merchants.filter((u: any) =>
-    !search || u.store_name?.includes(search) || u.phone?.includes(search)
+    !search || u.storeName?.includes(search) || u.phone?.includes(search)
   );
 
   const promoteMutation = useMutation({
@@ -85,7 +85,7 @@ export default function AdminsTab() {
   const confirmDemote = (admin: any) => {
     Alert.alert(
       'تحويل لتاجر',
-      `هل تريد تحويل "${admin.store_name}" من أدمن لتاجر؟`,
+      `هل تريد تحويل "${admin.storeName}" من أدمن لتاجر؟`,
       [
         { text: 'إلغاء', style: 'cancel' },
         { text: 'تحويل', style: 'destructive', onPress: () => demoteMutation.mutate(admin.id) },
@@ -138,11 +138,11 @@ export default function AdminsTab() {
                 <TouchableOpacity key={u.id} style={s.merchantRow} onPress={() => setSelectedUser(u)}>
                   <Ionicons name="chevron-back" size={18} color="#d1d5db" />
                   <View style={{ flex: 1 }}>
-                    <Text style={s.merchantName}>{u.store_name}</Text>
+                    <Text style={s.merchantName}>{u.storeName}</Text>
                     <Text style={s.merchantPhone}>{u.phone}</Text>
                   </View>
                   <View style={s.merchantAvatar}>
-                    <Text style={s.merchantAvatarText}>{u.store_name?.charAt(0)}</Text>
+                    <Text style={s.merchantAvatarText}>{u.storeName?.charAt(0)}</Text>
                   </View>
                 </TouchableOpacity>
               ))
@@ -244,7 +244,7 @@ export default function AdminsTab() {
               )}
               <View style={{ flex: 1 }}>
                 <View style={s.nameRow}>
-                  <Text style={s.adminName}>{admin.store_name}</Text>
+                  <Text style={s.adminName}>{admin.storeName}</Text>
                   {isSuperAdmin && (
                     <View style={s.superBadge}>
                       <Ionicons name="star" size={10} color="#fff" />
