@@ -16,6 +16,7 @@ import PromosTab      from '../admin-components/PromosTab';
 import StatsTab       from '../admin-components/StatsTab';
 import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
+import AdminsTab      from '../admin-components/AdminsTab';
 
 const PRIMARY   = '#0c6679';
 const SECONDARY = '#f5a006';
@@ -31,12 +32,15 @@ const TABS = [
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات', icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
   { key: 'notifications', label: 'الإشعارات',  icon: 'notifications-outline',  activeIcon: 'notifications' },
+  { key: 'admins',         label: 'الأدمنية',   icon: 'shield-half-outline',    activeIcon: 'shield-half'   },
 ];
 
 export default function AdminScreen() {
   const qc = useQueryClient();
   const [tab, setTab]               = useState<string>('orders');
   const [refreshing, setRefreshing] = useState(false);
+
+  const { data: user        } = useQuery({ queryKey: ['user'], queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; } });
 
   const { data: orders      = [] } = useQuery({ queryKey: ['admin-orders'],     queryFn: async () => { const { data } = await api.get('/api/orders');       return data; }, refetchInterval: 30000 });
   const { data: products    = [] } = useQuery({ queryKey: ['products'],          queryFn: async () => { const { data } = await api.get('/api/products');      return data; } });
@@ -49,6 +53,17 @@ export default function AdminScreen() {
     await qc.invalidateQueries();
     setRefreshing(false);
   };
+
+  const isSuperAdmin = (user as any)?.is_super_admin || (user as any)?.isSuperAdmin || false;
+  let userPermissions: string[] = [];
+  try { userPermissions = JSON.parse((user as any)?.permissions || '[]'); } catch {}
+
+  // الفلترة حسب الصلاحيات
+  const visibleTabs = TABS.filter(t => {
+    if (t.key === 'admins') return isSuperAdmin;
+    if (isSuperAdmin) return true;
+    return userPermissions.includes(t.key);
+  });
 
   const merchantCount      = (users      as any[]).filter((u: any) => u.role !== 'admin').length;
   const pendingWithdrawals = (withdrawals as any[]).filter((w: any) => w.status === 'pending').length;

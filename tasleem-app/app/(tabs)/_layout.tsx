@@ -34,32 +34,42 @@ export default function TabsLayout() {
           backgroundColor: '#fff',
           borderTopWidth: 1,
           borderTopColor: '#f3f4f6',
-          height: 60 + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
+          height: 64 + insets.bottom,
+          paddingBottom: 10 + insets.bottom,
           paddingTop: 8,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
       <Tabs.Screen name="index" options={{
         title: 'الرئيسية',
-        tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+        ),
       }} />
       <Tabs.Screen name="orders" options={{
         title: 'طلباتي',
-        tabBarIcon: ({ color, size }) => <Ionicons name="bag-outline" size={size} color={color} />,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />
+        ),
       }} />
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
-        tabBarIcon: ({ color, size }) => <Ionicons name="shield-outline" size={size} color={color} />,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'grid' : 'grid-outline'} size={24} color={color} />
+        ),
         href: isAdmin ? '/(tabs)/admin' : null,
       }} />
       <Tabs.Screen name="wallet" options={{
         title: 'المحفظة',
-        tabBarIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size} color={color} />,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
+        ),
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
-        tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
+        ),
       }} />
     </Tabs>
   );

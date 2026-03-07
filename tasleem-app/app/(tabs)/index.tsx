@@ -11,10 +11,7 @@ import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
 const PRIMARY       = '#0c6679';
-const BANNER_H      = 170;
-const AUTO_INTERVAL = 3500;
 
-// ── الصفحة الرئيسية ──
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -72,7 +69,10 @@ export default function HomeScreen() {
           <Text style={s.greeting} numberOfLines={1}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
           <Text style={s.subtitle}>{filtered.length} منتج متاح</Text>
         </View>
-        <View style={s.logo}><Text style={s.logoText}>ت</Text></View>
+        {/* شعار التطبيق */}
+        <View style={s.logo}>
+          <Image source={require('../../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
+        </View>
       </View>
 
       {/* Search */}
@@ -98,7 +98,6 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
         ListHeaderComponent={
           <>
-            {/* التصنيفات */}
             <View style={s.categoriesWrapper}>
               <FlatList
                 horizontal data={categories as string[]}
@@ -114,7 +113,6 @@ export default function HomeScreen() {
                 )}
               />
             </View>
-            {/* البنرات */}
             <BannerSlider banners={banners} containerWidth={width} />
           </>
         }
@@ -171,8 +169,8 @@ const s = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   greeting:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   subtitle:     { fontSize: 12, color: '#9ca3af', marginTop: 1 },
-  logo:         { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
-  logoText:     { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  logo:         { width: 52, height: 52, borderRadius: 14, backgroundColor: '#f0f9fb', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  logoImg:      { width: 46, height: 46 },
   cartBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
   searchInput:  { flex: 1, fontSize: 14, color: '#111827' },

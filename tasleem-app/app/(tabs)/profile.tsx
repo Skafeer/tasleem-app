@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -32,37 +32,78 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
-      <Text style={s.title}>الإعدادات</Text>
-      
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* User Card */}
-        <View style={s.userCard}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+
+        {/* Header Gradient */}
+        <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+          <View style={s.headerTop}>
+            <Text style={s.headerTitle}>حسابي</Text>
+            <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
           </View>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={s.userName}>{user?.storeName}</Text>
-            <Text style={s.userId}>ID: {user?.merchantId}</Text>
+
+          {/* User Card inside gradient */}
+          <View style={s.userCard}>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
+              <Text style={s.userId}>ID: {user?.merchantId}</Text>
+              <View style={s.badge}>
+                <Text style={s.badgeText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
+              </View>
+            </View>
+            <View style={s.avatar}>
+              <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Balance Cards */}
+        <View style={s.balanceRow}>
+          {/* الأرباح المنتظرة - برتقالي */}
+          <View style={[s.balanceCard, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
+            <View style={[s.balanceIconBox, { backgroundColor: '#ffedd5' }]}>
+              <Ionicons name="time-outline" size={20} color="#f97316" />
+            </View>
+            <Text style={[s.balanceLabel, { color: '#9a3412' }]}>الأرباح المنتظرة</Text>
+            <Text style={[s.balanceValue, { color: '#ea580c' }]}>
+              {(user?.pendingBalance || 0).toLocaleString('ar-IQ')}
+            </Text>
+            <Text style={[s.balanceCurrency, { color: '#fb923c' }]}>د.ع</Text>
+          </View>
+
+          {/* الأرباح المحققة - أخضر */}
+          <View style={[s.balanceCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+            <View style={[s.balanceIconBox, { backgroundColor: '#dcfce7' }]}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#16a34a" />
+            </View>
+            <Text style={[s.balanceLabel, { color: '#14532d' }]}>الأرباح المحققة</Text>
+            <Text style={[s.balanceValue, { color: '#16a34a' }]}>
+              {(user?.balance || 0).toLocaleString('ar-IQ')}
+            </Text>
+            <Text style={[s.balanceCurrency, { color: '#22c55e' }]}>د.ع</Text>
           </View>
         </View>
 
-        
-
         {/* Menu Items */}
-        {menuItems.map(item => (
-          <TouchableOpacity key={item.key} style={s.menuItem} onPress={() => router.push(item.route as any)}>
-            <Ionicons name="chevron-back" size={20} color="#9ca3af" />
-            <Text style={s.menuLabel}>{item.label}</Text>
-            <Ionicons name={item.icon as any} size={22} color={PRIMARY} />
-          </TouchableOpacity>
-        ))}
+        <View style={s.menuContainer}>
+          {menuItems.map((item, idx) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[s.menuItem, idx === menuItems.length - 1 && { borderBottomWidth: 0 }]}
+              onPress={() => router.push(item.route as any)}>
+              <Ionicons name="chevron-back" size={18} color="#d1d5db" />
+              <Text style={s.menuLabel}>{item.label}</Text>
+              <View style={[s.iconBox, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Logout */}
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="chevron-back" size={20} color="#ef4444" />
-          <Text style={s.logoutText}>تسجيل الخروج</Text>
           <Ionicons name="log-out-outline" size={22} color="#ef4444" />
+          <Text style={s.logoutText}>تسجيل الخروج</Text>
         </TouchableOpacity>
 
         <Text style={s.version}>إصدار التطبيق 1.0.0</Text>
@@ -73,31 +114,45 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'center', paddingVertical: 16 },
-  userCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#e0f2f7',
-    justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 24, fontWeight: 'bold', color: PRIMARY },
-  userName: { fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  userId: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
-  balanceCard: { borderRadius: 18, padding: 20, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
-  balanceIcon: { position: 'absolute', left: 20, top: 20 },
-  balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-  balanceValue: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginTop: 4, textAlign: 'right' },
-  withdrawBtn: { backgroundColor: '#fff', borderRadius: 12, paddingVertical: 12,
-    paddingHorizontal: 24, marginTop: 16, alignSelf: 'stretch' },
-  withdrawBtnText: { color: PRIMARY, fontSize: 15, fontWeight: 'bold', textAlign: 'center' },
-  menuItem: { backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  iconBox: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+
+  header: { paddingTop: 16, paddingHorizontal: 20, paddingBottom: 32 },
+  headerTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  headerLogo: { width: 48, height: 48, borderRadius: 0 },
+
+  userCard: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+  avatarText: { fontSize: 26, fontWeight: 'bold', color: '#fff' },
+  userName: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  userId: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
+  badge: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 12,
+    paddingVertical: 4, marginTop: 8, alignSelf: 'flex-end' },
+  badgeText: { fontSize: 12, color: '#fff', fontWeight: '600' },
+
+  balanceRow:      { flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 16, marginBottom: 20 },
+  balanceCard:     { flex: 1, borderRadius: 18, padding: 14, alignItems: 'flex-end', borderWidth: 1.5,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  balanceIconBox:  { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  balanceLabel:    { fontSize: 12, fontWeight: '600', marginBottom: 6, textAlign: 'right' },
+  balanceValue:    { fontSize: 22, fontWeight: 'bold', textAlign: 'right' },
+  balanceCurrency: { fontSize: 11, fontWeight: '600', textAlign: 'right', marginTop: 2 },
+
+  menuContainer: { backgroundColor: '#fff', marginHorizontal: 16, marginTop: -16,
+    borderRadius: 20, paddingHorizontal: 4,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 4 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
+    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 12 },
+  iconBox: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   menuLabel: { flex: 1, fontSize: 15, color: '#374151', fontWeight: '500', textAlign: 'right' },
-  logoutBtn: { backgroundColor: '#fef2f2', borderRadius: 14, padding: 16,
-    flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginTop: 10,
-    borderWidth: 1, borderColor: '#fecaca' },
-  logoutText: { flex: 1, fontSize: 15, color: '#ef4444', fontWeight: 'bold', textAlign: 'right' },
-  version: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 20 },
+
+  logoutBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center',
+    gap: 10, backgroundColor: '#fef2f2', marginHorizontal: 16, marginTop: 16,
+    borderRadius: 16, paddingVertical: 16, borderWidth: 1, borderColor: '#fecaca' },
+  logoutText: { fontSize: 15, color: '#ef4444', fontWeight: 'bold' },
+
+  version: { fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 16, marginBottom: 8 },
 });
