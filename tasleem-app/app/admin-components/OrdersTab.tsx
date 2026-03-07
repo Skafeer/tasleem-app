@@ -5,7 +5,7 @@ import {
   Clipboard, Modal, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -51,16 +51,31 @@ export default function OrdersTab() {
   const [editOrder, setEditOrder]   = useState<any>(null);
   const [editForm, setEditForm]     = useState<any>({});
 
-  const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['admin-orders'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/orders');
-      return [...data].sort((a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+  const {
+    data: ordersData,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['admin-orders', filter, search],
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        limit: '20',
+        ...(filter !== 'all' && { status: filter }),
+        ...(search && { search }),
+      });
+      const { data } = await api.get(`/api/orders?${params}`);
+      return data;
     },
+    getNextPageParam: (last: any) => last.hasMore ? last.page + 1 : undefined,
+    initialPageParam: 1,
     refetchInterval: 30000,
   });
+
+  const orders = ordersData?.pages.flatMap((p: any) => p.data) ?? [];
+  const total  = ordersData?.pages[0]?.total ?? 0;
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
@@ -157,14 +172,7 @@ export default function OrdersTab() {
     updateOrder.mutate({ id: editOrder.id, data: { ...editForm, items } });
   };
 
-  const filtered = orders.filter((o: any) => {
-    const matchFilter = filter === 'all' || o.status === filter;
-    const matchSearch = !search ||
-      o.customerName?.includes(search) ||
-      o.customerPhone?.includes(search) ||
-      String(o.id).includes(search);
-    return matchFilter && matchSearch;
-  });
+  const filtered = orders;
 
   const counts: Record<string, number> = {};
   Object.keys(STATUS).forEach(k => {
@@ -582,6 +590,11 @@ export default function OrdersTab() {
 }
 
 const s = StyleSheet.create({
+  totalTxt:    { fontSize: 12, color: '#9ca3af', textAlign: 'right', paddingHorizontal: 14, paddingVertical: 8 },
+  loadMoreBtn: { margin: 14, padding: 14, backgroundColor: '#fff', borderRadius: 14,
+    alignItems: 'center', borderWidth: 1.5, borderColor: PRIMARY + '40' },
+  loadMoreTxt: { color: PRIMARY, fontWeight: 'bold', fontSize: 14 },
+  noMoreTxt:   { textAlign: 'center', color: '#9ca3af', fontSize: 12, padding: 16 },
   center:     { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
   emptyTxt:   { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
