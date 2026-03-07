@@ -17,6 +17,7 @@ import StatsTab       from '../admin-components/StatsTab';
 import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
 import AdminsTab      from '../admin-components/AdminsTab';
+import SupportTab     from '../admin-components/SupportTab';
 
 const PRIMARY   = '#0c6679';
 const SECONDARY = '#f5a006';
@@ -33,6 +34,7 @@ const TABS = [
   { key: 'stats',       label: 'إحصائيات', icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
   { key: 'notifications', label: 'الإشعارات',  icon: 'notifications-outline',  activeIcon: 'notifications' },
   { key: 'admins',         label: 'الأدمنية',   icon: 'shield-half-outline',    activeIcon: 'shield-half'   },
+  { key: 'support',        label: 'الدعم',       icon: 'headset-outline',        activeIcon: 'headset'       },
 ];
 
 export default function AdminScreen() {
@@ -61,6 +63,7 @@ export default function AdminScreen() {
   // الفلترة حسب الصلاحيات
   const visibleTabs = TABS.filter(t => {
     if (t.key === 'admins') return isSuperAdmin;
+    if (t.key === 'support') return isSuperAdmin || hasPermission('notifications');
     if (isSuperAdmin) return true;
     return userPermissions.includes(t.key);
   });
@@ -147,6 +150,7 @@ export default function AdminScreen() {
         {tab === 'stats'       && <StatsTab />}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'admins'         && <AdminsTab />}
+        {tab === 'support'        && <SupportTab />}
 
       </ScrollView>
 

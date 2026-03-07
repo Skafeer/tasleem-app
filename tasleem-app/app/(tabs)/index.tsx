@@ -35,13 +35,13 @@ export default function HomeScreen() {
     onMutate: async ({ id, isFav }) => {
       await qc.cancelQueries({ queryKey: ['favorites'] });
       const prev = qc.getQueryData<number[]>(['favorites']) || [];
-      qc.setQueryData(['favorites'], isFav ? prev.filter(x => x !== id) : [...prev, id]);
+      qc.setQueryData(['favorites'], isFav ? prev.filter((x: number) => x !== id) : [...prev, id]);
       return { prev };
     },
     onError: (_: any, __: any, ctx: any) => {
       if (ctx?.prev) qc.setQueryData(['favorites'], ctx.prev);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
   });
 
   const { data: allProducts = [], refetch } = useQuery({

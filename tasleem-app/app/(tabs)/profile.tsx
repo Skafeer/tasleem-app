@@ -29,6 +29,7 @@ export default function ProfileScreen() {
     { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', color: '#8b5cf6', bg: '#ede9fe', route: '/withdraw-history' },
     { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', color: '#10b981', bg: '#d1fae5', route: '/stats' },
     { key: 'privacy', label: 'سياسة الخصوصية والشروط', icon: 'shield-checkmark-outline', color: '#f59e0b', bg: '#fef3c7', route: '/privacy' },
+    { key: 'support', label: 'الدعم الفني', icon: 'headset-outline', color: '#8b5cf6', bg: '#ede9fe', route: '/support' },
     { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', color: '#06b6d4', bg: '#cffafe', route: '/contact' },
   ];
 
