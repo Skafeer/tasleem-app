@@ -146,6 +146,7 @@ export default function AdminScreen() {
         {tab === 'banners'     && <BannersTab />}
         {tab === 'stats'       && <StatsTab />}
         {tab === 'notifications' && <NotificationsTab />}
+        {tab === 'admins'         && <AdminsTab />}
 
       </ScrollView>
 
