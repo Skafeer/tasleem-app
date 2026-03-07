@@ -53,11 +53,9 @@ async function registerForPushNotifications() {
         lightColor: '#0c6679',
       });
     }
-    const token = await Notifications.getExpoPushTokenAsync({
-      projectId: '46e2ebf7-2473-485d-8334-4ce2a12e4e53',
-    });
-    await api.post('/api/push-token', { token: token.data });
-    console.log('✅ Token:', token.data);
+    const fcmToken = await Notifications.getDevicePushTokenAsync();
+    await api.post('/api/push-token', { token: fcmToken.data });
+    console.log('✅ FCM Token:', fcmToken.data);
   } catch (e: any) {
     console.log('Push error:', e?.message || e);
     // إرسال الخطأ للسيرفر عشان نشوفه
