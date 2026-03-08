@@ -63,7 +63,7 @@ export default function AdminScreen() {
   // الفلترة حسب الصلاحيات
   const visibleTabs = TABS.filter(t => {
     if (t.key === 'admins') return isSuperAdmin;
-    if (t.key === 'support') return isSuperAdmin || hasPermission('notifications');
+    if (t.key === 'support') return isSuperAdmin || userPermissions.includes('notifications');
     if (isSuperAdmin) return true;
     return userPermissions.includes(t.key);
   });
