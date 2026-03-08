@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -100,21 +100,20 @@ export default function SupportTab() {
     }
   }, [conversations]);
 
-  useEffect(() => {
-    if (selectedUser?.messages?.length > 0)
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-  }, [selectedUser]);
+
 
   const convList = conversations as any[];
 
   // فلترة وفرز المحادثات
-  const filtered = convList
-    .filter(c => !search || c.storeName?.includes(search) || c.phone?.includes(search))
-    .sort((a, b) => {
-      if (sort === 'unread') return b.unread - a.unread;
-      if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
-      return new Date(b.lastMessage?.created_at || 0).getTime() - new Date(a.lastMessage?.created_at || 0).getTime();
-    });
+  const filtered = useMemo(() => {
+    return [...convList]
+      .filter(c => !search || c.storeName?.includes(search) || c.phone?.includes(search))
+      .sort((a, b) => {
+        if (sort === 'unread') return b.unread - a.unread;
+        if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
+        return new Date(b.lastMessage?.created_at || 0).getTime() - new Date(a.lastMessage?.created_at || 0).getTime();
+      });
+  }, [convList, search, sort]);
 
   // ── قائمة المحادثات ──
   if (!selectedUser) {
@@ -194,7 +193,7 @@ export default function SupportTab() {
   }
 
   // ── نافذة المحادثة ──
-  const msgs = selectedUser.messages || [];
+  const msgs = [...(selectedUser.messages || [])].reverse();
 
   return (
     <View style={s.container}>
@@ -226,8 +225,8 @@ export default function SupportTab() {
           ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>لا توجد رسائل</Text></View>}
           renderItem={({ item, index }: any) => {
             const isAdmin = item.from_admin;
-            const prevItem = msgs[index - 1];
-            const showDate = !prevItem || formatDate(item.created_at) !== formatDate(prevItem.created_at);
+            const nextItem = msgs[index + 1];
+            const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
             return (
               <>
                 {showDate && (
@@ -338,7 +337,7 @@ const s = StyleSheet.create({
   dateDivider:     { alignItems: 'center', marginVertical: 12 },
   dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
     paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-  msgRow:          { flexDirection: 'row-reverse', marginBottom: 8, alignItems: 'flex-end' },
+  msgRow:          { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-end' },
   msgRowAdmin:     { justifyContent: 'flex-end' },
   msgRowUser:      { justifyContent: 'flex-start' },
   bubble:          { maxWidth: '75%', borderRadius: 18, padding: 12, gap: 4 },
