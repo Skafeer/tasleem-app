@@ -20,23 +20,13 @@ const ACCENT = '#f5a006';
 export default function AuthScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  
   const [isLogin, setIsLogin] = useState(true);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [storeName, setStoreName] = useState('');
   const [address, setAddress] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
   const slideAnim = useRef(new Animated.Value(0)).current;
-
-  // التحقق من صحة رقم الهاتف (صيغة سعودية)
-  const validatePhone = (phone: string) => {
-    const regex = /^(05|5)[0-9]{8}$/;
-    return regex.test(phone);
-  };
 
   const switchTab = (login: boolean) => {
     Animated.spring(slideAnim, { 
@@ -45,13 +35,10 @@ export default function AuthScreen() {
       tension: 120, 
       friction: 8 
     }).start();
-    
     setIsLogin(login);
-    // مسح الحقول عند التبديل
-    setPhone('');
-    setPassword('');
-    setConfirmPassword('');
-    setStoreName('');
+    setPhone(''); 
+    setPassword(''); 
+    setStoreName(''); 
     setAddress('');
   };
 
@@ -86,18 +73,10 @@ export default function AuthScreen() {
   });
 
   const handleSubmit = () => {
-    // التحقق من الحقول المطلوبة
     if (!phone.trim() || !password.trim()) { 
       toast.warning('يرجى ملء جميع الحقول'); 
       return; 
     }
-
-    // التحقق من صحة رقم الهاتف
-    if (!validatePhone(phone)) {
-      toast.warning('رقم الهاتف غير صحيح (يجب أن يبدأ بـ 05)');
-      return;
-    }
-
     if (isLogin) {
       loginMutation.mutate({ phone, password });
     } else {
@@ -105,18 +84,6 @@ export default function AuthScreen() {
         toast.warning('يرجى ملء جميع الحقول'); 
         return; 
       }
-
-      // التحقق من تطابق كلمة المرور
-      if (password !== confirmPassword) {
-        toast.warning('كلمة المرور غير متطابقة');
-        return;
-      }
-
-      if (password.length < 6) {
-        toast.warning('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
-        return;
-      }
-
       registerMutation.mutate({ phone, password, storeName, address });
     }
   };
@@ -125,7 +92,7 @@ export default function AuthScreen() {
 
   const indicatorLeft = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0%', '50%'], // المعدل: يبدأ من اليسار للدخول وينتقل للتسجيل
+    outputRange: ['0%', '50%'],
   });
 
   return (
@@ -136,16 +103,15 @@ export default function AuthScreen() {
       <View style={s.circle3} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        {/* تعديل KeyboardAvoidingView للأندرويد */}
+        {/* مشكلة الحقول تم حلها - استخدام behavior مناسب لكل منصة */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}>
-          
           <ScrollView
             contentContainerStyle={s.scroll}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+            keyboardDismissMode="none"
             showsVerticalScrollIndicator={false}>
 
             <View style={s.topSection}>
@@ -153,33 +119,26 @@ export default function AuthScreen() {
               <Text style={s.appName}>تسليم</Text>
               <Text style={s.tagline}>منصتك لإدارة التجارة الإلكترونية</Text>
               <View style={s.dots}>
-                {[0, 1, 2].map(i => (
-                  <View key={i} style={[s.dot, i === 1 && s.dotActive]} />
-                ))}
+                {[0, 1, 2].map(i => <View key={i} style={[s.dot, i === 1 && s.dotActive]} />)}
               </View>
             </View>
 
             <View style={s.card}>
-              {/* تبويبات - معدلة */}
+
+              {/* تبويبات */}
               <View style={s.tabsWrap}>
                 <Animated.View style={[s.tabIndicator, { left: indicatorLeft }]} />
-                <TouchableOpacity 
-                  style={s.tabBtn} 
-                  onPress={() => switchTab(true)}
-                  activeOpacity={0.7}>
+                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(true)}>
                   <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={s.tabBtn} 
-                  onPress={() => switchTab(false)}
-                  activeOpacity={0.7}>
+                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
                   <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
                 </TouchableOpacity>
               </View>
 
               {/* الحقول */}
               <View style={s.fields}>
-                {/* رقم الهاتف */}
+
                 <View style={s.fieldWrap}>
                   <Ionicons name="call-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                   <TextInput
@@ -190,11 +149,9 @@ export default function AuthScreen() {
                     keyboardType="phone-pad"
                     textAlign="right"
                     placeholderTextColor="#9ca3af"
-                    editable={!isPending}
                   />
                 </View>
 
-                {/* كلمة المرور */}
                 <View style={s.fieldWrap}>
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                     <Ionicons 
@@ -212,35 +169,9 @@ export default function AuthScreen() {
                     secureTextEntry={!showPassword}
                     textAlign="right"
                     placeholderTextColor="#9ca3af"
-                    editable={!isPending}
                   />
                 </View>
 
-                {/* تأكيد كلمة المرور - للتسجيل فقط */}
-                {!isLogin && (
-                  <View style={s.fieldWrap}>
-                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                      <Ionicons 
-                        name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} 
-                        size={19} 
-                        color="#9ca3af" 
-                        style={s.fieldIcon} 
-                      />
-                    </TouchableOpacity>
-                    <TextInput
-                      style={s.fieldInput}
-                      placeholder="تأكيد كلمة المرور"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showConfirmPassword}
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"
-                      editable={!isPending}
-                    />
-                  </View>
-                )}
-
-                {/* حقول التسجيل الإضافية */}
                 {!isLogin && (
                   <>
                     <View style={s.fieldWrap}>
@@ -252,7 +183,6 @@ export default function AuthScreen() {
                         onChangeText={setStoreName}
                         textAlign="right"
                         placeholderTextColor="#9ca3af"
-                        editable={!isPending}
                       />
                     </View>
 
@@ -265,7 +195,6 @@ export default function AuthScreen() {
                         onChangeText={setAddress}
                         textAlign="right"
                         placeholderTextColor="#9ca3af"
-                        editable={!isPending}
                       />
                     </View>
                   </>
@@ -278,25 +207,14 @@ export default function AuthScreen() {
                 onPress={handleSubmit}
                 disabled={isPending}
                 activeOpacity={0.85}>
-                <LinearGradient 
-                  colors={[PRIMARY, PRIMARY2]} 
-                  start={{ x: 0, y: 0 }} 
-                  end={{ x: 1, y: 0 }} 
-                  style={s.submitGrad}>
-                  {isPending ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons 
-                        name={isLogin ? 'log-in-outline' : 'person-add-outline'} 
-                        size={20} 
-                        color="#fff" 
-                      />
-                      <Text style={s.submitText}>
-                        {isLogin ? 'دخول' : 'إنشاء الحساب'}
-                      </Text>
-                    </>
-                  )}
+                <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
+                  {isPending
+                    ? <ActivityIndicator color="#fff" />
+                    : <>
+                        <Ionicons name={isLogin ? 'log-in-outline' : 'person-add-outline'} size={20} color="#fff" />
+                        <Text style={s.submitText}>{isLogin ? 'دخول' : 'إنشاء الحساب'}</Text>
+                      </>
+                  }
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -306,20 +224,15 @@ export default function AuthScreen() {
                 <View style={s.dividerLine} />
               </View>
 
-              <TouchableOpacity 
-                style={s.switchRow} 
-                onPress={() => switchTab(!isLogin)}
-                activeOpacity={0.7}>
-                <Text style={s.switchText}>
-                  {isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}
-                </Text>
-                <Text style={s.switchAccent}>
-                  {isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}
-                </Text>
+              <TouchableOpacity style={s.switchRow} onPress={() => switchTab(!isLogin)}>
+                <Text style={s.switchText}>{isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}</Text>
+                <Text style={s.switchAccent}>{isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Text>
               </TouchableOpacity>
+
             </View>
 
             <Text style={s.footer}>جميع الحقوق محفوظة © تسليم 2026</Text>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -415,7 +328,10 @@ const s = StyleSheet.create({
     shadowColor: '#0c6679', 
     shadowOpacity: 0.18, 
     shadowRadius: 32,
-    shadowOffset: { width: 0, height: 12 }, 
+    shadowOffset: { 
+      width: 0, 
+      height: 12 
+    }, 
     elevation: 16 
   },
 
