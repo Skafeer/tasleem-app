@@ -68,7 +68,7 @@ export default function StatsTab() {
 
   const { data: orders = [], isLoading: l1 } = useQuery({
     queryKey: ['admin-orders'],
-    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); return data.data || data; },
+    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); const result = data?.data || data; return Array.isArray(result) ? result : []; },
     refetchInterval: 30000,
   });
   const { data: users = [], isLoading: l2 } = useQuery({
@@ -91,6 +91,16 @@ export default function StatsTab() {
     await qc.invalidateQueries();
     setRefreshing(false);
   };
+
+  // تحقق إن البيانات arrays
+  if (!Array.isArray(orders) || !Array.isArray(users) || !Array.isArray(withdrawals) || !Array.isArray(products)) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={s.loadingTxt}>جاري تحميل الإحصائيات...</Text>
+      </View>
+    );
+  }
 
   if (l1 || l2 || l3 || l4) return (
     <View style={s.center}>
