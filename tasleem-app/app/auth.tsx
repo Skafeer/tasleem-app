@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -26,12 +26,12 @@ export default function AuthScreen() {
   const [storeName, setStoreName] = useState('');
   const [address, setAddress] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [focused, setFocused] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const switchTab = (login: boolean) => {
     Animated.spring(slideAnim, { toValue: login ? 0 : 1, useNativeDriver: false, tension: 120, friction: 8 }).start();
     setIsLogin(login);
+    setPhone(''); setPassword(''); setStoreName(''); setAddress('');
   };
 
   const loginMutation = useMutation({
@@ -70,7 +70,7 @@ export default function AuthScreen() {
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
 
-  const indicatorRight = slideAnim.interpolate({
+  const indicatorLeft = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['50%', '0%'],
   });
@@ -83,8 +83,14 @@ export default function AuthScreen() {
       <View style={s.circle3} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
 
             <View style={s.topSection}>
               <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
@@ -99,21 +105,20 @@ export default function AuthScreen() {
 
               {/* تبويبات */}
               <View style={s.tabsWrap}>
-                <Animated.View style={[s.tabIndicator, { right: indicatorRight }]} />
-                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
-                  <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
-                </TouchableOpacity>
+                <Animated.View style={[s.tabIndicator, { left: indicatorLeft }]} />
                 <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(true)}>
                   <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
+                  <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
+                </TouchableOpacity>
               </View>
 
-              {/* الحقول */}
+              {/* الحقول — بدون focused state */}
               <View style={s.fields}>
 
-                {/* رقم الهاتف */}
-                <View style={[s.fieldWrap, focused === 'phone' && s.fieldFocused]}>
-                  <Ionicons name="call-outline" size={19} color={focused === 'phone' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                <View style={s.fieldWrap}>
+                  <Ionicons name="call-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                   <TextInput
                     style={s.fieldInput}
                     placeholder="رقم الهاتف"
@@ -121,16 +126,13 @@ export default function AuthScreen() {
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
                     textAlign="right"
-                    placeholderTextColor="#b0b8c1"
-                    onFocus={() => setFocused('phone')}
-                    onBlur={() => setFocused(null)}
+                    placeholderTextColor="#9ca3af"
                   />
                 </View>
 
-                {/* كلمة المرور */}
-                <View style={[s.fieldWrap, focused === 'password' && s.fieldFocused]}>
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={s.fieldIcon}>
-                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={19} color={focused === 'password' ? PRIMARY : '#9ca3af'} />
+                <View style={s.fieldWrap}>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={19} color="#9ca3af" style={s.fieldIcon} />
                   </TouchableOpacity>
                   <TextInput
                     style={s.fieldInput}
@@ -139,40 +141,33 @@ export default function AuthScreen() {
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                     textAlign="right"
-                    placeholderTextColor="#b0b8c1"
-                    onFocus={() => setFocused('password')}
-                    onBlur={() => setFocused(null)}
+                    placeholderTextColor="#9ca3af"
                   />
                 </View>
 
-                {/* حقول التسجيل */}
                 {!isLogin && (
                   <>
-                    <View style={[s.fieldWrap, focused === 'store' && s.fieldFocused]}>
-                      <Ionicons name="storefront-outline" size={19} color={focused === 'store' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                    <View style={s.fieldWrap}>
+                      <Ionicons name="storefront-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                       <TextInput
                         style={s.fieldInput}
                         placeholder="اسم المتجر"
                         value={storeName}
                         onChangeText={setStoreName}
                         textAlign="right"
-                        placeholderTextColor="#b0b8c1"
-                        onFocus={() => setFocused('store')}
-                        onBlur={() => setFocused(null)}
+                        placeholderTextColor="#9ca3af"
                       />
                     </View>
 
-                    <View style={[s.fieldWrap, focused === 'address' && s.fieldFocused]}>
-                      <Ionicons name="location-outline" size={19} color={focused === 'address' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                    <View style={s.fieldWrap}>
+                      <Ionicons name="location-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                       <TextInput
                         style={s.fieldInput}
                         placeholder="العنوان"
                         value={address}
                         onChangeText={setAddress}
                         textAlign="right"
-                        placeholderTextColor="#b0b8c1"
-                        onFocus={() => setFocused('address')}
-                        onBlur={() => setFocused(null)}
+                        placeholderTextColor="#9ca3af"
                       />
                     </View>
                   </>
@@ -180,7 +175,11 @@ export default function AuthScreen() {
               </View>
 
               {/* زر الإرسال */}
-              <TouchableOpacity style={[s.submitBtn, isPending && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isPending} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={[s.submitBtn, isPending && { opacity: 0.7 }]}
+                onPress={handleSubmit}
+                disabled={isPending}
+                activeOpacity={0.85}>
                 <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
                   {isPending
                     ? <ActivityIndicator color="#fff" />
@@ -229,7 +228,7 @@ const s = StyleSheet.create({
   topSection:    { alignItems: 'center', paddingTop: 44, paddingBottom: 36 },
   logoImg:       { width: 110, height: 110, marginBottom: 16 },
   appName:       { fontSize: 38, fontWeight: 'bold', color: '#fff', letterSpacing: 3, marginBottom: 8 },
-  tagline:       { fontSize: 13, color: 'rgba(255,255,255,0.72)', letterSpacing: 0.3 },
+  tagline:       { fontSize: 13, color: 'rgba(255,255,255,0.72)' },
   dots:          { flexDirection: 'row', gap: 6, marginTop: 20 },
   dot:           { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
   dotActive:     { width: 22, backgroundColor: ACCENT, borderRadius: 3 },
@@ -238,7 +237,7 @@ const s = StyleSheet.create({
     shadowColor: '#0c6679', shadowOpacity: 0.18, shadowRadius: 32,
     shadowOffset: { width: 0, height: 12 }, elevation: 16 },
 
-  tabsWrap:      { flexDirection: 'row-reverse', backgroundColor: '#f1f5f9',
+  tabsWrap:      { flexDirection: 'row', backgroundColor: '#f1f5f9',
     borderRadius: 18, padding: 4, marginBottom: 26, position: 'relative', height: 50 },
   tabIndicator:  { position: 'absolute', top: 4, bottom: 4, width: '50%',
     backgroundColor: PRIMARY, borderRadius: 14,
@@ -251,9 +250,7 @@ const s = StyleSheet.create({
   fieldWrap:     { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f8fafc',
     borderRadius: 16, paddingHorizontal: 16, height: 56,
     borderWidth: 1.5, borderColor: '#e5e7eb', gap: 10 },
-  fieldFocused:  { borderColor: PRIMARY, backgroundColor: '#f0f9fb',
-    shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
-  fieldIcon:     { width: 28, justifyContent: 'center', alignItems: 'center' },
+  fieldIcon:     { width: 28, textAlign: 'center' },
   fieldInput:    { flex: 1, fontSize: 15, color: '#111827' },
 
   submitBtn:     { borderRadius: 18, overflow: 'hidden', marginBottom: 22,
