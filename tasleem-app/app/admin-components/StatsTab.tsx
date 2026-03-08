@@ -66,25 +66,16 @@ export default function StatsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [revenueTab, setRevenueTab] = useState<'day'|'week'|'month'|'year'>('month');
 
-  const { data: orders = [], isLoading: l1 } = useQuery({
-    queryKey: ['admin-orders'],
-    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); const result = data?.data || data; return Array.isArray(result) ? result : []; },
+  const { data: statsData, isLoading: l1 } = useQuery({
+    queryKey: ['admin-stats-data'],
+    queryFn: async () => { const { data } = await api.get('/api/admin/stats-data'); return data; },
     refetchInterval: 30000,
   });
-  const { data: users = [], isLoading: l2 } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: async () => { const { data } = await api.get('/api/admin/users'); return data; },
-    refetchInterval: 30000,
-  });
-  const { data: withdrawals = [], isLoading: l3 } = useQuery({
-    queryKey: ['admin-withdrawals'],
-    queryFn: async () => { const { data } = await api.get('/api/withdrawals'); return data; },
-    refetchInterval: 30000,
-  });
-  const { data: products = [], isLoading: l4 } = useQuery({
-    queryKey: ['admin-products'],
-    queryFn: async () => { const { data } = await api.get('/api/products'); return data; },
-  });
+  const l2 = false, l3 = false, l4 = false;
+  const orders      = statsData?.orders      || [];
+  const users       = statsData?.users       || [];
+  const withdrawals = statsData?.withdrawals || [];
+  const products    = statsData?.products    || [];
 
   const onRefresh = async () => {
     setRefreshing(true);
