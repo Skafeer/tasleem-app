@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -60,13 +61,19 @@ export default function SupportScreen() {
     if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      base64: true,
+      quality: 1,
+      base64: false,
     });
-    if (result.canceled || !result.assets[0].base64) return;
+    if (result.canceled || !result.assets[0]) return;
     setUploadingImage(true);
     try {
-      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      // ضغط الصورة قبل الرفع
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const base64 = `data:image/jpeg;base64,${manipulated.base64}`;
       const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
       sendMutation.mutate({ msg: '', imageUrl: data.url });
     } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
