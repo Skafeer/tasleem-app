@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Image, Animated, Dimensions,
+  ScrollView, Image, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,37 @@ import { toast } from '../src/lib/toast';
 const PRIMARY  = '#0c6679';
 const PRIMARY2 = '#0a8a9f';
 const ACCENT   = '#f5a006';
+
+// ── Field خارج الكومبوننت عشان ما يُعاد إنشاؤها عند كل render ──
+const Field = ({
+  icon, placeholder, value, onChange, secure,
+  keyboard, fieldKey, focused, setFocused,
+  showPassword, setShowPassword,
+}: any) => (
+  <View style={[s.fieldWrap, focused === fieldKey && s.fieldFocused]}>
+    <TouchableOpacity
+      onPress={() => secure && setShowPassword(!showPassword)}
+      style={s.fieldIcon}>
+      <Ionicons
+        name={secure ? (showPassword ? 'eye-outline' : 'eye-off-outline') : icon}
+        size={19}
+        color={focused === fieldKey ? PRIMARY : '#9ca3af'}
+      />
+    </TouchableOpacity>
+    <TextInput
+      style={s.fieldInput}
+      placeholder={placeholder}
+      value={value}
+      onChangeText={onChange}
+      secureTextEntry={secure && !showPassword}
+      keyboardType={keyboard || 'default'}
+      textAlign="right"
+      placeholderTextColor="#b0b8c1"
+      onFocus={() => setFocused(fieldKey)}
+      onBlur={() => setFocused(null)}
+    />
+  </View>
+);
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -75,35 +106,11 @@ export default function AuthScreen() {
     outputRange: ['50%', '0%'],
   });
 
-  const Field = ({ icon, placeholder, value, onChange, secure, keyboard, fieldKey }: any) => (
-    <View style={[s.fieldWrap, focused === fieldKey && s.fieldFocused]}>
-      <TouchableOpacity onPress={() => secure && setShowPassword(!showPassword)} style={s.fieldIcon}>
-        <Ionicons
-          name={secure ? (showPassword ? 'eye-outline' : 'eye-off-outline') : icon}
-          size={19}
-          color={focused === fieldKey ? PRIMARY : '#9ca3af'}
-        />
-      </TouchableOpacity>
-      <TextInput
-        style={s.fieldInput}
-        placeholder={placeholder}
-        value={value}
-        onChangeText={onChange}
-        secureTextEntry={secure && !showPassword}
-        keyboardType={keyboard || 'default'}
-        textAlign="right"
-        placeholderTextColor="#b0b8c1"
-        onFocus={() => setFocused(fieldKey)}
-        onBlur={() => setFocused(null)}
-      />
-    </View>
-  );
+  const fieldProps = { focused, setFocused, showPassword, setShowPassword };
 
   return (
     <View style={s.root}>
       <LinearGradient colors={[PRIMARY, PRIMARY2, '#0d9eb8']} style={s.bg} />
-
-      {/* دوائر زخرفية */}
       <View style={s.circle1} />
       <View style={s.circle2} />
       <View style={s.circle3} />
@@ -112,11 +119,9 @@ export default function AuthScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            {/* اللوغو */}
             <View style={s.topSection}>
-              <View style={s.logoWrap}>
-                <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
-              </View>
+              {/* الشعار بدون خلفية */}
+              <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
               <Text style={s.appName}>تسليم</Text>
               <Text style={s.tagline}>منصتك لإدارة التجارة الإلكترونية</Text>
               <View style={s.dots}>
@@ -124,10 +129,7 @@ export default function AuthScreen() {
               </View>
             </View>
 
-            {/* البطاقة */}
             <View style={s.card}>
-
-              {/* تبويبات */}
               <View style={s.tabsWrap}>
                 <Animated.View style={[s.tabIndicator, { right: indicatorRight }]} />
                 <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
@@ -138,19 +140,21 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* الحقول */}
               <View style={s.fields}>
-                <Field fieldKey="phone" icon="call-outline" placeholder="رقم الهاتف" value={phone} onChange={setPhone} keyboard="phone-pad" />
-                <Field fieldKey="password" icon="lock-closed-outline" placeholder="كلمة المرور" value={password} onChange={setPassword} secure />
+                <Field fieldKey="phone" icon="call-outline" placeholder="رقم الهاتف"
+                  value={phone} onChange={setPhone} keyboard="phone-pad" {...fieldProps} />
+                <Field fieldKey="password" icon="lock-closed-outline" placeholder="كلمة المرور"
+                  value={password} onChange={setPassword} secure {...fieldProps} />
                 {!isLogin && (
                   <>
-                    <Field fieldKey="store" icon="storefront-outline" placeholder="اسم المتجر" value={storeName} onChange={setStoreName} />
-                    <Field fieldKey="address" icon="location-outline" placeholder="العنوان" value={address} onChange={setAddress} />
+                    <Field fieldKey="store" icon="storefront-outline" placeholder="اسم المتجر"
+                      value={storeName} onChange={setStoreName} {...fieldProps} />
+                    <Field fieldKey="address" icon="location-outline" placeholder="العنوان"
+                      value={address} onChange={setAddress} {...fieldProps} />
                   </>
                 )}
               </View>
 
-              {/* زر الإرسال */}
               <TouchableOpacity style={[s.submitBtn, isPending && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isPending} activeOpacity={0.85}>
                 <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
                   {isPending
@@ -163,19 +167,16 @@ export default function AuthScreen() {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* فاصل */}
               <View style={s.divider}>
                 <View style={s.dividerLine} />
                 <Text style={s.dividerText}>أو</Text>
                 <View style={s.dividerLine} />
               </View>
 
-              {/* تبديل */}
               <TouchableOpacity style={s.switchRow} onPress={() => switchTab(!isLogin)}>
                 <Text style={s.switchText}>{isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}</Text>
                 <Text style={s.switchAccent}>{isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Text>
               </TouchableOpacity>
-
             </View>
 
             <Text style={s.footer}>جميع الحقوق محفوظة © تسليم 2026</Text>
@@ -200,10 +201,7 @@ const s = StyleSheet.create({
   scroll:        { flexGrow: 1, paddingBottom: 30 },
 
   topSection:    { alignItems: 'center', paddingTop: 44, paddingBottom: 36 },
-  logoWrap:      { width: 92, height: 92, borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center',
-    marginBottom: 18, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 },
-  logoImg:       { width: 72, height: 72 },
+  logoImg:       { width: 110, height: 110, marginBottom: 16 },
   appName:       { fontSize: 38, fontWeight: 'bold', color: '#fff', letterSpacing: 3, marginBottom: 8 },
   tagline:       { fontSize: 13, color: 'rgba(255,255,255,0.72)', letterSpacing: 0.3 },
   dots:          { flexDirection: 'row', gap: 6, marginTop: 20 },
