@@ -248,3 +248,4 @@ const s = StyleSheet.create({
     shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },
   sendBtnOff:      { backgroundColor: '#d1d5db', shadowOpacity: 0 },
 });
+
