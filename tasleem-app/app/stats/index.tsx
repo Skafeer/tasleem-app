@@ -1,24 +1,24 @@
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator
+  TouchableOpacity, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
-const PRIMARY = '#0c6679';
+const PRIMARY  = '#0c6679';
+const { width } = Dimensions.get('window');
+const fmt = (n: number) => Math.round(n).toLocaleString('ar-IQ');
 
 export default function StatsScreen() {
   const router = useRouter();
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/orders');
-      return Array.isArray(data) ? data : [];
-    },
+  const { data: ordersRes, isLoading: ordersLoading } = useQuery({
+    queryKey: ['merchant-orders-stats'],
+    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); return data; },
   });
 
   const { data: user } = useQuery({
@@ -26,117 +26,126 @@ export default function StatsScreen() {
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
   });
 
-  const { data: withdrawals = [] } = useQuery({
-    queryKey: ['withdrawals'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/withdrawals');
-      return Array.isArray(data) ? data : [];
-    },
+  const { data: withdrawalsRes } = useQuery({
+    queryKey: ['merchant-withdrawals-stats'],
+    queryFn: async () => { const { data } = await api.get('/api/withdrawals'); return data; },
   });
 
-  const all = orders as any[];
-  const totalOrders     = all.length;
-  const delivered       = all.filter(o => o.status === 'delivered').length;
-  const pending         = all.filter(o => o.status === 'pending').length;
-  const processing      = all.filter(o => o.status === 'processing').length;
-  const returned        = all.filter(o => o.status === 'returned').length;
-  const totalRevenue    = all.filter(o => o.status === 'delivered')
-                            .reduce((s, o) => s + (o.totalAmount || 0), 0);
-  const totalProfit     = all.filter(o => o.status === 'delivered')
-                            .reduce((s, o) => s + (o.totalProfit || 0), 0);
-  const totalWithdrawn  = (withdrawals as any[])
-                            .filter(w => w.status === 'approved')
-                            .reduce((s, w) => s + w.amount, 0);
-  const deliveryRate    = totalOrders > 0 ? Math.round((delivered / totalOrders) * 100) : 0;
+  const all          = Array.isArray(ordersRes) ? ordersRes : (ordersRes?.data || []) as any[];
+  const ws           = Array.isArray(withdrawalsRes) ? withdrawalsRes : [] as any[];
 
-  const StatCard = ({ icon, label, value, unit, color, bg }: any) => (
-    <View style={[sCard.card, { backgroundColor: bg || '#fff' }]}>
-      <View style={[sCard.icon, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={22} color={color} />
-      </View>
-      <Text style={sCard.val}>{value}</Text>
-      {unit && <Text style={sCard.unit}>{unit}</Text>}
-      <Text style={sCard.label}>{label}</Text>
-    </View>
-  );
+  const totalOrders  = all.length;
+  const delivered    = all.filter(o => o.status === 'delivered');
+  const pending      = all.filter(o => o.status === 'pending').length;
+  const processing   = all.filter(o => ['processing','preparing','shipping'].includes(o.status)).length;
+  const returned     = all.filter(o => o.status === 'returned').length;
+  const cancelled    = all.filter(o => o.status === 'cancelled').length;
+  const totalRevenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
+  const totalProfit  = delivered.reduce((s, o) => s + (o.totalProfit || 0), 0);
+  const totalWithdrawn = ws.filter(w => w.status === 'paid').reduce((s: number, w: any) => s + w.amount, 0);
+  const deliveryRate = totalOrders > 0 ? Math.round((delivered.length / totalOrders) * 100) : 0;
+  const returnRate   = totalOrders > 0 ? Math.round((returned / totalOrders) * 100) : 0;
 
   return (
-    <SafeAreaView style={s.container}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-forward" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={s.title}>الإحصائيات</Text>
-      </View>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {ordersLoading ? (
-        <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      {/* هيدر */}
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        <View style={s.headerRow}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-forward" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>إحصائياتي</Text>
+          <View style={{ width: 38 }} />
+        </View>
 
-          {/* Overview Dark Card */}
-          <View style={s.darkCard}>
-            <View style={s.darkGlow} />
-            <Text style={s.darkLabel}>إجمالي الأرباح المحققة</Text>
-            <Text style={s.darkVal}>{totalProfit.toLocaleString()} <Text style={s.darkUnit}>د.ع</Text></Text>
-            <View style={s.darkRow}>
-              <View style={s.darkChip}>
-                <Text style={s.darkChipText}>{totalOrders} طلب إجمالي</Text>
-              </View>
-              <View style={[s.darkChip, { backgroundColor: 'rgba(74,222,128,0.15)' }]}>
-                <Text style={[s.darkChipText, { color: '#4ade80' }]}>
-                  نسبة التوصيل {deliveryRate}%
-                </Text>
-              </View>
+        {/* بطاقة الأرباح الرئيسية */}
+        <View style={s.mainCard}>
+          <Text style={s.mainLabel}>صافي الأرباح المحققة</Text>
+          <Text style={s.mainVal}>{fmt(totalProfit)} <Text style={s.mainUnit}>د.ع</Text></Text>
+          <View style={s.mainChips}>
+            <View style={s.chip}>
+              <Ionicons name="cube-outline" size={12} color="#fff" />
+              <Text style={s.chipText}>{totalOrders} طلب</Text>
+            </View>
+            <View style={[s.chip, { backgroundColor: 'rgba(74,222,128,0.2)' }]}>
+              <Ionicons name="checkmark-circle-outline" size={12} color="#4ade80" />
+              <Text style={[s.chipText, { color: '#4ade80' }]}>{deliveryRate}% توصيل</Text>
             </View>
           </View>
+        </View>
+      </LinearGradient>
 
-          {/* Orders Stats */}
+      {ordersLoading ? (
+        <View style={s.center}>
+          <ActivityIndicator color={PRIMARY} size="large" />
+          <Text style={s.loadingText}>جاري تحميل الإحصائيات...</Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+
+          {/* إحصائيات الطلبات */}
           <Text style={s.secTitle}>إحصائيات الطلبات</Text>
           <View style={s.grid}>
-            <StatCard icon="cube-outline"            label="إجمالي الطلبات"  value={totalOrders}  color="#6b7280" />
-            <StatCard icon="checkmark-circle-outline" label="تم التوصيل"     value={delivered}    color="#059669" />
-            <StatCard icon="time-outline"            label="قيد الانتظار"    value={pending}      color="#d97706" />
-            <StatCard icon="sync-outline"            label="قيد التجهيز"     value={processing}   color="#2563eb" />
-            <StatCard icon="close-circle-outline"   label="راجع"            value={returned}     color="#dc2626" />
-            <StatCard icon="trending-up-outline"    label="نسبة التوصيل"    value={`${deliveryRate}%`} color={PRIMARY} />
+            {[
+              { icon: 'cube-outline',             label: 'إجمالي الطلبات', value: totalOrders,        color: '#6b7280', bg: '#f9fafb' },
+              { icon: 'checkmark-circle-outline', label: 'تم التوصيل',     value: delivered.length,   color: '#059669', bg: '#f0fdf4' },
+              { icon: 'time-outline',             label: 'قيد الانتظار',   value: pending,             color: '#d97706', bg: '#fffbeb' },
+              { icon: 'refresh-outline',          label: 'قيد التجهيز',    value: processing,          color: '#2563eb', bg: '#eff6ff' },
+              { icon: 'arrow-undo-outline',       label: 'راجع',           value: returned,            color: '#dc2626', bg: '#fef2f2' },
+              { icon: 'close-circle-outline',     label: 'ملغي',           value: cancelled,           color: '#9ca3af', bg: '#f9fafb' },
+            ].map((item, i) => (
+              <View key={i} style={[s.statCard, { backgroundColor: item.bg }]}>
+                <View style={[s.statIcon, { backgroundColor: item.color + '20' }]}>
+                  <Ionicons name={item.icon as any} size={20} color={item.color} />
+                </View>
+                <Text style={s.statVal}>{item.value}</Text>
+                <Text style={s.statLabel}>{item.label}</Text>
+              </View>
+            ))}
           </View>
 
-          {/* Financial Stats */}
+          {/* الإحصائيات المالية */}
           <Text style={s.secTitle}>الإحصائيات المالية</Text>
-          <View style={s.grid}>
-            <StatCard icon="cash-outline"    label="إجمالي المبيعات"    value={totalRevenue.toLocaleString()}   unit="د.ع" color="#8b5cf6" />
-            <StatCard icon="wallet-outline"  label="صافي الأرباح"       value={totalProfit.toLocaleString()}    unit="د.ع" color="#059669" />
-            <StatCard icon="arrow-up-circle-outline" label="إجمالي المسحوبات" value={totalWithdrawn.toLocaleString()} unit="د.ع" color="#f97316" />
-            <StatCard icon="save-outline"    label="الرصيد الحالي"      value={(user?.balance || 0).toLocaleString()} unit="د.ع" color={PRIMARY} />
+          <View style={s.finGrid}>
+            {[
+              { icon: 'cash-outline',             label: 'إجمالي المبيعات',  value: fmt(totalRevenue),   color: '#8b5cf6' },
+              { icon: 'wallet-outline',            label: 'صافي الأرباح',     value: fmt(totalProfit),    color: '#059669' },
+              { icon: 'arrow-up-circle-outline',   label: 'إجمالي السحوبات',  value: fmt(totalWithdrawn), color: '#f97316' },
+              { icon: 'card-outline',              label: 'الرصيد الحالي',    value: fmt(user?.balance || 0), color: PRIMARY },
+            ].map((item, i) => (
+              <View key={i} style={s.finCard}>
+                <View style={[s.finIcon, { backgroundColor: item.color + '15' }]}>
+                  <Ionicons name={item.icon as any} size={22} color={item.color} />
+                </View>
+                <View style={s.finInfo}>
+                  <Text style={s.finLabel}>{item.label}</Text>
+                  <Text style={[s.finVal, { color: item.color }]}>{item.value} <Text style={s.finUnit}>د.ع</Text></Text>
+                </View>
+              </View>
+            ))}
           </View>
 
-          {/* Delivery Rate Bar */}
+          {/* معدل الأداء */}
           <Text style={s.secTitle}>معدل الأداء</Text>
           <View style={s.perfCard}>
             <View style={s.perfRow}>
-              <Text style={s.perfVal}>{deliveryRate}%</Text>
               <Text style={s.perfLabel}>نسبة نجاح التوصيل</Text>
+              <Text style={[s.perfVal, { color: '#059669' }]}>{deliveryRate}%</Text>
             </View>
             <View style={s.barBg}>
-              <View style={[s.barFill, { width: `${deliveryRate}%` as any }]} />
+              <View style={[s.barFill, { width: `${deliveryRate}%` as any, backgroundColor: '#059669' }]} />
             </View>
 
-            <View style={s.perfRow}>
-              <Text style={[s.perfVal, { color: '#dc2626' }]}>
-                {totalOrders > 0 ? Math.round((returned / totalOrders) * 100) : 0}%
-              </Text>
+            <View style={[s.perfRow, { marginTop: 16 }]}>
               <Text style={s.perfLabel}>نسبة الإرجاع</Text>
+              <Text style={[s.perfVal, { color: '#dc2626' }]}>{returnRate}%</Text>
             </View>
             <View style={s.barBg}>
-              <View style={[s.barFill, {
-                backgroundColor: '#dc2626',
-                width: `${totalOrders > 0 ? Math.round((returned / totalOrders) * 100) : 0}%` as any
-              }]} />
+              <View style={[s.barFill, { width: `${returnRate}%` as any, backgroundColor: '#dc2626' }]} />
             </View>
           </View>
+
         </ScrollView>
       )}
     </SafeAreaView>
@@ -144,46 +153,54 @@ export default function StatsScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 16, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn: { width: 40, height: 40, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#111827' },
-  darkCard: { backgroundColor: '#1f2937', borderRadius: 24,
-    padding: 24, marginBottom: 24, overflow: 'hidden',
-    shadowColor: '#111827', shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
-  darkGlow: { position: 'absolute', top: -60, right: -60,
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.04)' },
-  darkLabel: { fontSize: 13, color: '#9ca3af', textAlign: 'right', marginBottom: 8 },
-  darkVal: { fontSize: 36, fontWeight: 'bold', color: '#fff',
-    textAlign: 'right', marginBottom: 16 },
-  darkUnit: { fontSize: 18, color: '#6b7280' },
-  darkRow: { flexDirection: 'row-reverse', gap: 10 },
-  darkChip: { backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  darkChipText: { color: '#d1d5db', fontSize: 12, fontWeight: '600' },
-  secTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827',
-    textAlign: 'right', marginBottom: 14, marginTop: 4 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  perfCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, gap: 12 },
-  perfRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  perfLabel: { fontSize: 13, color: '#6b7280' },
-  perfVal: { fontSize: 18, fontWeight: 'bold', color: PRIMARY },
-  barBg: { height: 10, backgroundColor: '#f3f4f6', borderRadius: 10, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: PRIMARY, borderRadius: 10 },
-});
+  container:   { flex: 1, backgroundColor: '#f8fafc' },
+  header:      { paddingHorizontal: 16, paddingBottom: 24 },
+  headerRow:   { flexDirection: 'row-reverse', alignItems: 'center',
+    justifyContent: 'space-between', paddingTop: 12, marginBottom: 20 },
+  backBtn:     { width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
 
-const sCard = StyleSheet.create({
-  card: { width: '47%', backgroundColor: '#fff', borderRadius: 18,
-    padding: 16, alignItems: 'flex-end',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  icon: { width: 44, height: 44, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  val: { fontSize: 22, fontWeight: 'bold', color: '#111827' },
-  unit: { fontSize: 11, color: '#9ca3af' },
-  label: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
+  mainCard:    { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: 20 },
+  mainLabel:   { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginBottom: 8 },
+  mainVal:     { fontSize: 34, fontWeight: 'bold', color: '#fff', textAlign: 'right', marginBottom: 14 },
+  mainUnit:    { fontSize: 16, color: 'rgba(255,255,255,0.7)' },
+  mainChips:   { flexDirection: 'row-reverse', gap: 10 },
+  chip:        { flexDirection: 'row-reverse', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText:    { color: '#fff', fontSize: 12, fontWeight: '600' },
+
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { color: '#9ca3af', fontSize: 14 },
+
+  scroll:      { padding: 16, paddingBottom: 40 },
+  secTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111827',
+    textAlign: 'right', marginBottom: 12, marginTop: 8 },
+
+  grid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  statCard:    { width: (width - 52) / 3, borderRadius: 16, padding: 14, alignItems: 'flex-end',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  statIcon:    { width: 38, height: 38, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  statVal:     { fontSize: 20, fontWeight: 'bold', color: '#111827' },
+  statLabel:   { fontSize: 11, color: '#9ca3af', marginTop: 4, textAlign: 'right' },
+
+  finGrid:     { gap: 10, marginBottom: 24 },
+  finCard:     { backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 14,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  finIcon:     { width: 48, height: 48, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center' },
+  finInfo:     { flex: 1, gap: 4 },
+  finLabel:    { fontSize: 13, color: '#6b7280', textAlign: 'right' },
+  finVal:      { fontSize: 18, fontWeight: 'bold', textAlign: 'right' },
+  finUnit:     { fontSize: 12, color: '#9ca3af' },
+
+  perfCard:    { backgroundColor: '#fff', borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, marginBottom: 20 },
+  perfRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  perfLabel:   { fontSize: 13, color: '#6b7280' },
+  perfVal:     { fontSize: 18, fontWeight: 'bold' },
+  barBg:       { height: 10, backgroundColor: '#f3f4f6', borderRadius: 10, overflow: 'hidden' },
+  barFill:     { height: '100%', borderRadius: 10 },
 });
