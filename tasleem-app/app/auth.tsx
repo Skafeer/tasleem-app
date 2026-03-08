@@ -13,29 +13,53 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
-const PRIMARY  = '#0c6679';
+const PRIMARY = '#0c6679';
 const PRIMARY2 = '#0a8a9f';
-const ACCENT   = '#f5a006';
+const ACCENT = '#f5a006';
 
 export default function AuthScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  
   const [isLogin, setIsLogin] = useState(true);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [storeName, setStoreName] = useState('');
   const [address, setAddress] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // التحقق من صحة رقم الهاتف (صيغة سعودية)
+  const validatePhone = (phone: string) => {
+    const regex = /^(05|5)[0-9]{8}$/;
+    return regex.test(phone);
+  };
+
   const switchTab = (login: boolean) => {
-    Animated.spring(slideAnim, { toValue: login ? 0 : 1, useNativeDriver: false, tension: 120, friction: 8 }).start();
+    Animated.spring(slideAnim, { 
+      toValue: login ? 0 : 1, 
+      useNativeDriver: false, 
+      tension: 120, 
+      friction: 8 
+    }).start();
+    
     setIsLogin(login);
-    setPhone(''); setPassword(''); setStoreName(''); setAddress('');
+    // مسح الحقول عند التبديل
+    setPhone('');
+    setPassword('');
+    setConfirmPassword('');
+    setStoreName('');
+    setAddress('');
   };
 
   const loginMutation = useMutation({
-    mutationFn: async (data: any) => { const res = await api.post('/api/auth/login', data); return res.data; },
+    mutationFn: async (data: any) => { 
+      const res = await api.post('/api/auth/login', data); 
+      return res.data; 
+    },
     onSuccess: async (data) => {
       await AsyncStorage.setItem('token', data.token);
       api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
@@ -47,7 +71,10 @@ export default function AuthScreen() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: any) => { const res = await api.post('/api/auth/register', data); return res.data; },
+    mutationFn: async (data: any) => { 
+      const res = await api.post('/api/auth/register', data); 
+      return res.data; 
+    },
     onSuccess: async (data) => {
       await AsyncStorage.setItem('token', data.token);
       api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
@@ -59,11 +86,37 @@ export default function AuthScreen() {
   });
 
   const handleSubmit = () => {
-    if (!phone.trim() || !password.trim()) { toast.warning('يرجى ملء جميع الحقول'); return; }
+    // التحقق من الحقول المطلوبة
+    if (!phone.trim() || !password.trim()) { 
+      toast.warning('يرجى ملء جميع الحقول'); 
+      return; 
+    }
+
+    // التحقق من صحة رقم الهاتف
+    if (!validatePhone(phone)) {
+      toast.warning('رقم الهاتف غير صحيح (يجب أن يبدأ بـ 05)');
+      return;
+    }
+
     if (isLogin) {
       loginMutation.mutate({ phone, password });
     } else {
-      if (!storeName.trim() || !address.trim()) { toast.warning('يرجى ملء جميع الحقول'); return; }
+      if (!storeName.trim() || !address.trim()) { 
+        toast.warning('يرجى ملء جميع الحقول'); 
+        return; 
+      }
+
+      // التحقق من تطابق كلمة المرور
+      if (password !== confirmPassword) {
+        toast.warning('كلمة المرور غير متطابقة');
+        return;
+      }
+
+      if (password.length < 6) {
+        toast.warning('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+        return;
+      }
+
       registerMutation.mutate({ phone, password, storeName, address });
     }
   };
@@ -72,7 +125,7 @@ export default function AuthScreen() {
 
   const indicatorLeft = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['50%', '0%'],
+    outputRange: ['0%', '50%'], // المعدل: يبدأ من اليسار للدخول وينتقل للتسجيل
   });
 
   return (
@@ -83,13 +136,16 @@ export default function AuthScreen() {
       <View style={s.circle3} />
 
       <SafeAreaView style={{ flex: 1 }}>
+        {/* تعديل KeyboardAvoidingView للأندرويد */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}>
+          
           <ScrollView
             contentContainerStyle={s.scroll}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}>
 
             <View style={s.topSection}>
@@ -97,26 +153,33 @@ export default function AuthScreen() {
               <Text style={s.appName}>تسليم</Text>
               <Text style={s.tagline}>منصتك لإدارة التجارة الإلكترونية</Text>
               <View style={s.dots}>
-                {[0, 1, 2].map(i => <View key={i} style={[s.dot, i === 1 && s.dotActive]} />)}
+                {[0, 1, 2].map(i => (
+                  <View key={i} style={[s.dot, i === 1 && s.dotActive]} />
+                ))}
               </View>
             </View>
 
             <View style={s.card}>
-
-              {/* تبويبات */}
+              {/* تبويبات - معدلة */}
               <View style={s.tabsWrap}>
                 <Animated.View style={[s.tabIndicator, { left: indicatorLeft }]} />
-                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(true)}>
+                <TouchableOpacity 
+                  style={s.tabBtn} 
+                  onPress={() => switchTab(true)}
+                  activeOpacity={0.7}>
                   <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
+                <TouchableOpacity 
+                  style={s.tabBtn} 
+                  onPress={() => switchTab(false)}
+                  activeOpacity={0.7}>
                   <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* الحقول — بدون focused state */}
+              {/* الحقول */}
               <View style={s.fields}>
-
+                {/* رقم الهاتف */}
                 <View style={s.fieldWrap}>
                   <Ionicons name="call-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                   <TextInput
@@ -127,12 +190,19 @@ export default function AuthScreen() {
                     keyboardType="phone-pad"
                     textAlign="right"
                     placeholderTextColor="#9ca3af"
+                    editable={!isPending}
                   />
                 </View>
 
+                {/* كلمة المرور */}
                 <View style={s.fieldWrap}>
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={19} color="#9ca3af" style={s.fieldIcon} />
+                    <Ionicons 
+                      name={showPassword ? 'eye-outline' : 'eye-off-outline'} 
+                      size={19} 
+                      color="#9ca3af" 
+                      style={s.fieldIcon} 
+                    />
                   </TouchableOpacity>
                   <TextInput
                     style={s.fieldInput}
@@ -142,9 +212,35 @@ export default function AuthScreen() {
                     secureTextEntry={!showPassword}
                     textAlign="right"
                     placeholderTextColor="#9ca3af"
+                    editable={!isPending}
                   />
                 </View>
 
+                {/* تأكيد كلمة المرور - للتسجيل فقط */}
+                {!isLogin && (
+                  <View style={s.fieldWrap}>
+                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      <Ionicons 
+                        name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} 
+                        size={19} 
+                        color="#9ca3af" 
+                        style={s.fieldIcon} 
+                      />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={s.fieldInput}
+                      placeholder="تأكيد كلمة المرور"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry={!showConfirmPassword}
+                      textAlign="right"
+                      placeholderTextColor="#9ca3af"
+                      editable={!isPending}
+                    />
+                  </View>
+                )}
+
+                {/* حقول التسجيل الإضافية */}
                 {!isLogin && (
                   <>
                     <View style={s.fieldWrap}>
@@ -156,6 +252,7 @@ export default function AuthScreen() {
                         onChangeText={setStoreName}
                         textAlign="right"
                         placeholderTextColor="#9ca3af"
+                        editable={!isPending}
                       />
                     </View>
 
@@ -168,6 +265,7 @@ export default function AuthScreen() {
                         onChangeText={setAddress}
                         textAlign="right"
                         placeholderTextColor="#9ca3af"
+                        editable={!isPending}
                       />
                     </View>
                   </>
@@ -180,14 +278,25 @@ export default function AuthScreen() {
                 onPress={handleSubmit}
                 disabled={isPending}
                 activeOpacity={0.85}>
-                <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-                  {isPending
-                    ? <ActivityIndicator color="#fff" />
-                    : <>
-                        <Ionicons name={isLogin ? 'log-in-outline' : 'person-add-outline'} size={20} color="#fff" />
-                        <Text style={s.submitText}>{isLogin ? 'دخول' : 'إنشاء الحساب'}</Text>
-                      </>
-                  }
+                <LinearGradient 
+                  colors={[PRIMARY, PRIMARY2]} 
+                  start={{ x: 0, y: 0 }} 
+                  end={{ x: 1, y: 0 }} 
+                  style={s.submitGrad}>
+                  {isPending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons 
+                        name={isLogin ? 'log-in-outline' : 'person-add-outline'} 
+                        size={20} 
+                        color="#fff" 
+                      />
+                      <Text style={s.submitText}>
+                        {isLogin ? 'دخول' : 'إنشاء الحساب'}
+                      </Text>
+                    </>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -197,15 +306,20 @@ export default function AuthScreen() {
                 <View style={s.dividerLine} />
               </View>
 
-              <TouchableOpacity style={s.switchRow} onPress={() => switchTab(!isLogin)}>
-                <Text style={s.switchText}>{isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}</Text>
-                <Text style={s.switchAccent}>{isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Text>
+              <TouchableOpacity 
+                style={s.switchRow} 
+                onPress={() => switchTab(!isLogin)}
+                activeOpacity={0.7}>
+                <Text style={s.switchText}>
+                  {isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}
+                </Text>
+                <Text style={s.switchAccent}>
+                  {isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}
+                </Text>
               </TouchableOpacity>
-
             </View>
 
             <Text style={s.footer}>جميع الحقوق محفوظة © تسليم 2026</Text>
-
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -214,58 +328,216 @@ export default function AuthScreen() {
 }
 
 const s = StyleSheet.create({
-  root:          { flex: 1 },
-  bg:            { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  circle1:       { position: 'absolute', width: 320, height: 320, borderRadius: 160,
-    backgroundColor: 'rgba(255,255,255,0.06)', top: -100, right: -80 },
-  circle2:       { position: 'absolute', width: 200, height: 200, borderRadius: 100,
-    backgroundColor: 'rgba(255,255,255,0.04)', top: 120, left: -60 },
-  circle3:       { position: 'absolute', width: 160, height: 160, borderRadius: 80,
-    backgroundColor: 'rgba(245,160,6,0.07)', bottom: 180, right: -50 },
+  root: { flex: 1 },
+  bg: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0 
+  },
+  circle1: { 
+    position: 'absolute', 
+    width: 320, 
+    height: 320, 
+    borderRadius: 160,
+    backgroundColor: 'rgba(255,255,255,0.06)', 
+    top: -100, 
+    right: -80 
+  },
+  circle2: { 
+    position: 'absolute', 
+    width: 200, 
+    height: 200, 
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.04)', 
+    top: 120, 
+    left: -60 
+  },
+  circle3: { 
+    position: 'absolute', 
+    width: 160, 
+    height: 160, 
+    borderRadius: 80,
+    backgroundColor: 'rgba(245,160,6,0.07)', 
+    bottom: 180, 
+    right: -50 
+  },
 
-  scroll:        { flexGrow: 1, paddingBottom: 30 },
+  scroll: { 
+    flexGrow: 1, 
+    paddingBottom: 30 
+  },
 
-  topSection:    { alignItems: 'center', paddingTop: 44, paddingBottom: 36 },
-  logoImg:       { width: 110, height: 110, marginBottom: 16 },
-  appName:       { fontSize: 38, fontWeight: 'bold', color: '#fff', letterSpacing: 3, marginBottom: 8 },
-  tagline:       { fontSize: 13, color: 'rgba(255,255,255,0.72)' },
-  dots:          { flexDirection: 'row', gap: 6, marginTop: 20 },
-  dot:           { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
-  dotActive:     { width: 22, backgroundColor: ACCENT, borderRadius: 3 },
+  topSection: { 
+    alignItems: 'center', 
+    paddingTop: 44, 
+    paddingBottom: 36 
+  },
+  logoImg: { 
+    width: 110, 
+    height: 110, 
+    marginBottom: 16 
+  },
+  appName: { 
+    fontSize: 38, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    letterSpacing: 3, 
+    marginBottom: 8 
+  },
+  tagline: { 
+    fontSize: 13, 
+    color: 'rgba(255,255,255,0.72)' 
+  },
+  dots: { 
+    flexDirection: 'row', 
+    gap: 6, 
+    marginTop: 20 
+  },
+  dot: { 
+    width: 6, 
+    height: 6, 
+    borderRadius: 3, 
+    backgroundColor: 'rgba(255,255,255,0.3)' 
+  },
+  dotActive: { 
+    width: 22, 
+    backgroundColor: ACCENT, 
+    borderRadius: 3 
+  },
 
-  card:          { marginHorizontal: 16, borderRadius: 32, backgroundColor: '#fff', padding: 24,
-    shadowColor: '#0c6679', shadowOpacity: 0.18, shadowRadius: 32,
-    shadowOffset: { width: 0, height: 12 }, elevation: 16 },
+  card: { 
+    marginHorizontal: 16, 
+    borderRadius: 32, 
+    backgroundColor: '#fff', 
+    padding: 24,
+    shadowColor: '#0c6679', 
+    shadowOpacity: 0.18, 
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 12 }, 
+    elevation: 16 
+  },
 
-  tabsWrap:      { flexDirection: 'row', backgroundColor: '#f1f5f9',
-    borderRadius: 18, padding: 4, marginBottom: 26, position: 'relative', height: 50 },
-  tabIndicator:  { position: 'absolute', top: 4, bottom: 4, width: '50%',
-    backgroundColor: PRIMARY, borderRadius: 14,
-    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
-  tabBtn:        { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
-  tabText:       { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
-  tabTextActive: { color: '#fff' },
+  tabsWrap: { 
+    flexDirection: 'row', 
+    backgroundColor: '#f1f5f9',
+    borderRadius: 18, 
+    padding: 4, 
+    marginBottom: 26, 
+    position: 'relative', 
+    height: 50 
+  },
+  tabIndicator: { 
+    position: 'absolute', 
+    top: 4, 
+    bottom: 4, 
+    width: '50%',
+    backgroundColor: PRIMARY, 
+    borderRadius: 14,
+    shadowColor: PRIMARY, 
+    shadowOpacity: 0.35, 
+    shadowRadius: 10, 
+    elevation: 5 
+  },
+  tabBtn: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    zIndex: 1 
+  },
+  tabText: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#9ca3af' 
+  },
+  tabTextActive: { 
+    color: '#fff' 
+  },
 
-  fields:        { gap: 12, marginBottom: 22 },
-  fieldWrap:     { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f8fafc',
-    borderRadius: 16, paddingHorizontal: 16, height: 56,
-    borderWidth: 1.5, borderColor: '#e5e7eb', gap: 10 },
-  fieldIcon:     { width: 28, textAlign: 'center' },
-  fieldInput:    { flex: 1, fontSize: 15, color: '#111827' },
+  fields: { 
+    gap: 12, 
+    marginBottom: 22 
+  },
+  fieldWrap: { 
+    flexDirection: 'row-reverse', 
+    alignItems: 'center', 
+    backgroundColor: '#f8fafc',
+    borderRadius: 16, 
+    paddingHorizontal: 16, 
+    height: 56,
+    borderWidth: 1.5, 
+    borderColor: '#e5e7eb', 
+    gap: 10 
+  },
+  fieldIcon: { 
+    width: 28, 
+    textAlign: 'center' 
+  },
+  fieldInput: { 
+    flex: 1, 
+    fontSize: 15, 
+    color: '#111827' 
+  },
 
-  submitBtn:     { borderRadius: 18, overflow: 'hidden', marginBottom: 22,
-    shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 14, elevation: 7 },
-  submitGrad:    { height: 56, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  submitText:    { fontSize: 16, fontWeight: 'bold', color: '#fff', letterSpacing: 0.8 },
+  submitBtn: { 
+    borderRadius: 18, 
+    overflow: 'hidden', 
+    marginBottom: 22,
+    shadowColor: PRIMARY, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 14, 
+    elevation: 7 
+  },
+  submitGrad: { 
+    height: 56, 
+    flexDirection: 'row-reverse', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 10 
+  },
+  submitText: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    letterSpacing: 0.8 
+  },
 
-  divider:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
-  dividerLine:   { flex: 1, height: 1, backgroundColor: '#f1f5f9' },
-  dividerText:   { fontSize: 13, color: '#d1d5db' },
+  divider: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12, 
+    marginBottom: 18 
+  },
+  dividerLine: { 
+    flex: 1, 
+    height: 1, 
+    backgroundColor: '#f1f5f9' 
+  },
+  dividerText: { 
+    fontSize: 13, 
+    color: '#d1d5db' 
+  },
 
-  switchRow:     { alignItems: 'center', gap: 6 },
-  switchText:    { fontSize: 13, color: '#9ca3af' },
-  switchAccent:  { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
+  switchRow: { 
+    alignItems: 'center', 
+    gap: 6 
+  },
+  switchText: { 
+    fontSize: 13, 
+    color: '#9ca3af' 
+  },
+  switchAccent: { 
+    fontSize: 14, 
+    fontWeight: 'bold', 
+    color: PRIMARY 
+  },
 
-  footer:        { textAlign: 'center', color: 'rgba(255,255,255,0.45)',
-    fontSize: 11, marginTop: 26, paddingHorizontal: 20 },
+  footer: { 
+    textAlign: 'center', 
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 11, 
+    marginTop: 26, 
+    paddingHorizontal: 20 
+  },
 });
