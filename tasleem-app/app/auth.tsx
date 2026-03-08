@@ -28,6 +28,25 @@ export default function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // دالة التحقق من رقم الهاتف - يجب أن يبدأ بـ07 ويكون 11 رقم
+  const validatePhone = (phoneNumber: string) => {
+    const phoneRegex = /^07[0-9]{9}$/; // يبدأ بـ07 ثم 9 أرقام = 11 رقم
+    return phoneRegex.test(phoneNumber);
+  };
+
+  // تنسيق رقم الهاتف أثناء الكتابة
+  const formatPhone = (text: string) => {
+    // إزالة أي أحرف غير رقمية
+    const cleaned = text.replace(/[^0-9]/g, '');
+    
+    // تحديد الحد الأقصى للطول (11 رقم)
+    if (cleaned.length > 11) {
+      return cleaned.slice(0, 11);
+    }
+    
+    return cleaned;
+  };
+
   const switchTab = (login: boolean) => {
     Animated.spring(slideAnim, { 
       toValue: login ? 0 : 1, 
@@ -73,10 +92,18 @@ export default function AuthScreen() {
   });
 
   const handleSubmit = () => {
+    // التحقق من الحقول المطلوبة
     if (!phone.trim() || !password.trim()) { 
       toast.warning('يرجى ملء جميع الحقول'); 
       return; 
     }
+
+    // التحقق من صحة رقم الهاتف
+    if (!validatePhone(phone)) {
+      toast.warning('رقم الهاتف يجب أن يبدأ بـ07 ويتكون من 11 رقم');
+      return;
+    }
+
     if (isLogin) {
       loginMutation.mutate({ phone, password });
     } else {
@@ -86,6 +113,11 @@ export default function AuthScreen() {
       }
       registerMutation.mutate({ phone, password, storeName, address });
     }
+  };
+
+  const handlePhoneChange = (text: string) => {
+    const formatted = formatPhone(text);
+    setPhone(formatted);
   };
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
@@ -103,7 +135,6 @@ export default function AuthScreen() {
       <View style={s.circle3} />
 
       <SafeAreaView style={{ flex: 1 }}>
-        {/* مشكلة الحقول تم حلها - استخدام behavior مناسب لكل منصة */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
@@ -143,12 +174,13 @@ export default function AuthScreen() {
                   <Ionicons name="call-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
                   <TextInput
                     style={s.fieldInput}
-                    placeholder="رقم الهاتف"
+                    placeholder="رقم الهاتف - 07xxxxxxxxx"
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={handlePhoneChange}
                     keyboardType="phone-pad"
                     textAlign="right"
                     placeholderTextColor="#9ca3af"
+                    maxLength={11} // تحديد الحد الأقصى 11 رقم
                   />
                 </View>
 
@@ -200,6 +232,13 @@ export default function AuthScreen() {
                   </>
                 )}
               </View>
+
+              {/* نص مساعد لرقم الهاتف */}
+              {phone.length > 0 && !validatePhone(phone) && (
+                <Text style={s.phoneHint}>
+                  يجب أن يبدأ رقم الهاتف بـ07 ويتكون من 11 رقم
+                </Text>
+              )}
 
               {/* زر الإرسال */}
               <TouchableOpacity
@@ -394,6 +433,16 @@ const s = StyleSheet.create({
     flex: 1, 
     fontSize: 15, 
     color: '#111827' 
+  },
+
+  // نص مساعد جديد لرقم الهاتف
+  phoneHint: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: -10,
+    marginBottom: 10,
+    textAlign: 'right',
+    paddingHorizontal: 8,
   },
 
   submitBtn: { 
