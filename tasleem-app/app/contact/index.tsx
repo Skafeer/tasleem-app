@@ -1,100 +1,56 @@
-import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Linking, Alert
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const PRIMARY = '#0c6679';
 
 const CONTACTS = [
-  {
-    label: 'واتساب',
-    desc: 'تواصل معنا عبر واتساب',
-    icon: 'logo-whatsapp',
-    color: '#25d366',
-    bg: '#f0fdf4',
-    action: () => Linking.openURL('https://wa.me/9647800000000'),
-  },
-  {
-    label: 'تيليغرام',
-    desc: 'راسلنا على تيليغرام',
-    icon: 'paper-plane-outline',
-    color: '#0088cc',
-    bg: '#eff6ff',
-    action: () => Linking.openURL('https://t.me/tasleem'),
-  },
-  {
-    label: 'البريد الإلكتروني',
-    desc: 'support@tasleem.iq',
-    icon: 'mail-outline',
-    color: '#8b5cf6',
-    bg: '#f5f3ff',
-    action: () => Linking.openURL('mailto:support@tasleem.iq'),
-  },
-  {
-    label: 'الهاتف',
-    desc: '07800000000',
-    icon: 'call-outline',
-    color: '#f97316',
-    bg: '#fff7ed',
-    action: () => Linking.openURL('tel:07800000000'),
-  },
+  { label: 'واتساب',          desc: 'تواصل معنا عبر واتساب',    icon: 'logo-whatsapp',      color: '#25d366', bg: '#f0fdf4', url: 'https://wa.me/9647800000000' },
+  { label: 'تيليغرام',        desc: 'راسلنا على تيليغرام',       icon: 'paper-plane-outline', color: '#0088cc', bg: '#eff6ff', url: 'https://t.me/tasleem' },
+  { label: 'البريد الإلكتروني', desc: 'support@tasleem.iq',      icon: 'mail-outline',        color: '#8b5cf6', bg: '#f5f3ff', url: 'mailto:support@tasleem.iq' },
+  { label: 'الهاتف',          desc: '07800000000',               icon: 'call-outline',        color: '#f97316', bg: '#fff7ed', url: 'tel:07800000000' },
 ];
 
 const FAQS = [
-  {
-    q: 'كيف أبدأ البيع على تسليم؟',
-    a: 'قم بإنشاء حساب، ثم تصفح المنتجات واختر ما يناسبك، وأضفه للسلة مع تحديد سعر البيع، ثم أدخل بيانات الزبون وأرسل الطلب.',
-  },
-  {
-    q: 'متى يتم تحويل الأرباح؟',
-    a: 'يتم تحويل الأرباح بعد التأكد من توصيل الطلب وانتهاء فترة الإرجاع. يمكنك طلب السحب في أي وقت من صفحة المحفظة.',
-  },
-  {
-    q: 'ما هي طرق الدفع المتاحة للسحب؟',
-    a: 'نوفر السحب عبر Zain Cash وAsia Hawala والتحويل البنكي.',
-  },
-  {
-    q: 'كيف أتتبع حالة طلباتي؟',
-    a: 'يمكنك متابعة جميع طلباتك من صفحة "طلباتي" حيث تظهر حالة كل طلب بشكل واضح.',
-  },
+  { q: 'كيف أبدأ البيع على تسليم؟', a: 'قم بإنشاء حساب، ثم تصفح المنتجات واختر ما يناسبك، وأضفه مع تحديد سعر البيع، ثم أدخل بيانات الزبون وأرسل الطلب.' },
+  { q: 'متى يتم تحويل الأرباح؟', a: 'يتم تحويل الأرباح بعد التأكد من توصيل الطلب. يمكنك طلب السحب في أي وقت من صفحة المحفظة.' },
+  { q: 'ما هي طرق الدفع المتاحة للسحب؟', a: 'نوفر السحب عبر Zain Cash وAsia Hawala والتحويل البنكي.' },
+  { q: 'كيف أتتبع حالة طلباتي؟', a: 'يمكنك متابعة جميع طلباتك من صفحة "طلباتي" حيث تظهر حالة كل طلب بشكل واضح.' },
 ];
 
 export default function ContactScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={s.container}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-forward" size={24} color="#374151" />
-        </TouchableOpacity>
-        <Text style={s.title}>تواصل معنا</Text>
-      </View>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      <ScrollView showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-
-        {/* Hero */}
-        <View style={s.hero}>
-          <View style={s.heroIcon}>
-            <Ionicons name="chatbubbles-outline" size={40} color={PRIMARY} />
-          </View>
-          <Text style={s.heroTitle}>كيف يمكننا مساعدتك؟</Text>
-          <Text style={s.heroSub}>
-            فريق الدعم متاح للمساعدة في أي وقت
-          </Text>
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        <View style={s.headerRow}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-forward" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>تواصل معنا</Text>
+          <View style={{ width: 38 }} />
         </View>
+        <View style={s.heroCard}>
+          <View style={s.heroIcon}>
+            <Ionicons name="chatbubbles-outline" size={32} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.heroTitle}>كيف يمكننا مساعدتك؟</Text>
+            <Text style={s.heroSub}>فريق الدعم متاح للمساعدة في أي وقت</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
-        {/* Contact Options */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+
         <Text style={s.secTitle}>وسائل التواصل</Text>
         <View style={s.contactsGrid}>
           {CONTACTS.map((c) => (
-            <TouchableOpacity key={c.label} style={s.contactCard}
-              onPress={c.action}>
+            <TouchableOpacity key={c.label} style={s.contactCard} onPress={() => Linking.openURL(c.url)} activeOpacity={0.8}>
               <View style={[s.contactIcon, { backgroundColor: c.bg }]}>
                 <Ionicons name={c.icon as any} size={26} color={c.color} />
               </View>
@@ -104,89 +60,82 @@ export default function ContactScreen() {
           ))}
         </View>
 
-        {/* Working Hours */}
         <View style={s.hoursCard}>
           <View style={s.hoursTop}>
-            <Ionicons name="time-outline" size={20} color={PRIMARY} />
+            <View style={s.hoursIcon}>
+              <Ionicons name="time-outline" size={18} color={PRIMARY} />
+            </View>
             <Text style={s.hoursTitle}>ساعات العمل</Text>
           </View>
-          <View style={s.hoursRow}>
-            <Text style={s.hoursVal}>9 صباحاً - 10 مساءً</Text>
-            <Text style={s.hoursLabel}>السبت - الخميس</Text>
-          </View>
-          <View style={s.hoursRow}>
-            <Text style={s.hoursVal}>10 صباحاً - 6 مساءً</Text>
-            <Text style={s.hoursLabel}>الجمعة</Text>
-          </View>
+          {[
+            { day: 'السبت - الخميس', time: '9 صباحاً - 10 مساءً' },
+            { day: 'الجمعة',         time: '10 صباحاً - 6 مساءً' },
+          ].map((r, i) => (
+            <View key={i} style={[s.hoursRow, i === 1 && { borderBottomWidth: 0 }]}>
+              <Text style={s.hoursTime}>{r.time}</Text>
+              <Text style={s.hoursDay}>{r.day}</Text>
+            </View>
+          ))}
         </View>
 
-        {/* FAQ */}
         <Text style={s.secTitle}>الأسئلة الشائعة</Text>
         <View style={s.faqList}>
           {FAQS.map((faq, i) => (
             <View key={i} style={s.faqCard}>
               <View style={s.faqQ}>
-                <View style={s.faqNum}>
-                  <Text style={s.faqNumText}>{i + 1}</Text>
-                </View>
+                <View style={s.faqNum}><Text style={s.faqNumText}>{i + 1}</Text></View>
                 <Text style={s.faqQText}>{faq.q}</Text>
               </View>
               <Text style={s.faqA}>{faq.a}</Text>
             </View>
           ))}
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 16, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn: { width: 40, height: 40, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#111827' },
-  hero: { alignItems: 'center', paddingVertical: 28 },
-  heroIcon: { width: 80, height: 80, borderRadius: 24,
-    backgroundColor: `${PRIMARY}12`, justifyContent: 'center',
-    alignItems: 'center', marginBottom: 16 },
-  heroTitle: { fontSize: 22, fontWeight: 'bold', color: '#111827',
-    marginBottom: 8 },
-  heroSub: { fontSize: 14, color: '#9ca3af', textAlign: 'center' },
-  secTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827',
-    textAlign: 'right', marginBottom: 14, marginTop: 4 },
-  contactsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  contactCard: { width: '47%', backgroundColor: '#fff', borderRadius: 20,
-    padding: 18, alignItems: 'center', gap: 10,
+  container:    { flex: 1, backgroundColor: '#f8fafc' },
+  header:       { paddingHorizontal: 16, paddingBottom: 24 },
+  headerRow:    { flexDirection: 'row-reverse', alignItems: 'center',
+    justifyContent: 'space-between', paddingTop: 12, marginBottom: 20 },
+  backBtn:      { width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  headerTitle:  { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  heroCard:     { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 18, padding: 16,
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 14 },
+  heroIcon:     { width: 56, height: 56, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  heroTitle:    { fontSize: 16, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  heroSub:      { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4, textAlign: 'right' },
+  scroll:       { padding: 16, paddingBottom: 40 },
+  secTitle:     { fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 14, marginTop: 4 },
+  contactsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  contactCard:  { width: '47%', backgroundColor: '#fff', borderRadius: 20,
+    padding: 18, alignItems: 'center', gap: 8,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  contactIcon: { width: 56, height: 56, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center' },
+  contactIcon:  { width: 56, height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   contactLabel: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
-  contactDesc: { fontSize: 11, color: '#9ca3af', textAlign: 'center' },
-  hoursCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20,
-    marginBottom: 24, shadowColor: '#000',
-    shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  hoursTop: { flexDirection: 'row-reverse', alignItems: 'center',
-    gap: 8, marginBottom: 16 },
-  hoursTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  hoursRow: { flexDirection: 'row-reverse', justifyContent: 'space-between',
-    alignItems: 'center', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  hoursLabel: { fontSize: 13, color: '#9ca3af' },
-  hoursVal: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  faqList: { gap: 12 },
-  faqCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18,
+  contactDesc:  { fontSize: 11, color: '#9ca3af', textAlign: 'center' },
+  hoursCard:    { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 24,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  hoursTop:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 14 },
+  hoursIcon:    { width: 36, height: 36, borderRadius: 10, backgroundColor: `${PRIMARY}12`,
+    justifyContent: 'center', alignItems: 'center' },
+  hoursTitle:   { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  hoursRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  hoursDay:     { fontSize: 13, color: '#6b7280' },
+  hoursTime:    { fontSize: 14, fontWeight: '600', color: '#374151' },
+  faqList:      { gap: 12 },
+  faqCard:      { backgroundColor: '#fff', borderRadius: 20, padding: 18,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  faqQ: { flexDirection: 'row-reverse', alignItems: 'flex-start',
-    gap: 12, marginBottom: 12 },
-  faqNum: { width: 28, height: 28, borderRadius: 14,
-    backgroundColor: `${PRIMARY}15`, justifyContent: 'center',
-    alignItems: 'center', marginTop: 2 },
-  faqNumText: { fontSize: 13, fontWeight: 'bold', color: PRIMARY },
-  faqQText: { flex: 1, fontSize: 14, fontWeight: 'bold',
-    color: '#111827', textAlign: 'right', lineHeight: 22 },
-  faqA: { fontSize: 13, color: '#6b7280', textAlign: 'right',
-    lineHeight: 22, paddingRight: 40 },
+  faqQ:         { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
+  faqNum:       { width: 28, height: 28, borderRadius: 10, backgroundColor: `${PRIMARY}15`,
+    justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  faqNumText:   { fontSize: 13, fontWeight: 'bold', color: PRIMARY },
+  faqQText:     { flex: 1, fontSize: 14, fontWeight: 'bold', color: '#111827', textAlign: 'right', lineHeight: 22 },
+  faqA:         { fontSize: 13, color: '#6b7280', textAlign: 'right', lineHeight: 22, paddingRight: 40 },
 });

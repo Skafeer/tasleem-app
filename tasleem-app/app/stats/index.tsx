@@ -18,7 +18,7 @@ export default function StatsScreen() {
 
   const { data: ordersRes, isLoading: ordersLoading } = useQuery({
     queryKey: ['merchant-orders-stats'],
-    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); return data; },
+    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); const r = data?.data || data; return Array.isArray(r) ? r : []; },
   });
 
   const { data: user } = useQuery({
@@ -31,8 +31,8 @@ export default function StatsScreen() {
     queryFn: async () => { const { data } = await api.get('/api/withdrawals'); return data; },
   });
 
-  const all          = Array.isArray(ordersRes) ? ordersRes : (ordersRes?.data || []) as any[];
-  const ws           = Array.isArray(withdrawalsRes) ? withdrawalsRes : [] as any[];
+  const all          = Array.isArray(ordersRes) ? ordersRes as any[] : ((ordersRes as any)?.data || []) as any[];
+  const ws           = Array.isArray(withdrawalsRes) ? withdrawalsRes as any[] : [] as any[];
 
   const totalOrders  = all.length;
   const delivered    = all.filter(o => o.status === 'delivered');

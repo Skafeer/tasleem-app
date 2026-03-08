@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../src/lib/api';
 
@@ -86,7 +87,10 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-      <View style={s.header}>
+      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-forward" size={22} color="#fff" />
+        </TouchableOpacity>
         <View style={s.headerInfo}>
           <Text style={s.headerTitle}>الدعم الفني</Text>
           <Text style={s.headerSub}>نرد خلال ساعات العمل</Text>
@@ -95,10 +99,7 @@ export default function SupportScreen() {
           <View style={s.onlineDot} />
           <Text style={s.onlineText}>متاح</Text>
         </View>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-forward" size={22} color="#111827" />
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {isLoading ? (
@@ -136,7 +137,7 @@ export default function SupportScreen() {
                         <Ionicons name="shield-checkmark" size={14} color="#fff" />
                       </View>
                     )}
-                    <TouchableOpacity onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
+                    <TouchableOpacity style={{ maxWidth: '75%' }} onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
                       <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
                         {item.image_url && (
                           <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
@@ -191,16 +192,16 @@ export default function SupportScreen() {
 const s = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#f8fafc' },
   header:          { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14,
-    paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
-  backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: '#f3f4f6',
+    paddingVertical: 12, paddingTop: 14, gap: 10 },
+  backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
   headerInfo:      { flex: 1 },
-  headerTitle:     { fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  headerSub:       { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginTop: 2 },
+  headerTitle:     { fontSize: 16, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  headerSub:       { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginTop: 2 },
   onlineIndicator: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5,
-    backgroundColor: '#d1fae5', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  onlineDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
-  onlineText:      { fontSize: 11, color: '#10b981', fontWeight: '600' },
+    backgroundColor: 'rgba(16,185,129,0.2)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  onlineDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
+  onlineText:      { fontSize: 11, color: '#4ade80', fontWeight: '600' },
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center' },
   messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
@@ -211,17 +212,17 @@ const s = StyleSheet.create({
   dateDivider:     { alignItems: 'center', marginVertical: 12 },
   dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
     paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-  msgRow:          { flexDirection: 'row-reverse', marginBottom: 8, alignItems: 'flex-end', gap: 6 },
-  msgRowAdmin:     { justifyContent: 'flex-end' },
-  msgRowUser:      { justifyContent: 'flex-start' },
+  msgRow:          { marginBottom: 8, alignItems: 'flex-end' },
+  msgRowAdmin:     { alignItems: 'flex-end' },
+  msgRowUser:      { alignItems: 'flex-start' },
   adminAvatar:     { width: 28, height: 28, borderRadius: 9, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  bubble:          { maxWidth: '75%', borderRadius: 18, padding: 12, gap: 4 },
+  bubble:          { maxWidth: 280, borderRadius: 18, padding: 12, gap: 4 },
   bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
   bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
   msgImage:        { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  bubbleText:      { fontSize: 14, lineHeight: 20 },
+  bubbleText:      { fontSize: 14, lineHeight: 20, flexWrap: 'wrap' },
   bubbleTextAdmin: { color: '#fff', textAlign: 'right' },
   bubbleTextUser:  { color: '#111827', textAlign: 'right' },
   bubbleTime:      { fontSize: 10, textAlign: 'left' },
