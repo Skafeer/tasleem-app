@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -16,37 +16,6 @@ import { toast } from '../src/lib/toast';
 const PRIMARY  = '#0c6679';
 const PRIMARY2 = '#0a8a9f';
 const ACCENT   = '#f5a006';
-
-// ── Field خارج الكومبوننت عشان ما يُعاد إنشاؤها عند كل render ──
-const Field = ({
-  icon, placeholder, value, onChange, secure,
-  keyboard, fieldKey, focused, setFocused,
-  showPassword, setShowPassword,
-}: any) => (
-  <View style={[s.fieldWrap, focused === fieldKey && s.fieldFocused]}>
-    <TouchableOpacity
-      onPress={() => secure && setShowPassword(!showPassword)}
-      style={s.fieldIcon}>
-      <Ionicons
-        name={secure ? (showPassword ? 'eye-outline' : 'eye-off-outline') : icon}
-        size={19}
-        color={focused === fieldKey ? PRIMARY : '#9ca3af'}
-      />
-    </TouchableOpacity>
-    <TextInput
-      style={s.fieldInput}
-      placeholder={placeholder}
-      value={value}
-      onChangeText={onChange}
-      secureTextEntry={secure && !showPassword}
-      keyboardType={keyboard || 'default'}
-      textAlign="right"
-      placeholderTextColor="#b0b8c1"
-      onFocus={() => setFocused(fieldKey)}
-      onBlur={() => setFocused(null)}
-    />
-  </View>
-);
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -106,8 +75,6 @@ export default function AuthScreen() {
     outputRange: ['50%', '0%'],
   });
 
-  const fieldProps = { focused, setFocused, showPassword, setShowPassword };
-
   return (
     <View style={s.root}>
       <LinearGradient colors={[PRIMARY, PRIMARY2, '#0d9eb8']} style={s.bg} />
@@ -120,7 +87,6 @@ export default function AuthScreen() {
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             <View style={s.topSection}>
-              {/* الشعار بدون خلفية */}
               <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
               <Text style={s.appName}>تسليم</Text>
               <Text style={s.tagline}>منصتك لإدارة التجارة الإلكترونية</Text>
@@ -130,6 +96,8 @@ export default function AuthScreen() {
             </View>
 
             <View style={s.card}>
+
+              {/* تبويبات */}
               <View style={s.tabsWrap}>
                 <Animated.View style={[s.tabIndicator, { right: indicatorRight }]} />
                 <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
@@ -140,21 +108,78 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               </View>
 
+              {/* الحقول */}
               <View style={s.fields}>
-                <Field fieldKey="phone" icon="call-outline" placeholder="رقم الهاتف"
-                  value={phone} onChange={setPhone} keyboard="phone-pad" {...fieldProps} />
-                <Field fieldKey="password" icon="lock-closed-outline" placeholder="كلمة المرور"
-                  value={password} onChange={setPassword} secure {...fieldProps} />
+
+                {/* رقم الهاتف */}
+                <View style={[s.fieldWrap, focused === 'phone' && s.fieldFocused]}>
+                  <Ionicons name="call-outline" size={19} color={focused === 'phone' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                  <TextInput
+                    style={s.fieldInput}
+                    placeholder="رقم الهاتف"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    textAlign="right"
+                    placeholderTextColor="#b0b8c1"
+                    onFocus={() => setFocused('phone')}
+                    onBlur={() => setFocused(null)}
+                  />
+                </View>
+
+                {/* كلمة المرور */}
+                <View style={[s.fieldWrap, focused === 'password' && s.fieldFocused]}>
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={s.fieldIcon}>
+                    <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={19} color={focused === 'password' ? PRIMARY : '#9ca3af'} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={s.fieldInput}
+                    placeholder="كلمة المرور"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    textAlign="right"
+                    placeholderTextColor="#b0b8c1"
+                    onFocus={() => setFocused('password')}
+                    onBlur={() => setFocused(null)}
+                  />
+                </View>
+
+                {/* حقول التسجيل */}
                 {!isLogin && (
                   <>
-                    <Field fieldKey="store" icon="storefront-outline" placeholder="اسم المتجر"
-                      value={storeName} onChange={setStoreName} {...fieldProps} />
-                    <Field fieldKey="address" icon="location-outline" placeholder="العنوان"
-                      value={address} onChange={setAddress} {...fieldProps} />
+                    <View style={[s.fieldWrap, focused === 'store' && s.fieldFocused]}>
+                      <Ionicons name="storefront-outline" size={19} color={focused === 'store' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                      <TextInput
+                        style={s.fieldInput}
+                        placeholder="اسم المتجر"
+                        value={storeName}
+                        onChangeText={setStoreName}
+                        textAlign="right"
+                        placeholderTextColor="#b0b8c1"
+                        onFocus={() => setFocused('store')}
+                        onBlur={() => setFocused(null)}
+                      />
+                    </View>
+
+                    <View style={[s.fieldWrap, focused === 'address' && s.fieldFocused]}>
+                      <Ionicons name="location-outline" size={19} color={focused === 'address' ? PRIMARY : '#9ca3af'} style={s.fieldIcon} />
+                      <TextInput
+                        style={s.fieldInput}
+                        placeholder="العنوان"
+                        value={address}
+                        onChangeText={setAddress}
+                        textAlign="right"
+                        placeholderTextColor="#b0b8c1"
+                        onFocus={() => setFocused('address')}
+                        onBlur={() => setFocused(null)}
+                      />
+                    </View>
                   </>
                 )}
               </View>
 
+              {/* زر الإرسال */}
               <TouchableOpacity style={[s.submitBtn, isPending && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isPending} activeOpacity={0.85}>
                 <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
                   {isPending
@@ -177,6 +202,7 @@ export default function AuthScreen() {
                 <Text style={s.switchText}>{isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}</Text>
                 <Text style={s.switchAccent}>{isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Text>
               </TouchableOpacity>
+
             </View>
 
             <Text style={s.footer}>جميع الحقوق محفوظة © تسليم 2026</Text>
