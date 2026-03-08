@@ -68,7 +68,7 @@ export default function StatsTab() {
 
   const { data: orders = [], isLoading: l1 } = useQuery({
     queryKey: ['admin-orders'],
-    queryFn: async () => { const { data } = await api.get('/api/orders'); return data; },
+    queryFn: async () => { const { data } = await api.get('/api/orders?limit=9999&page=1'); return data.data || data; },
     refetchInterval: 30000,
   });
   const { data: users = [], isLoading: l2 } = useQuery({
