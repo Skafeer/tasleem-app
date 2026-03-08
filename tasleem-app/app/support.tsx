@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Clipboard, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import api from '../../src/lib/api';
+import * as ImagePicker from 'expo-image-picker';
+import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
 
@@ -25,6 +27,7 @@ export default function SupportScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const [message, setMessage] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const { data: messages = [], isLoading } = useQuery({
@@ -34,30 +37,55 @@ export default function SupportScreen() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (msg: string) => { await api.post('/api/support/messages', { message: msg }); },
+    mutationFn: async ({ msg, imageUrl }: { msg: string; imageUrl?: string }) => {
+      await api.post('/api/support/messages', { message: msg, imageUrl });
+    },
     onSuccess: () => {
       setMessage('');
       qc.invalidateQueries({ queryKey: ['support-messages'] });
+    },
+    onError: (e: any) => {
+      Alert.alert('خطأ', e?.response?.data?.message || 'فشل إرسال الرسالة');
     },
   });
 
   const handleSend = () => {
     if (!message.trim()) return;
-    sendMutation.mutate(message.trim());
+    sendMutation.mutate({ msg: message.trim() });
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0].base64) return;
+    setUploadingImage(true);
+    try {
+      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
+      sendMutation.mutate({ msg: '', imageUrl: data.url });
+    } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
+    finally { setUploadingImage(false); }
+  };
+
+  const handleLongPress = (msg: string) => {
+    Clipboard.setString(msg);
+    Alert.alert('', 'تم نسخ الرسالة');
   };
 
   useEffect(() => {
-    if ((messages as any[]).length > 0) {
+    if ((messages as any[]).length > 0)
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-    }
   }, [messages]);
 
   const msgList = messages as any[];
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-
-      {/* هيدر */}
       <View style={s.header}>
         <View style={s.headerInfo}>
           <Text style={s.headerTitle}>الدعم الفني</Text>
@@ -73,12 +101,8 @@ export default function SupportScreen() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-
-        {/* الرسائل */}
         {isLoading ? (
-          <View style={s.center}>
-            <ActivityIndicator color={PRIMARY} />
-          </View>
+          <View style={s.center}><ActivityIndicator color={PRIMARY} /></View>
         ) : (
           <FlatList
             ref={flatListRef}
@@ -98,9 +122,7 @@ export default function SupportScreen() {
             renderItem={({ item, index }: any) => {
               const isAdmin = item.from_admin;
               const prevItem = msgList[index - 1];
-              const showDate = !prevItem ||
-                formatDate(item.created_at) !== formatDate(prevItem.created_at);
-
+              const showDate = !prevItem || formatDate(item.created_at) !== formatDate(prevItem.created_at);
               return (
                 <>
                   {showDate && (
@@ -114,14 +136,21 @@ export default function SupportScreen() {
                         <Ionicons name="shield-checkmark" size={14} color="#fff" />
                       </View>
                     )}
-                    <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
-                      <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
-                        {item.message}
-                      </Text>
-                      <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
-                        {formatTime(item.created_at)}
-                      </Text>
-                    </View>
+                    <TouchableOpacity onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
+                      <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
+                        {item.image_url && (
+                          <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
+                        )}
+                        {!!item.message && (
+                          <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
+                            {item.message}
+                          </Text>
+                        )}
+                        <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
+                          {formatTime(item.created_at)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
                 </>
               );
@@ -129,7 +158,6 @@ export default function SupportScreen() {
           />
         )}
 
-        {/* حقل الإرسال */}
         <View style={s.inputRow}>
           <TouchableOpacity
             style={[s.sendBtn, (!message.trim() || sendMutation.isPending) && s.sendBtnOff]}
@@ -137,8 +165,12 @@ export default function SupportScreen() {
             disabled={!message.trim() || sendMutation.isPending}>
             {sendMutation.isPending
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Ionicons name="send" size={18} color="#fff" />
-            }
+              : <Ionicons name="send" size={18} color="#fff" />}
+          </TouchableOpacity>
+          <TouchableOpacity style={s.imageBtn} onPress={handlePickImage} disabled={uploadingImage}>
+            {uploadingImage
+              ? <ActivityIndicator color={PRIMARY} size="small" />
+              : <Ionicons name="image-outline" size={22} color={PRIMARY} />}
           </TouchableOpacity>
           <TextInput
             style={s.input}
@@ -149,10 +181,8 @@ export default function SupportScreen() {
             textAlign="right"
             multiline
             maxLength={500}
-            onSubmitEditing={handleSend}
           />
         </View>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -160,7 +190,6 @@ export default function SupportScreen() {
 
 const s = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#f8fafc' },
-
   header:          { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14,
     paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
   backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: '#f3f4f6',
@@ -172,45 +201,40 @@ const s = StyleSheet.create({
     backgroundColor: '#d1fae5', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
   onlineDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
   onlineText:      { fontSize: 11, color: '#10b981', fontWeight: '600' },
-
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
   messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
-
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
   emptyIconBox:    { width: 80, height: 80, borderRadius: 40, backgroundColor: PRIMARY + '15',
     justifyContent: 'center', alignItems: 'center' },
   emptyTitle:      { fontSize: 16, fontWeight: 'bold', color: '#374151' },
   emptyText:       { fontSize: 13, color: '#9ca3af', textAlign: 'center' },
-
   dateDivider:     { alignItems: 'center', marginVertical: 12 },
   dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
     paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-
   msgRow:          { flexDirection: 'row-reverse', marginBottom: 8, alignItems: 'flex-end', gap: 6 },
   msgRowAdmin:     { justifyContent: 'flex-end' },
   msgRowUser:      { justifyContent: 'flex-start' },
-
   adminAvatar:     { width: 28, height: 28, borderRadius: 9, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-
   bubble:          { maxWidth: '75%', borderRadius: 18, padding: 12, gap: 4 },
   bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
   bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  msgImage:        { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
   bubbleText:      { fontSize: 14, lineHeight: 20 },
   bubbleTextAdmin: { color: '#fff', textAlign: 'right' },
   bubbleTextUser:  { color: '#111827', textAlign: 'right' },
   bubbleTime:      { fontSize: 10, textAlign: 'left' },
   bubbleTimeAdmin: { color: 'rgba(255,255,255,0.7)' },
   bubbleTimeUser:  { color: '#9ca3af' },
-
   inputRow:        { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff',
     borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   input:           { flex: 1, backgroundColor: '#f8fafc', borderRadius: 22, paddingHorizontal: 16,
     paddingVertical: 10, fontSize: 14, color: '#111827', maxHeight: 100,
     borderWidth: 1.5, borderColor: '#e5e7eb' } as any,
+  imageBtn:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY + '15',
+    justifyContent: 'center', alignItems: 'center' },
   sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },

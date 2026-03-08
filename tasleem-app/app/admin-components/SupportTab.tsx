@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Alert, Clipboard, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -19,10 +21,15 @@ const formatDate = (date: string) => {
   return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 };
 
+type SortType = 'recent' | 'unread' | 'most';
+
 export default function SupportTab() {
   const qc = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [reply, setReply] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortType>('recent');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -32,13 +39,17 @@ export default function SupportTab() {
   });
 
   const sendReply = useMutation({
-    mutationFn: async ({ userId, message }: { userId: number; message: string }) => {
-      await api.post(`/api/admin/support/${userId}`, { message });
+    mutationFn: async ({ userId, message, imageUrl }: { userId: number; message: string; imageUrl?: string }) => {
+      await api.post(`/api/admin/support/${userId}`, { message, imageUrl });
     },
-    onSuccess: () => {
-      setReply('');
-      qc.invalidateQueries({ queryKey: ['admin-support'] });
+    onSuccess: () => { setReply(''); qc.invalidateQueries({ queryKey: ['admin-support'] }); },
+  });
+
+  const blockMutation = useMutation({
+    mutationFn: async ({ userId, block }: { userId: number; block: boolean }) => {
+      await api.post(`/api/admin/support/${userId}/block`, { block });
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-support'] }),
   });
 
   const handleSend = () => {
@@ -46,7 +57,42 @@ export default function SupportTab() {
     sendReply.mutate({ userId: selectedUser.userId, message: reply.trim() });
   };
 
-  // تحديث الـ selectedUser بعد كل refetch
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0].base64) return;
+    setUploadingImage(true);
+    try {
+      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
+      sendReply.mutate({ userId: selectedUser.userId, message: '', imageUrl: data.url });
+    } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
+    finally { setUploadingImage(false); }
+  };
+
+  const handleLongPress = (msg: string) => {
+    Clipboard.setString(msg);
+    Alert.alert('', 'تم نسخ الرسالة');
+  };
+
+  const confirmBlock = (user: any) => {
+    const isBlocked = user.isBlocked;
+    Alert.alert(
+      isBlocked ? 'فك الحظر' : 'حظر المستخدم',
+      isBlocked ? `هل تريد فك حظر ${user.storeName}؟` : `هل تريد حظر ${user.storeName} من إرسال الرسائل؟`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: isBlocked ? 'فك الحظر' : 'حظر', style: 'destructive',
+          onPress: () => blockMutation.mutate({ userId: user.userId, block: !isBlocked }) },
+      ]
+    );
+  };
+
   useEffect(() => {
     if (selectedUser && (conversations as any[]).length > 0) {
       const updated = (conversations as any[]).find(c => c.userId === selectedUser.userId);
@@ -55,34 +101,60 @@ export default function SupportTab() {
   }, [conversations]);
 
   useEffect(() => {
-    if (selectedUser?.messages?.length > 0) {
+    if (selectedUser?.messages?.length > 0)
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-    }
   }, [selectedUser]);
 
   const convList = conversations as any[];
+
+  // فلترة وفرز المحادثات
+  const filtered = convList
+    .filter(c => !search || c.storeName?.includes(search) || c.phone?.includes(search))
+    .sort((a, b) => {
+      if (sort === 'unread') return b.unread - a.unread;
+      if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
+      return new Date(b.lastMessage?.created_at || 0).getTime() - new Date(a.lastMessage?.created_at || 0).getTime();
+    });
 
   // ── قائمة المحادثات ──
   if (!selectedUser) {
     return (
       <View style={s.container}>
-        <View style={s.listHeader}>
-          <Text style={s.listHeaderTitle}>محادثات الدعم</Text>
-          <View style={s.countBadge}>
-            <Text style={s.countText}>{convList.length}</Text>
-          </View>
+        {/* بحث */}
+        <View style={s.searchBox}>
+          <Ionicons name="search-outline" size={18} color="#9ca3af" />
+          <TextInput
+            style={s.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="بحث عن تاجر..."
+            placeholderTextColor="#9ca3af"
+            textAlign="right"
+          />
+        </View>
+
+        {/* فرز */}
+        <View style={s.sortRow}>
+          {([['recent', 'الأحدث'], ['unread', 'غير مقروء'], ['most', 'الأكثر']] as [SortType, string][]).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[s.sortBtn, sort === key && s.sortBtnActive]}
+              onPress={() => setSort(key)}>
+              <Text style={[s.sortText, sort === key && s.sortTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {isLoading ? (
           <View style={s.center}><ActivityIndicator color={PRIMARY} /></View>
-        ) : convList.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <View style={s.center}>
             <Ionicons name="chatbubbles-outline" size={48} color="#d1d5db" />
             <Text style={s.emptyText}>لا توجد محادثات</Text>
           </View>
         ) : (
           <FlatList
-            data={convList}
+            data={filtered}
             keyExtractor={(item: any) => String(item.userId)}
             contentContainerStyle={{ paddingBottom: 20 }}
             renderItem={({ item }: any) => {
@@ -106,7 +178,7 @@ export default function SupportTab() {
                       <Text style={s.convPhone}>{item.phone}</Text>
                       {last && (
                         <Text style={s.convLastMsg} numberOfLines={1}>
-                          {last.from_admin ? 'أنت: ' : ''}{last.message}
+                          {last.from_admin ? 'أنت: ' : ''}{last.image_url ? 'صورة' : last.message}
                         </Text>
                       )}
                     </View>
@@ -126,8 +198,15 @@ export default function SupportTab() {
 
   return (
     <View style={s.container}>
-      {/* هيدر المحادثة */}
       <View style={s.chatHeader}>
+        <View style={s.chatHeaderBtns}>
+          <TouchableOpacity
+            style={[s.blockBtn, selectedUser.isBlocked && s.unblockBtn]}
+            onPress={() => confirmBlock(selectedUser)}>
+            <Ionicons name={selectedUser.isBlocked ? 'lock-open-outline' : 'ban-outline'} size={16}
+              color={selectedUser.isBlocked ? '#10b981' : '#ef4444'} />
+          </TouchableOpacity>
+        </View>
         <View style={s.chatHeaderInfo}>
           <Text style={s.chatHeaderName}>{selectedUser.storeName}</Text>
           <Text style={s.chatHeaderPhone}>{selectedUser.phone}</Text>
@@ -144,17 +223,11 @@ export default function SupportTab() {
           keyExtractor={(item: any) => String(item.id)}
           contentContainerStyle={s.messagesList}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={s.center}>
-              <Text style={s.emptyText}>لا توجد رسائل</Text>
-            </View>
-          }
+          ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>لا توجد رسائل</Text></View>}
           renderItem={({ item, index }: any) => {
             const isAdmin = item.from_admin;
             const prevItem = msgs[index - 1];
-            const showDate = !prevItem ||
-              formatDate(item.created_at) !== formatDate(prevItem.created_at);
-
+            const showDate = !prevItem || formatDate(item.created_at) !== formatDate(prevItem.created_at);
             return (
               <>
                 {showDate && (
@@ -163,21 +236,27 @@ export default function SupportTab() {
                   </View>
                 )}
                 <View style={[s.msgRow, isAdmin ? s.msgRowAdmin : s.msgRowUser]}>
-                  <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
-                    <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
-                      {item.message}
-                    </Text>
-                    <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
-                      {formatTime(item.created_at)}
-                    </Text>
-                  </View>
+                  <TouchableOpacity onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
+                    <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
+                      {item.image_url && (
+                        <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
+                      )}
+                      {!!item.message && (
+                        <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
+                          {item.message}
+                        </Text>
+                      )}
+                      <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
+                        {formatTime(item.created_at)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
               </>
             );
           }}
         />
 
-        {/* حقل الرد */}
         <View style={s.inputRow}>
           <TouchableOpacity
             style={[s.sendBtn, (!reply.trim() || sendReply.isPending) && s.sendBtnOff]}
@@ -185,8 +264,12 @@ export default function SupportTab() {
             disabled={!reply.trim() || sendReply.isPending}>
             {sendReply.isPending
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Ionicons name="send" size={18} color="#fff" />
-            }
+              : <Ionicons name="send" size={18} color="#fff" />}
+          </TouchableOpacity>
+          <TouchableOpacity style={s.imageBtn} onPress={handlePickImage} disabled={uploadingImage}>
+            {uploadingImage
+              ? <ActivityIndicator color={PRIMARY} size="small" />
+              : <Ionicons name="image-outline" size={22} color={PRIMARY} />}
           </TouchableOpacity>
           <TextInput
             style={s.input}
@@ -209,13 +292,18 @@ const s = StyleSheet.create({
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyText:       { fontSize: 15, color: '#9ca3af' },
 
-  listHeader:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  listHeaderTitle: { flex: 1, fontSize: 16, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  countBadge:      { backgroundColor: PRIMARY + '15', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 4 },
-  countText:       { fontSize: 13, fontWeight: 'bold', color: PRIMARY },
+  searchBox:       { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+    marginHorizontal: 14, marginTop: 12, marginBottom: 8, backgroundColor: '#fff',
+    borderRadius: 14, paddingHorizontal: 14, height: 44,
+    borderWidth: 1.5, borderColor: '#e5e7eb' },
+  searchInput:     { flex: 1, fontSize: 14, color: '#111827' },
+
+  sortRow:         { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 14, marginBottom: 10 },
+  sortBtn:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
+  sortBtnActive:   { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  sortText:        { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  sortTextActive:  { color: '#fff' },
 
   convCard:        { flexDirection: 'row-reverse', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff',
@@ -226,7 +314,7 @@ const s = StyleSheet.create({
     borderRadius: 9, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' },
   unreadText:      { fontSize: 10, color: '#fff', fontWeight: 'bold' },
   convInfo:        { flex: 1, gap: 4 },
-  convTop:         { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  convTop:         { flexDirection: 'row-reverse', justifyContent: 'space-between' },
   convName:        { fontSize: 14, fontWeight: 'bold', color: '#111827' },
   convTime:        { fontSize: 11, color: '#9ca3af' },
   convBottom:      { gap: 2 },
@@ -241,20 +329,23 @@ const s = StyleSheet.create({
   chatHeaderInfo:  { flex: 1 },
   chatHeaderName:  { fontSize: 15, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
   chatHeaderPhone: { fontSize: 12, color: '#9ca3af', textAlign: 'right' },
+  chatHeaderBtns:  { flexDirection: 'row', gap: 8 },
+  blockBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: '#fee2e2',
+    justifyContent: 'center', alignItems: 'center' },
+  unblockBtn:      { backgroundColor: '#d1fae5' },
 
   messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
   dateDivider:     { alignItems: 'center', marginVertical: 12 },
   dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
     paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-
   msgRow:          { flexDirection: 'row-reverse', marginBottom: 8, alignItems: 'flex-end' },
   msgRowAdmin:     { justifyContent: 'flex-end' },
   msgRowUser:      { justifyContent: 'flex-start' },
-
   bubble:          { maxWidth: '75%', borderRadius: 18, padding: 12, gap: 4 },
   bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
   bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  msgImage:        { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
   bubbleText:      { fontSize: 14, lineHeight: 20 },
   bubbleTextAdmin: { color: '#fff', textAlign: 'right' },
   bubbleTextUser:  { color: '#111827', textAlign: 'right' },
@@ -268,6 +359,8 @@ const s = StyleSheet.create({
   input:           { flex: 1, backgroundColor: '#f8fafc', borderRadius: 22, paddingHorizontal: 16,
     paddingVertical: 10, fontSize: 14, color: '#111827', maxHeight: 100,
     borderWidth: 1.5, borderColor: '#e5e7eb' } as any,
+  imageBtn:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY + '15',
+    justifyContent: 'center', alignItems: 'center' },
   sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center' },
   sendBtnOff:      { backgroundColor: '#d1d5db' },
