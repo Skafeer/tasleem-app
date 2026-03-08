@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image
+  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ScrollView, Image, Animated, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +13,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
-const PRIMARY = '#0c6679';
+const PRIMARY  = '#0c6679';
+const PRIMARY2 = '#0a8a9f';
+const ACCENT   = '#f5a006';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -23,215 +26,225 @@ export default function AuthScreen() {
   const [storeName, setStoreName] = useState('');
   const [address, setAddress] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const switchTab = (login: boolean) => {
+    Animated.spring(slideAnim, { toValue: login ? 0 : 1, useNativeDriver: false, tension: 120, friction: 8 }).start();
+    setIsLogin(login);
+  };
 
   const loginMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await api.post('/api/auth/login', data);
-      return res.data;
-    },
+    mutationFn: async (data: any) => { const res = await api.post('/api/auth/login', data); return res.data; },
     onSuccess: async (data) => {
       await AsyncStorage.setItem('token', data.token);
       api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       queryClient.clear();
-      toast.success('مرحباً بك! 👋');
-      setTimeout(() => { router.replace('/(tabs)'); }, 100);
+      toast.success('مرحباً بك!');
+      setTimeout(() => router.replace('/(tabs)'), 100);
     },
-    onError: (e: any) => {
-      toast.error(e?.response?.data?.message || 'خطأ في تسجيل الدخول');
-    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'خطأ في تسجيل الدخول'),
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await api.post('/api/auth/register', data);
-      return res.data;
-    },
+    mutationFn: async (data: any) => { const res = await api.post('/api/auth/register', data); return res.data; },
     onSuccess: async (data) => {
       await AsyncStorage.setItem('token', data.token);
       api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       queryClient.clear();
-      toast.success('تم إنشاء الحساب بنجاح! 🎉');
-      setTimeout(() => { router.replace('/(tabs)'); }, 100);
+      toast.success('تم إنشاء الحساب بنجاح!');
+      setTimeout(() => router.replace('/(tabs)'), 100);
     },
-    onError: (e: any) => {
-      toast.error(e?.response?.data?.message || 'خطأ في التسجيل');
-    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'خطأ في التسجيل'),
   });
 
   const handleSubmit = () => {
-    if (!phone.trim() || !password.trim()) {
-      toast.warning('يرجى ملء جميع الحقول'); return;
-    }
+    if (!phone.trim() || !password.trim()) { toast.warning('يرجى ملء جميع الحقول'); return; }
     if (isLogin) {
       loginMutation.mutate({ phone, password });
     } else {
-      if (!storeName.trim() || !address.trim()) {
-        toast.warning('يرجى ملء جميع الحقول'); return;
-      }
+      if (!storeName.trim() || !address.trim()) { toast.warning('يرجى ملء جميع الحقول'); return; }
       registerMutation.mutate({ phone, password, storeName, address });
     }
   };
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
 
+  const indicatorRight = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['50%', '0%'],
+  });
+
+  const Field = ({ icon, placeholder, value, onChange, secure, keyboard, fieldKey }: any) => (
+    <View style={[s.fieldWrap, focused === fieldKey && s.fieldFocused]}>
+      <TouchableOpacity onPress={() => secure && setShowPassword(!showPassword)} style={s.fieldIcon}>
+        <Ionicons
+          name={secure ? (showPassword ? 'eye-outline' : 'eye-off-outline') : icon}
+          size={19}
+          color={focused === fieldKey ? PRIMARY : '#9ca3af'}
+        />
+      </TouchableOpacity>
+      <TextInput
+        style={s.fieldInput}
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChange}
+        secureTextEntry={secure && !showPassword}
+        keyboardType={keyboard || 'default'}
+        textAlign="right"
+        placeholderTextColor="#b0b8c1"
+        onFocus={() => setFocused(fieldKey)}
+        onBlur={() => setFocused(null)}
+      />
+    </View>
+  );
+
   return (
-    <SafeAreaView style={s.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={s.root}>
+      <LinearGradient colors={[PRIMARY, PRIMARY2, '#0d9eb8']} style={s.bg} />
 
-          {/* القسم العلوي - الشعار */}
-          <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.topSection}>
-            <View style={s.logoWrap}>
-              <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
-            </View>
-            <Text style={s.appName}>تسليم</Text>
-            <Text style={s.appTagline}>منصة التجارة الإلكترونية</Text>
-          </LinearGradient>
+      {/* دوائر زخرفية */}
+      <View style={s.circle1} />
+      <View style={s.circle2} />
+      <View style={s.circle3} />
 
-          {/* البطاقة السفلية */}
-          <View style={s.card}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            {/* تبويبات */}
-            <View style={s.tabs}>
-              <TouchableOpacity style={[s.tab, isLogin && s.tabActive]} onPress={() => setIsLogin(true)}>
-                <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.tab, !isLogin && s.tabActive]} onPress={() => setIsLogin(false)}>
-                <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* الحقول */}
-            <View style={s.fields}>
-
-              {/* رقم الهاتف */}
-              <View style={[s.inputRow, focusedField === 'phone' && s.inputRowFocused]}>
-                <TextInput
-                  style={s.input}
-                  placeholder="رقم الهاتف"
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                />
-                <Ionicons name="call-outline" size={20} color={focusedField === 'phone' ? PRIMARY : '#9ca3af'} />
+            {/* اللوغو */}
+            <View style={s.topSection}>
+              <View style={s.logoWrap}>
+                <Image source={require('../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
               </View>
+              <Text style={s.appName}>تسليم</Text>
+              <Text style={s.tagline}>منصتك لإدارة التجارة الإلكترونية</Text>
+              <View style={s.dots}>
+                {[0, 1, 2].map(i => <View key={i} style={[s.dot, i === 1 && s.dotActive]} />)}
+              </View>
+            </View>
 
-              {/* كلمة المرور */}
-              <View style={[s.inputRow, focusedField === 'password' && s.inputRowFocused]}>
-                <TextInput
-                  style={s.input}
-                  placeholder="كلمة المرور"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  textAlign="right"
-                  placeholderTextColor="#9ca3af"
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={focusedField === 'password' ? PRIMARY : '#9ca3af'} />
+            {/* البطاقة */}
+            <View style={s.card}>
+
+              {/* تبويبات */}
+              <View style={s.tabsWrap}>
+                <Animated.View style={[s.tabIndicator, { right: indicatorRight }]} />
+                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(false)}>
+                  <Text style={[s.tabText, !isLogin && s.tabTextActive]}>إنشاء حساب</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.tabBtn} onPress={() => switchTab(true)}>
+                  <Text style={[s.tabText, isLogin && s.tabTextActive]}>تسجيل الدخول</Text>
                 </TouchableOpacity>
               </View>
 
-              {!isLogin && (
-                <>
-                  {/* اسم المتجر */}
-                  <View style={[s.inputRow, focusedField === 'storeName' && s.inputRowFocused]}>
-                    <TextInput
-                      style={s.input}
-                      placeholder="اسم المتجر"
-                      value={storeName}
-                      onChangeText={setStoreName}
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"
-                      onFocus={() => setFocusedField('storeName')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                    <Ionicons name="storefront-outline" size={20} color={focusedField === 'storeName' ? PRIMARY : '#9ca3af'} />
-                  </View>
+              {/* الحقول */}
+              <View style={s.fields}>
+                <Field fieldKey="phone" icon="call-outline" placeholder="رقم الهاتف" value={phone} onChange={setPhone} keyboard="phone-pad" />
+                <Field fieldKey="password" icon="lock-closed-outline" placeholder="كلمة المرور" value={password} onChange={setPassword} secure />
+                {!isLogin && (
+                  <>
+                    <Field fieldKey="store" icon="storefront-outline" placeholder="اسم المتجر" value={storeName} onChange={setStoreName} />
+                    <Field fieldKey="address" icon="location-outline" placeholder="العنوان" value={address} onChange={setAddress} />
+                  </>
+                )}
+              </View>
 
-                  {/* العنوان */}
-                  <View style={[s.inputRow, focusedField === 'address' && s.inputRowFocused]}>
-                    <TextInput
-                      style={s.input}
-                      placeholder="العنوان"
-                      value={address}
-                      onChangeText={setAddress}
-                      textAlign="right"
-                      placeholderTextColor="#9ca3af"
-                      onFocus={() => setFocusedField('address')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                    <Ionicons name="location-outline" size={20} color={focusedField === 'address' ? PRIMARY : '#9ca3af'} />
-                  </View>
-                </>
-              )}
+              {/* زر الإرسال */}
+              <TouchableOpacity style={[s.submitBtn, isPending && { opacity: 0.7 }]} onPress={handleSubmit} disabled={isPending} activeOpacity={0.85}>
+                <LinearGradient colors={[PRIMARY, PRIMARY2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
+                  {isPending
+                    ? <ActivityIndicator color="#fff" />
+                    : <>
+                        <Ionicons name={isLogin ? 'log-in-outline' : 'person-add-outline'} size={20} color="#fff" />
+                        <Text style={s.submitText}>{isLogin ? 'دخول' : 'إنشاء الحساب'}</Text>
+                      </>
+                  }
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* فاصل */}
+              <View style={s.divider}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerText}>أو</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              {/* تبديل */}
+              <TouchableOpacity style={s.switchRow} onPress={() => switchTab(!isLogin)}>
+                <Text style={s.switchText}>{isLogin ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'}</Text>
+                <Text style={s.switchAccent}>{isLogin ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Text>
+              </TouchableOpacity>
+
             </View>
 
-            {/* زر الدخول */}
-            <TouchableOpacity
-              style={[s.btn, isPending && { opacity: 0.7 }]}
-              onPress={handleSubmit}
-              disabled={isPending}>
-              <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.btnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                {isPending
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.btnText}>{isLogin ? 'دخول' : 'إنشاء حساب'}</Text>
-                }
-              </LinearGradient>
-            </TouchableOpacity>
+            <Text style={s.footer}>جميع الحقوق محفوظة © تسليم 2026</Text>
 
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#f8fafc' },
-  scroll:        { flexGrow: 1 },
+  root:          { flex: 1 },
+  bg:            { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  circle1:       { position: 'absolute', width: 320, height: 320, borderRadius: 160,
+    backgroundColor: 'rgba(255,255,255,0.06)', top: -100, right: -80 },
+  circle2:       { position: 'absolute', width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.04)', top: 120, left: -60 },
+  circle3:       { position: 'absolute', width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(245,160,6,0.07)', bottom: 180, right: -50 },
 
-  // القسم العلوي
-  topSection:    { alignItems: 'center', paddingTop: 60, paddingBottom: 70, paddingHorizontal: 24 },
-  logoWrap:      { width: 110, height: 110, borderRadius: 30, backgroundColor: 'rgba(255,255,255,0.18)',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' },
-  logoImg:       { width: 88, height: 88 },
-  appName:       { fontSize: 30, fontWeight: 'bold', color: '#fff', marginBottom: 6 },
-  appTagline:    { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  scroll:        { flexGrow: 1, paddingBottom: 30 },
 
-  // البطاقة البيضاء
-  card:          { backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    marginTop: -30, flex: 1, paddingHorizontal: 24, paddingTop: 30, paddingBottom: 40,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, elevation: 8 },
+  topSection:    { alignItems: 'center', paddingTop: 44, paddingBottom: 36 },
+  logoWrap:      { width: 92, height: 92, borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center',
+    marginBottom: 18, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 20, elevation: 12 },
+  logoImg:       { width: 72, height: 72 },
+  appName:       { fontSize: 38, fontWeight: 'bold', color: '#fff', letterSpacing: 3, marginBottom: 8 },
+  tagline:       { fontSize: 13, color: 'rgba(255,255,255,0.72)', letterSpacing: 0.3 },
+  dots:          { flexDirection: 'row', gap: 6, marginTop: 20 },
+  dot:           { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
+  dotActive:     { width: 22, backgroundColor: ACCENT, borderRadius: 3 },
 
-  // تبويبات
-  tabs:          { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 14, padding: 4, marginBottom: 26 },
-  tab:           { flex: 1, paddingVertical: 12, borderRadius: 11, alignItems: 'center' },
-  tabActive:     { backgroundColor: PRIMARY,
-    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },
-  tabText:       { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  card:          { marginHorizontal: 16, borderRadius: 32, backgroundColor: '#fff', padding: 24,
+    shadowColor: '#0c6679', shadowOpacity: 0.18, shadowRadius: 32,
+    shadowOffset: { width: 0, height: 12 }, elevation: 16 },
+
+  tabsWrap:      { flexDirection: 'row-reverse', backgroundColor: '#f1f5f9',
+    borderRadius: 18, padding: 4, marginBottom: 26, position: 'relative', height: 50 },
+  tabIndicator:  { position: 'absolute', top: 4, bottom: 4, width: '50%',
+    backgroundColor: PRIMARY, borderRadius: 14,
+    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
+  tabBtn:        { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  tabText:       { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
   tabTextActive: { color: '#fff' },
 
-  // حقول الإدخال
-  fields:        { gap: 14, marginBottom: 26 },
-  inputRow:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc',
-    borderRadius: 14, paddingHorizontal: 16, height: 56, gap: 10,
-    borderWidth: 1.5, borderColor: '#e5e7eb' },
-  inputRowFocused: { borderColor: PRIMARY, backgroundColor: '#fff',
-    shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 6, elevation: 2 },
-  input:         { flex: 1, fontSize: 15, color: '#111827', textAlign: 'right' } as any,
+  fields:        { gap: 12, marginBottom: 22 },
+  fieldWrap:     { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f8fafc',
+    borderRadius: 16, paddingHorizontal: 16, height: 56,
+    borderWidth: 1.5, borderColor: '#e5e7eb', gap: 10 },
+  fieldFocused:  { borderColor: PRIMARY, backgroundColor: '#f0f9fb',
+    shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 8, elevation: 2 },
+  fieldIcon:     { width: 28, justifyContent: 'center', alignItems: 'center' },
+  fieldInput:    { flex: 1, fontSize: 15, color: '#111827' },
 
-  // زر الإرسال
-  btn:           { borderRadius: 14, overflow: 'hidden',
-    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
-  btnGrad:       { height: 56, justifyContent: 'center', alignItems: 'center' },
-  btnText:       { color: '#fff', fontSize: 16, fontWeight: 'bold', letterSpacing: 0.5 },
+  submitBtn:     { borderRadius: 18, overflow: 'hidden', marginBottom: 22,
+    shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 14, elevation: 7 },
+  submitGrad:    { height: 56, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  submitText:    { fontSize: 16, fontWeight: 'bold', color: '#fff', letterSpacing: 0.8 },
+
+  divider:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  dividerLine:   { flex: 1, height: 1, backgroundColor: '#f1f5f9' },
+  dividerText:   { fontSize: 13, color: '#d1d5db' },
+
+  switchRow:     { alignItems: 'center', gap: 6 },
+  switchText:    { fontSize: 13, color: '#9ca3af' },
+  switchAccent:  { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
+
+  footer:        { textAlign: 'center', color: 'rgba(255,255,255,0.45)',
+    fontSize: 11, marginTop: 26, paddingHorizontal: 20 },
 });
