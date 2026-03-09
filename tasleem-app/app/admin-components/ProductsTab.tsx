@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -71,7 +70,7 @@ export default function ProductsTab() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: 10 - form.images.length,
-        quality: 1,
+        quality: 0.6,
       });
       
       if (result.canceled || !result.assets.length) return;
@@ -82,13 +81,14 @@ export default function ProductsTab() {
       
       for (const asset of result.assets) {
         try {
-          // ضغط الصورة قبل الرفع
-          const manipulated = await ImageManipulator.manipulateAsync(
-            asset.uri,
-            [{ resize: { width: 1024 } }],
-            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-          );
-          const base64 = `data:image/jpeg;base64,${manipulated.base64}`;
+          const response = await fetch(asset.uri);
+          const blob = await response.blob();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
           
           const uploadResponse = await api.post('/api/upload', { image: base64 });
           

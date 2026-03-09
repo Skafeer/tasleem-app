@@ -7,7 +7,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -63,19 +62,13 @@ export default function SupportTab() {
     if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      base64: false,
+      quality: 0.5,
+      base64: true,
     });
-    if (result.canceled || !result.assets[0]) return;
+    if (result.canceled || !result.assets[0]?.base64) return;
     setUploadingImage(true);
     try {
-      // ضغط الصورة قبل الرفع
-      const manipulated = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 800 } }],
-        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      const base64 = `data:image/jpeg;base64,${manipulated.base64}`;
+      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
       const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
       sendReply.mutate({ userId: selectedUser.userId, message: '', imageUrl: data.url });
     } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
