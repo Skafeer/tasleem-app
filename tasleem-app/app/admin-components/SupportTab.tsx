@@ -124,7 +124,14 @@ export default function SupportTab() {
       .sort((a, b) => {
         if (sort === 'unread') return b.unread - a.unread;
         if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
-        return new Date(b.lastMessage?.created_at || 0).getTime() - new Date(a.lastMessage?.created_at || 0).getTime();
+        // fallback لآخر رسالة من messages array إذا lastMessage مو موجود
+        const getTime = (conv: any) => {
+          if (conv.lastMessage?.created_at) return new Date(conv.lastMessage.created_at).getTime();
+          const msgs = conv.messages || [];
+          if (msgs.length > 0) return new Date(msgs[msgs.length - 1].created_at).getTime();
+          return 0;
+        };
+        return getTime(b) - getTime(a);
       });
   }, [convList, search, sort]);
 
@@ -229,17 +236,17 @@ export default function SupportTab() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           ref={flatListRef}
-          data={[...msgs].reverse()}
-          inverted
+          data={msgs}
           keyExtractor={(item: any) => String(item.id)}
           contentContainerStyle={s.messagesList}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>لا توجد رسائل</Text></View>}
           renderItem={({ item, index }: any) => {
             const isAdmin = item.from_admin;
-            const reversedMsgs = [...msgs].reverse();
-            const nextItem = reversedMsgs[index + 1];
-            const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
+            const prevItem = msgs[index - 1];
+            const showDate = !prevItem || formatDate(item.created_at) !== formatDate(prevItem.created_at);
             return (
               <>
                 {showDate && (
@@ -352,7 +359,9 @@ const s = StyleSheet.create({
   msgRow:          { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-end' },
   msgRowAdmin:     { justifyContent: 'flex-end' },
   msgRowUser:      { justifyContent: 'flex-start' },
-  bubble:          { borderRadius: 18, padding: 12, gap: 4 },
+  adminAvatar:     { width: 28, height: 28, borderRadius: 9, backgroundColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  bubble:          { maxWidth: 280, borderRadius: 18, padding: 12, gap: 4 },
   bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
   bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
