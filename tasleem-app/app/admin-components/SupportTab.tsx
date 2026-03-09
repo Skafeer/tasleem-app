@@ -7,6 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -51,6 +52,14 @@ export default function SupportTab() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-support'] }),
   });
+
+  // تصفير العداد لما يدخل للمحادثة
+  const markAsRead = async (userId: number) => {
+    try {
+      await api.post(`/api/admin/support/${userId}/read`);
+      qc.invalidateQueries({ queryKey: ['admin-support'] });
+    } catch {}
+  };
 
   const handleSend = () => {
     if (!reply.trim() || !selectedUser) return;
@@ -159,7 +168,7 @@ export default function SupportTab() {
             renderItem={({ item }: any) => {
               const last = item.lastMessage;
               return (
-                <TouchableOpacity style={s.convCard} onPress={() => setSelectedUser(item)}>
+                <TouchableOpacity style={s.convCard} onPress={() => { setSelectedUser(item); if (item.unread > 0) markAsRead(item.userId); }}>
                   <View style={s.convAvatar}>
                     <Ionicons name="person" size={20} color="#fff" />
                     {item.unread > 0 && (
@@ -197,23 +206,21 @@ export default function SupportTab() {
 
   return (
     <View style={s.container}>
-      <View style={s.chatHeader}>
-        <View style={s.chatHeaderBtns}>
-          <TouchableOpacity
-            style={[s.blockBtn, selectedUser.isBlocked && s.unblockBtn]}
-            onPress={() => confirmBlock(selectedUser)}>
-            <Ionicons name={selectedUser.isBlocked ? 'lock-open-outline' : 'ban-outline'} size={16}
-              color={selectedUser.isBlocked ? '#10b981' : '#ef4444'} />
-          </TouchableOpacity>
-        </View>
+      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.chatHeader}>
+        <TouchableOpacity style={s.backBtn} onPress={() => setSelectedUser(null)}>
+          <Ionicons name="arrow-forward" size={20} color="#fff" />
+        </TouchableOpacity>
         <View style={s.chatHeaderInfo}>
           <Text style={s.chatHeaderName}>{selectedUser.storeName}</Text>
           <Text style={s.chatHeaderPhone}>{selectedUser.phone}</Text>
         </View>
-        <TouchableOpacity style={s.backBtn} onPress={() => setSelectedUser(null)}>
-          <Ionicons name="arrow-forward" size={20} color="#111827" />
+        <TouchableOpacity
+          style={[s.blockBtn, selectedUser.isBlocked && s.unblockBtn]}
+          onPress={() => confirmBlock(selectedUser)}>
+          <Ionicons name={selectedUser.isBlocked ? 'lock-open-outline' : 'ban-outline'} size={16}
+            color={selectedUser.isBlocked ? '#4ade80' : '#fca5a5'} />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
@@ -235,7 +242,7 @@ export default function SupportTab() {
                   </View>
                 )}
                 <View style={[s.msgRow, isAdmin ? s.msgRowAdmin : s.msgRowUser]}>
-                  <TouchableOpacity onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
+                  <TouchableOpacity style={{ maxWidth: '75%' }} onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
                     <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
                       {item.image_url && (
                         <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
@@ -321,17 +328,16 @@ const s = StyleSheet.create({
   convLastMsg:     { fontSize: 12, color: '#6b7280', textAlign: 'right' },
 
   chatHeader:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn:         { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14, paddingVertical: 14 },
+  backBtn:         { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
   chatHeaderInfo:  { flex: 1 },
-  chatHeaderName:  { fontSize: 15, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  chatHeaderPhone: { fontSize: 12, color: '#9ca3af', textAlign: 'right' },
+  chatHeaderName:  { fontSize: 15, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  chatHeaderPhone: { fontSize: 12, color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
   chatHeaderBtns:  { flexDirection: 'row', gap: 8 },
-  blockBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: '#fee2e2',
+  blockBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center' },
-  unblockBtn:      { backgroundColor: '#d1fae5' },
+  unblockBtn:      { backgroundColor: 'rgba(74,222,128,0.2)' },
 
   messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
   dateDivider:     { alignItems: 'center', marginVertical: 12 },
@@ -340,7 +346,7 @@ const s = StyleSheet.create({
   msgRow:          { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-end' },
   msgRowAdmin:     { justifyContent: 'flex-end' },
   msgRowUser:      { justifyContent: 'flex-start' },
-  bubble:          { maxWidth: '75%', borderRadius: 18, padding: 12, gap: 4 },
+  bubble:          { borderRadius: 18, padding: 12, gap: 4 },
   bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
   bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
