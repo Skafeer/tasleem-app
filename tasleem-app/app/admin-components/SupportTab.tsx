@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -83,13 +83,7 @@ export default function SupportTab() {
 
   const convList = conversations as any[];
 
-  // تحديث المحادثة المفتوحة تلقائياً
-  if (selectedUser) {
-    const updated = convList.find((c: any) => c.userId === selectedUser.userId);
-    if (updated && updated.messages?.length !== selectedUser.messages?.length) {
-      setTimeout(() => setSelectedUser(updated), 0);
-    }
-  }
+
 
   const sendReply = useMutation({
     mutationFn: async ({ userId, message, imageUrl }: { userId: number; message: string; imageUrl?: string }) => {
@@ -111,6 +105,15 @@ export default function SupportTab() {
     },
   });
 
+  // تحديث المحادثة المفتوحة تلقائياً عند وصول رسائل جديدة
+  useEffect(() => {
+    if (!selectedUser) return;
+    const updated = convList.find((c: any) => c.userId === selectedUser.userId);
+    if (updated && updated.messages?.length !== selectedUser.messages?.length) {
+      setSelectedUser(updated);
+    }
+  }, [convList]);
+
   const markAsRead = async (userId: number) => {
     qc.setQueryData(['admin-support'], (old: any) => {
       if (!Array.isArray(old)) return old;
@@ -124,27 +127,35 @@ export default function SupportTab() {
     sendReply.mutate({ userId: selectedUser.userId, message: reply.trim() });
   };
 
+  const selectedUserRef = useRef<any>(null);
+  selectedUserRef.current = selectedUser;
+
   const handlePickImage = async () => {
+    const currentUser = selectedUserRef.current;
+    if (!currentUser) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.5, base64: true,
+      quality: 0.5,
+      base64: true,
     });
     if (result.canceled || !result.assets[0]?.base64) return;
     setUploadingImage(true);
     try {
-      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
+      const base64Data = result.assets[0].base64!;
+      const imageBase64 = `data:image/jpeg;base64,${base64Data}`;
+      const { data } = await api.post('/api/support/upload-image', { imageBase64 });
       if (data?.url) {
-        sendReply.mutate({ userId: selectedUser.userId, message: '', imageUrl: data.url });
+        sendReply.mutate({ userId: currentUser.userId, message: '', imageUrl: data.url });
       } else {
         Alert.alert('خطأ', 'لم يتم الحصول على رابط الصورة');
       }
-    } catch (e: any) { 
-      Alert.alert('خطأ', e?.response?.data?.message || 'فشل رفع الصورة'); 
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.response?.data?.message || 'فشل رفع الصورة');
+    } finally {
+      setUploadingImage(false);
     }
-    finally { setUploadingImage(false); }
   };
 
   const handleLongPress = (msg: string) => {
