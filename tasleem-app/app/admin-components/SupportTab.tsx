@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -24,6 +24,49 @@ const formatDate = (date: string) => {
 
 type SortType = 'recent' | 'unread' | 'most';
 
+// مكوّن رسالة واحدة
+const ChatBubble = ({ item, nextItem, onLongPress }: any) => {
+  const isAdmin = item.from_admin;
+  // في inverted، nextItem هو الرسالة الأقدم
+  const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
+
+  return (
+    <>
+      <View style={[s.msgRow, isAdmin ? s.msgRowAdmin : s.msgRowUser]}>
+        {!isAdmin && (
+          <View style={s.userAvatar}>
+            <Ionicons name="person" size={14} color="#fff" />
+          </View>
+        )}
+        <TouchableOpacity
+          style={s.bubbleWrap}
+          onLongPress={() => item.message && onLongPress(item.message)}
+          activeOpacity={0.85}
+        >
+          <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
+            {item.image_url && (
+              <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
+            )}
+            {!!item.message && (
+              <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
+                {item.message}
+              </Text>
+            )}
+            <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
+              {formatTime(item.created_at)}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      {showDate && (
+        <View style={s.dateDivider}>
+          <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
+        </View>
+      )}
+    </>
+  );
+};
+
 export default function SupportTab() {
   const qc = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -31,13 +74,22 @@ export default function SupportTab() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortType>('recent');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['admin-support'],
     queryFn: async () => { const { data } = await api.get('/api/admin/support'); return data; },
     refetchInterval: 10000,
   });
+
+  const convList = conversations as any[];
+
+  // تحديث المحادثة المفتوحة تلقائياً
+  if (selectedUser) {
+    const updated = convList.find((c: any) => c.userId === selectedUser.userId);
+    if (updated && updated.messages?.length !== selectedUser.messages?.length) {
+      setTimeout(() => setSelectedUser(updated), 0);
+    }
+  }
 
   const sendReply = useMutation({
     mutationFn: async ({ userId, message, imageUrl }: { userId: number; message: string; imageUrl?: string }) => {
@@ -53,16 +105,12 @@ export default function SupportTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-support'] }),
   });
 
-  // تصفير العداد لما يدخل للمحادثة
   const markAsRead = async (userId: number) => {
-    // حدث الـ cache فوراً بدون انتظار
     qc.setQueryData(['admin-support'], (old: any) => {
       if (!Array.isArray(old)) return old;
       return old.map((c: any) => c.userId === userId ? { ...c, unread: 0 } : c);
     });
-    try {
-      await api.post(`/api/admin/support/${userId}/read`);
-    } catch {}
+    try { await api.post(`/api/admin/support/${userId}/read`); } catch {}
   };
 
   const handleSend = () => {
@@ -75,8 +123,7 @@ export default function SupportTab() {
     if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.5,
-      base64: true,
+      quality: 0.5, base64: true,
     });
     if (result.canceled || !result.assets[0]?.base64) return;
     setUploadingImage(true);
@@ -97,7 +144,7 @@ export default function SupportTab() {
     const isBlocked = user.isBlocked;
     Alert.alert(
       isBlocked ? 'فك الحظر' : 'حظر المستخدم',
-      isBlocked ? `هل تريد فك حظر ${user.storeName}؟` : `هل تريد حظر ${user.storeName} من إرسال الرسائل؟`,
+      isBlocked ? `هل تريد فك حظر ${user.storeName}؟` : `هل تريد حظر ${user.storeName}؟`,
       [
         { text: 'إلغاء', style: 'cancel' },
         { text: isBlocked ? 'فك الحظر' : 'حظر', style: 'destructive',
@@ -106,30 +153,15 @@ export default function SupportTab() {
     );
   };
 
-  useEffect(() => {
-    if (selectedUser && (conversations as any[]).length > 0) {
-      const updated = (conversations as any[]).find(c => c.userId === selectedUser.userId);
-      if (updated) setSelectedUser(updated);
-    }
-  }, [conversations]);
-
-
-
-  const convList = conversations as any[];
-
-  // فلترة وفرز المحادثات
   const filtered = useMemo(() => {
     return [...convList]
       .filter(c => !search || c.storeName?.includes(search) || c.phone?.includes(search))
       .sort((a, b) => {
         if (sort === 'unread') return b.unread - a.unread;
         if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
-        // fallback لآخر رسالة من messages array إذا lastMessage مو موجود
         const getTime = (conv: any) => {
-          if (conv.lastMessage?.created_at) return new Date(conv.lastMessage.created_at).getTime();
           const msgs = conv.messages || [];
-          if (msgs.length > 0) return new Date(msgs[msgs.length - 1].created_at).getTime();
-          return 0;
+          return msgs.length > 0 ? new Date(msgs[msgs.length - 1].created_at).getTime() : 0;
         };
         return getTime(b) - getTime(a);
       });
@@ -139,7 +171,6 @@ export default function SupportTab() {
   if (!selectedUser) {
     return (
       <View style={s.container}>
-        {/* بحث */}
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
@@ -150,15 +181,16 @@ export default function SupportTab() {
             placeholderTextColor="#9ca3af"
             textAlign="right"
           />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={17} color="#9ca3af" />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        {/* فرز */}
         <View style={s.sortRow}>
           {([['recent', 'الأحدث'], ['unread', 'غير مقروء'], ['most', 'الأكثر']] as [SortType, string][]).map(([key, label]) => (
-            <TouchableOpacity
-              key={key}
-              style={[s.sortBtn, sort === key && s.sortBtnActive]}
-              onPress={() => setSort(key)}>
+            <TouchableOpacity key={key} style={[s.sortBtn, sort === key && s.sortBtnActive]} onPress={() => setSort(key as SortType)}>
               <Text style={[s.sortText, sort === key && s.sortTextActive]}>{label}</Text>
             </TouchableOpacity>
           ))}
@@ -177,14 +209,17 @@ export default function SupportTab() {
             keyExtractor={(item: any) => String(item.userId)}
             contentContainerStyle={{ paddingBottom: 20 }}
             renderItem={({ item }: any) => {
-              const last = item.lastMessage;
+              const msgs = item.messages || [];
+              const last = msgs[msgs.length - 1];
               return (
-                <TouchableOpacity style={s.convCard} onPress={() => { setSelectedUser(item); if (item.unread > 0) markAsRead(item.userId); }}>
+                <TouchableOpacity
+                  style={s.convCard}
+                  onPress={() => { setSelectedUser(item); if (item.unread > 0) markAsRead(item.userId); }}>
                   <View style={s.convAvatar}>
-                    <Ionicons name="person" size={20} color="#fff" />
+                    <Text style={s.convAvatarText}>{item.storeName?.charAt(0) || 'ت'}</Text>
                     {item.unread > 0 && (
                       <View style={s.unreadBadge}>
-                        <Text style={s.unreadText}>{item.unread}</Text>
+                        <Text style={s.unreadText}>{item.unread > 99 ? '99+' : item.unread}</Text>
                       </View>
                     )}
                   </View>
@@ -193,16 +228,14 @@ export default function SupportTab() {
                       <Text style={s.convTime}>{last ? formatTime(last.created_at) : ''}</Text>
                       <Text style={s.convName}>{item.storeName}</Text>
                     </View>
-                    <View style={s.convBottom}>
+                    {last ? (
+                      <Text style={[s.convLastMsg, item.unread > 0 && s.convLastMsgBold]} numberOfLines={1}>
+                        {last.from_admin ? '↩ ' : ''}{last.image_url ? '📷 صورة' : last.message}
+                      </Text>
+                    ) : (
                       <Text style={s.convPhone}>{item.phone}</Text>
-                      {last && (
-                        <Text style={s.convLastMsg} numberOfLines={1}>
-                          {last.from_admin ? 'أنت: ' : ''}{last.image_url ? 'صورة' : last.message}
-                        </Text>
-                      )}
-                    </View>
+                    )}
                   </View>
-                  <Ionicons name="chevron-back" size={16} color="#d1d5db" />
                 </TouchableOpacity>
               );
             }}
@@ -212,12 +245,12 @@ export default function SupportTab() {
     );
   }
 
-  // ── نافذة المحادثة ──
-  const msgs = [...(selectedUser.messages || [])];
+  // ── نافذة المحادثة — inverted مثل واتساب ──
+  const msgs = [...(selectedUser.messages || [])].reverse();
 
   return (
     <View style={s.container}>
-      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.chatHeader}>
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.chatHeader}>
         <TouchableOpacity style={s.backBtn} onPress={() => setSelectedUser(null)}>
           <Ionicons name="arrow-forward" size={20} color="#fff" />
         </TouchableOpacity>
@@ -228,52 +261,34 @@ export default function SupportTab() {
         <TouchableOpacity
           style={[s.blockBtn, selectedUser.isBlocked && s.unblockBtn]}
           onPress={() => confirmBlock(selectedUser)}>
-          <Ionicons name={selectedUser.isBlocked ? 'lock-open-outline' : 'ban-outline'} size={16}
-            color={selectedUser.isBlocked ? '#4ade80' : '#fca5a5'} />
+          <Ionicons
+            name={selectedUser.isBlocked ? 'lock-open-outline' : 'ban-outline'}
+            size={16}
+            color={selectedUser.isBlocked ? '#4ade80' : '#fca5a5'}
+          />
         </TouchableOpacity>
       </LinearGradient>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
-          ref={flatListRef}
           data={msgs}
           keyExtractor={(item: any) => String(item.id)}
+          inverted
           contentContainerStyle={s.messagesList}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>لا توجد رسائل</Text></View>}
-          renderItem={({ item, index }: any) => {
-            const isAdmin = item.from_admin;
-            const prevItem = msgs[index - 1];
-            const showDate = !prevItem || formatDate(item.created_at) !== formatDate(prevItem.created_at);
-            return (
-              <>
-                {showDate && (
-                  <View style={s.dateDivider}>
-                    <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
-                  </View>
-                )}
-                <View style={[s.msgRow, isAdmin ? s.msgRowAdmin : s.msgRowUser]}>
-                  <TouchableOpacity style={{ maxWidth: '75%' }} onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
-                    <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
-                      {item.image_url && (
-                        <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
-                      )}
-                      {!!item.message && (
-                        <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
-                          {item.message}
-                        </Text>
-                      )}
-                      <Text style={[s.bubbleTime, isAdmin ? s.bubbleTimeAdmin : s.bubbleTimeUser]}>
-                        {formatTime(item.created_at)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </>
-            );
-          }}
+          ListEmptyComponent={
+            <View style={s.emptyChat}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#d1d5db" />
+              <Text style={s.emptyText}>لا توجد رسائل</Text>
+            </View>
+          }
+          renderItem={({ item, index }: any) => (
+            <ChatBubble
+              item={item}
+              nextItem={msgs[index + 1]}
+              onLongPress={handleLongPress}
+            />
+          )}
         />
 
         <View style={s.inputRow}>
@@ -307,81 +322,91 @@ export default function SupportTab() {
 }
 
 const s = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#f8fafc' },
-  center:          { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText:       { fontSize: 15, color: '#9ca3af' },
+  container:    { flex: 1, backgroundColor: '#f0f2f5' },
+  center:       { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyText:    { fontSize: 15, color: '#9ca3af' },
 
-  searchBox:       { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+  searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
     marginHorizontal: 14, marginTop: 12, marginBottom: 8, backgroundColor: '#fff',
     borderRadius: 14, paddingHorizontal: 14, height: 44,
     borderWidth: 1.5, borderColor: '#e5e7eb' },
-  searchInput:     { flex: 1, fontSize: 14, color: '#111827' },
+  searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
 
-  sortRow:         { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 14, marginBottom: 10 },
-  sortBtn:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+  sortRow:      { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 14, marginBottom: 10 },
+  sortBtn:      { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  sortBtnActive:   { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  sortText:        { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  sortTextActive:  { color: '#fff' },
+  sortBtnActive:{ backgroundColor: PRIMARY, borderColor: PRIMARY },
+  sortText:     { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  sortTextActive:{ color: '#fff' },
 
-  convCard:        { flexDirection: 'row-reverse', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
-  convAvatar:      { width: 46, height: 46, borderRadius: 23, backgroundColor: PRIMARY,
+  convCard:       { flexDirection: 'row-reverse', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  convAvatar:     { width: 50, height: 50, borderRadius: 25, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  unreadBadge:     { position: 'absolute', top: -2, right: -2, width: 18, height: 18,
-    borderRadius: 9, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' },
-  unreadText:      { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-  convInfo:        { flex: 1, gap: 4 },
-  convTop:         { flexDirection: 'row-reverse', justifyContent: 'space-between' },
-  convName:        { fontSize: 14, fontWeight: 'bold', color: '#111827' },
-  convTime:        { fontSize: 11, color: '#9ca3af' },
-  convBottom:      { gap: 2 },
-  convPhone:       { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
-  convLastMsg:     { fontSize: 12, color: '#6b7280', textAlign: 'right' },
+  convAvatarText: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  unreadBadge:    { position: 'absolute', top: -3, right: -3, minWidth: 20, height: 20,
+    borderRadius: 10, backgroundColor: '#ef4444', justifyContent: 'center',
+    alignItems: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: '#fff' },
+  unreadText:     { fontSize: 10, color: '#fff', fontWeight: 'bold' },
+  convInfo:       { flex: 1, gap: 3 },
+  convTop:        { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  convName:       { fontSize: 14, fontWeight: 'bold', color: '#111827' },
+  convTime:       { fontSize: 11, color: '#9ca3af' },
+  convPhone:      { fontSize: 12, color: '#9ca3af', textAlign: 'right' },
+  convLastMsg:    { fontSize: 13, color: '#6b7280', textAlign: 'right' },
+  convLastMsgBold:{ color: '#111827', fontWeight: '600' },
 
-  chatHeader:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 14 },
-  backBtn:         { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)',
+  chatHeader:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12 },
+  backBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
-  chatHeaderInfo:  { flex: 1 },
-  chatHeaderName:  { fontSize: 15, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  chatHeaderPhone: { fontSize: 12, color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
-  chatHeaderBtns:  { flexDirection: 'row', gap: 8 },
-  blockBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)',
+  chatHeaderInfo: { flex: 1 },
+  chatHeaderName: { fontSize: 15, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  chatHeaderPhone:{ fontSize: 12, color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  blockBtn:       { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center' },
-  unblockBtn:      { backgroundColor: 'rgba(74,222,128,0.2)' },
+  unblockBtn:     { backgroundColor: 'rgba(74,222,128,0.2)' },
 
-  messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
-  dateDivider:     { alignItems: 'center', marginVertical: 12 },
-  dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-  msgRow:          { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-end' },
-  msgRowAdmin:     { justifyContent: 'flex-end' },
-  msgRowUser:      { justifyContent: 'flex-start' },
-  adminAvatar:     { width: 28, height: 28, borderRadius: 9, backgroundColor: PRIMARY,
+  messagesList:   { paddingHorizontal: 12, paddingVertical: 8 },
+  emptyChat:      { flex: 1, alignItems: 'center', paddingTop: 60, gap: 12,
+    transform: [{ scaleY: -1 }] },
+
+  msgRow:         { flexDirection: 'row', marginBottom: 3, alignItems: 'flex-end', gap: 6 },
+  msgRowAdmin:    { justifyContent: 'flex-start' },
+  msgRowUser:     { justifyContent: 'flex-end' },
+
+  userAvatar:     { width: 28, height: 28, borderRadius: 14, backgroundColor: '#9ca3af',
     justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  bubble:          { maxWidth: 280, borderRadius: 18, padding: 12, gap: 4 },
-  bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
-  bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  msgImage:        { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  bubbleText:      { fontSize: 14, lineHeight: 20 },
-  bubbleTextAdmin: { color: '#fff', textAlign: 'right' },
-  bubbleTextUser:  { color: '#111827', textAlign: 'right' },
-  bubbleTime:      { fontSize: 10, textAlign: 'left' },
-  bubbleTimeAdmin: { color: 'rgba(255,255,255,0.7)' },
-  bubbleTimeUser:  { color: '#9ca3af' },
 
-  inputRow:        { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  input:           { flex: 1, backgroundColor: '#f8fafc', borderRadius: 22, paddingHorizontal: 16,
-    paddingVertical: 10, fontSize: 14, color: '#111827', maxHeight: 100,
-    borderWidth: 1.5, borderColor: '#e5e7eb' } as any,
-  imageBtn:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY + '15',
+  bubbleWrap:     { maxWidth: '78%' },
+  bubble:         { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 3 },
+  bubbleAdmin:    { backgroundColor: '#fff', borderBottomLeftRadius: 4,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
+  bubbleUser:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
+
+  msgImage:       { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
+  bubbleText:     { fontSize: 15, lineHeight: 22 },
+  bubbleTextAdmin:{ color: '#111827', textAlign: 'left' },
+  bubbleTextUser: { color: '#fff', textAlign: 'right' },
+  bubbleTime:     { fontSize: 10 },
+  bubbleTimeAdmin:{ color: '#9ca3af', textAlign: 'left' },
+  bubbleTimeUser: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+
+  dateDivider:    { alignItems: 'center', marginVertical: 10 },
+  dateDividerText:{ fontSize: 11, color: '#6b7280', backgroundColor: 'rgba(0,0,0,0.07)',
+    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10, overflow: 'hidden' },
+
+  inputRow:       { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8, paddingBottom: 12,
+    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  input:          { flex: 1, backgroundColor: '#f0f2f5', borderRadius: 22,
+    paddingHorizontal: 16, paddingVertical: 10, fontSize: 14,
+    color: '#111827', maxHeight: 100 } as any,
+  imageBtn:       { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY + '15',
     justifyContent: 'center', alignItems: 'center' },
-  sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
-    justifyContent: 'center', alignItems: 'center' },
-  sendBtnOff:      { backgroundColor: '#d1d5db' },
+  sendBtn:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },
+  sendBtnOff:     { backgroundColor: '#d1d5db', shadowOpacity: 0 },
 });
