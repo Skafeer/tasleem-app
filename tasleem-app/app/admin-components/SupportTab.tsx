@@ -55,9 +55,13 @@ export default function SupportTab() {
 
   // تصفير العداد لما يدخل للمحادثة
   const markAsRead = async (userId: number) => {
+    // حدث الـ cache فوراً بدون انتظار
+    qc.setQueryData(['admin-support'], (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((c: any) => c.userId === userId ? { ...c, unread: 0 } : c);
+    });
     try {
       await api.post(`/api/admin/support/${userId}/read`);
-      qc.invalidateQueries({ queryKey: ['admin-support'] });
     } catch {}
   };
 
@@ -202,7 +206,7 @@ export default function SupportTab() {
   }
 
   // ── نافذة المحادثة ──
-  const msgs = [...(selectedUser.messages || [])].reverse();
+  const msgs = [...(selectedUser.messages || [])];
 
   return (
     <View style={s.container}>
@@ -225,14 +229,16 @@ export default function SupportTab() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           ref={flatListRef}
-          data={msgs}
+          data={[...msgs].reverse()}
+          inverted
           keyExtractor={(item: any) => String(item.id)}
           contentContainerStyle={s.messagesList}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>لا توجد رسائل</Text></View>}
           renderItem={({ item, index }: any) => {
             const isAdmin = item.from_admin;
-            const nextItem = msgs[index + 1];
+            const reversedMsgs = [...msgs].reverse();
+            const nextItem = reversedMsgs[index + 1];
             const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
             return (
               <>
