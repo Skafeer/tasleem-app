@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
@@ -39,7 +40,6 @@ const TAB_COLORS: any = {
   returned:  { bg: '#fff7ed', text: '#f97316', border: '#f97316' },
 };
 
-// الحالات التي يُسمح فيها بالإلغاء
 const CANCELLABLE = ['pending', 'processing'];
 
 export default function OrdersScreen() {
@@ -51,8 +51,10 @@ export default function OrdersScreen() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
-      const { data } = await api.get('/api/orders');
-      return Array.isArray(data) ? data : [];
+      const { data } = await api.get('/api/orders?limit=9999&page=1');
+      // يتعامل مع pagination response و array عادي
+      const result = data?.data || data;
+      return Array.isArray(result) ? result : [];
     },
   });
 
@@ -85,13 +87,11 @@ export default function OrdersScreen() {
       const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tB - tA;
     });
-
     return sorted.filter((o: any) => {
       const matchSearch =
         o.id.toString().includes(search) ||
         o.customerName?.toLowerCase().includes(search.toLowerCase()) ||
         o.customerPhone?.includes(search);
-
       if (tab === 'active')
         return matchSearch && ['pending', 'processing', 'preparing', 'shipping'].includes(o.status);
       return matchSearch && o.status === tab;
@@ -101,42 +101,30 @@ export default function OrdersScreen() {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const dt = new Date(dateStr);
-    const date = dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
-    const time = dt.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-    return `${date} — ${time}`;
+    return dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const filtered = getFiltered(activeTab);
+  const activeCount = getFiltered('active').length;
 
   const renderOrder = ({ item: o }: any) => {
-    const status  = STATUS[o.status] || STATUS.pending;
+    const status = STATUS[o.status] || STATUS.pending;
     const canCancel = CANCELLABLE.includes(o.status);
 
     return (
       <View style={s.orderCard}>
-
-        {/* الصف العلوي: رقم الطلب + الحالة */}
-        <TouchableOpacity
-          style={s.cardPressable}
-          onPress={() => router.push(`/order-details/${o.id}`)}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={s.cardPressable} onPress={() => router.push(`/order-details/${o.id}`)} activeOpacity={0.7}>
           <View style={s.cardTop}>
-            {/* أيقونة الحالة */}
             <View style={[s.orderIcon, { backgroundColor: status.bg }]}>
               <Ionicons name={status.icon} size={22} color={status.color} />
             </View>
-
             <View style={s.orderInfo}>
-              {/* رقم الطلب + badge الحالة */}
               <View style={s.orderTopRow}>
                 <View style={[s.badge, { backgroundColor: status.bg }]}>
                   <Text style={[s.badgeText, { color: status.color }]}>{status.label}</Text>
                 </View>
                 <Text style={s.orderId}>طلب #{o.id}</Text>
               </View>
-
-              {/* اسم الزبون + المحافظة */}
               {(o.customerName || o.province) && (
                 <View style={s.customerRow}>
                   {o.province ? (
@@ -148,14 +136,10 @@ export default function OrdersScreen() {
                   <Text style={s.customerName} numberOfLines={1}>{o.customerName}</Text>
                 </View>
               )}
-
-              {/* التاريخ والوقت */}
               <View style={s.dateRow}>
-                <Ionicons name="time-outline" size={11} color="#9ca3af" />
+                <Ionicons name="calendar-outline" size={11} color="#9ca3af" />
                 <Text style={s.dateText}>{formatDate(o.createdAt)}</Text>
               </View>
-
-              {/* المبلغ والربح */}
               <View style={s.amountRow}>
                 {o.totalProfit != null && (
                   <View style={s.profitTag}>
@@ -163,53 +147,51 @@ export default function OrdersScreen() {
                     <Text style={s.profitText}>ربح: {o.totalProfit?.toLocaleString()} د.ع</Text>
                   </View>
                 )}
-                <Text style={s.orderAmount}>{o.totalAmount?.toLocaleString()} د.ع</Text>
+                <Text style={s.orderAmount}>{o.totalAmount?.toLocaleString()} <Text style={{ fontSize: 11, color: '#9ca3af' }}>د.ع</Text></Text>
               </View>
             </View>
           </View>
         </TouchableOpacity>
 
-        {/* زر الإلغاء */}
         <View style={s.cardFooter}>
           <TouchableOpacity
             style={[s.cancelBtn, !canCancel && s.cancelBtnDisabled]}
             onPress={() => canCancel && confirmCancel(o)}
             disabled={!canCancel || cancelOrder.isPending}
-            activeOpacity={canCancel ? 0.7 : 1}
-          >
-            <Ionicons
-              name="close-circle-outline"
-              size={15}
-              color={canCancel ? '#ef4444' : '#d1d5db'}
-            />
+            activeOpacity={canCancel ? 0.7 : 1}>
+            <Ionicons name="close-circle-outline" size={15} color={canCancel ? '#ef4444' : '#d1d5db'} />
             <Text style={[s.cancelBtnText, !canCancel && s.cancelBtnTextDisabled]}>
               {canCancel ? 'إلغاء الطلب' : 'لا يمكن الإلغاء'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={s.detailsBtn}
-            onPress={() => router.push(`/order-details/${o.id}`)}
-          >
+          <TouchableOpacity style={s.detailsBtn} onPress={() => router.push(`/order-details/${o.id}`)}>
             <Ionicons name="eye-outline" size={15} color={PRIMARY} />
             <Text style={s.detailsBtnText}>التفاصيل</Text>
           </TouchableOpacity>
         </View>
-
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
       {/* Header */}
-      <View style={s.header}>
-        <Text style={s.title}>طلباتي</Text>
-        <Text style={s.subtitle}>تتبع حالة طلباتك وأرباحك</Text>
-      </View>
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        <View style={s.headerContent}>
+          <View>
+            <Text style={s.headerSub}>تتبع حالة طلباتك وأرباحك</Text>
+            <Text style={s.headerTitle}>طلباتي</Text>
+          </View>
+          {activeCount > 0 && (
+            <View style={s.activeCountBadge}>
+              <Text style={s.activeCountText}>{activeCount}</Text>
+              <Text style={s.activeCountLabel}>نشط</Text>
+            </View>
+          )}
+        </View>
 
-      {/* Search */}
-      <View style={s.searchWrap}>
+        {/* Search */}
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
@@ -226,7 +208,7 @@ export default function OrdersScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Tabs */}
       <View style={s.tabsWrap}>
@@ -243,8 +225,7 @@ export default function OrdersScreen() {
             return (
               <TouchableOpacity
                 style={[s.tabBtn, isActive && { backgroundColor: colors.bg, borderColor: colors.border }]}
-                onPress={() => setActiveTab(tab.key)}
-              >
+                onPress={() => setActiveTab(tab.key)}>
                 <Ionicons name={tab.icon as any} size={13} color={isActive ? colors.text : '#9ca3af'} />
                 <Text style={[s.tabText, isActive && { color: colors.text }]}>{tab.label}</Text>
                 {count > 0 && (
@@ -260,7 +241,7 @@ export default function OrdersScreen() {
 
       {/* List */}
       {isLoading ? (
-        <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
+        <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
       ) : (
         <FlatList
           data={filtered}
@@ -269,30 +250,36 @@ export default function OrdersScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           ListEmptyComponent={
             <View style={s.emptyBox}>
-              <Ionicons name="cube-outline" size={52} color="#e5e7eb" />
+              <View style={s.emptyIcon}>
+                <Ionicons name="cube-outline" size={40} color={PRIMARY} />
+              </View>
+              <Text style={s.emptyTitle}>لا توجد طلبات</Text>
               <Text style={s.emptyText}>لا توجد طلبات في هذه القائمة</Text>
             </View>
           }
           showsVerticalScrollIndicator={false}
         />
       )}
-
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container:  { flex: 1, backgroundColor: '#f8fafc' },
+  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
 
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  title:    { fontSize: 26, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  subtitle: { fontSize: 13, color: '#9ca3af', textAlign: 'right', marginTop: 2 },
+  header:        { paddingHorizontal: 16, paddingBottom: 16 },
+  headerContent: { flexDirection: 'row-reverse', justifyContent: 'space-between',
+    alignItems: 'flex-start', paddingTop: 12, marginBottom: 14 },
+  headerTitle:   { fontSize: 26, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  headerSub:     { fontSize: 12, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginBottom: 2 },
+  activeCountBadge: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
+  activeCountText:  { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  activeCountLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },
 
-  searchWrap: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff' },
-  searchBox:  { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f9fafb',
-    borderRadius: 14, paddingHorizontal: 12, height: 44, gap: 8,
-    borderWidth: 1.5, borderColor: '#e5e7eb' },
+  searchBox:   { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 14, paddingHorizontal: 12, height: 44, gap: 8 },
   searchInput: { flex: 1, fontSize: 13, color: '#111827' },
 
   tabsWrap: { paddingVertical: 10, backgroundColor: '#fff',
@@ -300,21 +287,17 @@ const s = StyleSheet.create({
   tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
     backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  tabText:  { fontSize: 12, fontWeight: '700', color: '#9ca3af' },
-  tabBadge: { backgroundColor: '#e5e7eb', borderRadius: 8,
-    paddingHorizontal: 5, paddingVertical: 1 },
+  tabText:      { fontSize: 12, fontWeight: '700', color: '#9ca3af' },
+  tabBadge:     { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
   tabBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#6b7280' },
 
   orderCard: { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' },
-
   cardPressable: { padding: 14 },
-  cardTop: { flexDirection: 'row-reverse', gap: 12, alignItems: 'flex-start' },
+  cardTop:       { flexDirection: 'row-reverse', gap: 12, alignItems: 'flex-start' },
 
-  orderIcon: { width: 46, height: 46, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-
+  orderIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   orderInfo:   { flex: 1, gap: 6 },
   orderTopRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   orderId:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
@@ -327,30 +310,31 @@ const s = StyleSheet.create({
     backgroundColor: '#f3f4f6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   provinceText: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
 
-  dateRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  dateRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   dateText: { fontSize: 11, color: '#9ca3af' },
 
-  amountRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  orderAmount: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
-  profitTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
+  amountRow:   { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  orderAmount: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  profitTag:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
     backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  profitText: { fontSize: 11, color: '#10b981', fontWeight: '700' },
+  profitText:  { fontSize: 11, color: '#10b981', fontWeight: '700' },
 
   cardFooter: { flexDirection: 'row-reverse', borderTopWidth: 1,
     borderTopColor: '#f3f4f6', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-
-  cancelBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+  cancelBtn:            { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
     justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
     backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
-  cancelBtnDisabled: { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' },
-  cancelBtnText:     { fontSize: 12, fontWeight: '700', color: '#ef4444' },
-  cancelBtnTextDisabled: { color: '#d1d5db' },
-
-  detailsBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+  cancelBtnDisabled:    { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' },
+  cancelBtnText:        { fontSize: 12, fontWeight: '700', color: '#ef4444' },
+  cancelBtnTextDisabled:{ color: '#d1d5db' },
+  detailsBtn:     { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
     justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
     backgroundColor: PRIMARY + '10', borderWidth: 1, borderColor: PRIMARY + '30' },
   detailsBtnText: { fontSize: 12, fontWeight: '700', color: PRIMARY },
 
-  emptyBox:  { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  emptyText: { fontSize: 14, color: '#9ca3af', fontWeight: '500' },
+  emptyBox:   { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  emptyIcon:  { width: 80, height: 80, borderRadius: 24, backgroundColor: `${PRIMARY}15`,
+    justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151' },
+  emptyText:  { fontSize: 13, color: '#9ca3af' },
 });
