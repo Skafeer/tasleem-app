@@ -102,7 +102,13 @@ export default function SupportTab() {
     mutationFn: async ({ userId, block }: { userId: number; block: boolean }) => {
       await api.post(`/api/admin/support/${userId}/block`, { block });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-support'] }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-support'] });
+      // حدث selectedUser فوراً
+      if (selectedUser && selectedUser.userId === vars.userId) {
+        setSelectedUser((prev: any) => ({ ...prev, isBlocked: vars.block }));
+      }
+    },
   });
 
   const markAsRead = async (userId: number) => {
@@ -130,8 +136,14 @@ export default function SupportTab() {
     try {
       const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
       const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
-      sendReply.mutate({ userId: selectedUser.userId, message: '', imageUrl: data.url });
-    } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
+      if (data?.url) {
+        sendReply.mutate({ userId: selectedUser.userId, message: '', imageUrl: data.url });
+      } else {
+        Alert.alert('خطأ', 'لم يتم الحصول على رابط الصورة');
+      }
+    } catch (e: any) { 
+      Alert.alert('خطأ', e?.response?.data?.message || 'فشل رفع الصورة'); 
+    }
     finally { setUploadingImage(false); }
   };
 
@@ -161,9 +173,13 @@ export default function SupportTab() {
         if (sort === 'most') return (b.messages?.length || 0) - (a.messages?.length || 0);
         const getTime = (conv: any) => {
           const msgs = conv.messages || [];
-          return msgs.length > 0 ? new Date(msgs[msgs.length - 1].created_at).getTime() : 0;
+          if (msgs.length > 0) {
+            // آخر رسالة في الـ array هي الأحدث
+            return new Date(msgs[msgs.length - 1].created_at).getTime();
+          }
+          return 0;
         };
-        return getTime(b) - getTime(a);
+        return getTime(b) - getTime(a); // الأحدث أولاً
       });
   }, [convList, search, sort]);
 
@@ -246,6 +262,9 @@ export default function SupportTab() {
   }
 
   // ── نافذة المحادثة — inverted مثل واتساب ──
+  // inverted يعكس العرض، فنحتاج الـ data من الأحدث للأقدم
+  // الـ messages من الـ API مرتبة من الأقدم للأحدث
+  // بعد reverse: الأحدث أول → inverted يعرضها في الأسفل ✓
   const msgs = [...(selectedUser.messages || [])].reverse();
 
   return (
