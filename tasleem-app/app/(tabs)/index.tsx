@@ -7,10 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
-const PRIMARY       = '#0c6679';
+const PRIMARY = '#0c6679';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -81,24 +82,28 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="cart-outline" size={22} color={PRIMARY} />
-        </TouchableOpacity>
+      {/* ── Header Gradient ── */}
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        {/* شعار — خلفية صفراء بارزة */}
+        <View style={s.logoBox}>
+          <Image source={require('../../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
+        </View>
+
+        {/* نص الترحيب */}
         <View style={s.headerCenter}>
           <Text style={s.greeting} numberOfLines={1}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
           <Text style={s.subtitle}>{filtered.length} منتج متاح</Text>
         </View>
-        {/* شعار التطبيق */}
-        <View style={s.logo}>
-          <Image source={require('../../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
-        </View>
-      </View>
 
-      {/* Search */}
+        {/* زر الكارت */}
+        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
+          <Ionicons name="cart-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
+
+      {/* ── Search ── */}
       <View style={s.searchBox}>
         <Ionicons name="search-outline" size={18} color="#9ca3af" />
         <TextInput style={s.searchInput} placeholder="ابحث عن منتج..."
@@ -197,33 +202,61 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
+
+  // ── Header ──
+  header:       { flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   headerCenter: { flex: 1, alignItems: 'center' },
-  greeting:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  subtitle:     { fontSize: 12, color: '#9ca3af', marginTop: 1 },
-  logo:         { width: 52, height: 52, borderRadius: 14, backgroundColor: '#f0f9fb', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  logoImg:      { width: 46, height: 46 },
-  cartBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-  searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
+  greeting:     { fontSize: 15, fontWeight: 'bold', color: '#fff' },
+  subtitle:     { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  cartBtn:      { width: 42, height: 42, borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center' },
+
+  // شعار — خلفية صفراء بارزة مع توهج
+  logoBox:      { width: 52, height: 52, borderRadius: 16,
+    backgroundColor: '#f5c518',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#f5c518', shadowOpacity: 0.8,
+    shadowRadius: 12, shadowOffset: { width: 0, height: 0 },
+    elevation: 8 },
+  logoImg:      { width: 40, height: 40, tintColor: '#fff' },
+
+  // ── Search ──
+  searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
+    marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14,
+    height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
   searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
+
+  // ── Categories ──
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList:           { maxHeight: 44 },
   catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
-  catBtn:            { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
+  catBtn:            { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
   catBtnActive:      { backgroundColor: PRIMARY, borderColor: PRIMARY },
   catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   catTextActive:     { color: '#fff' },
-  card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+
+  // ── Cards ──
+  card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   imgBox:        { position: 'relative', overflow: 'hidden' },
   img:           { width: '100%', height: '100%' },
   imgPlaceholder:{ backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  renewBadge:    { position: 'absolute', top: 8, right: 8, backgroundColor: PRIMARY, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  renewBadge:    { position: 'absolute', top: 8, right: 8, backgroundColor: PRIMARY,
+    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   renewText:     { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ef4444',
+    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  favBtn:       { position: 'absolute', top: 8, left: 8, width: 32, height: 32, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
-  imgCount:      { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  favBtn:        { position: 'absolute', top: 8, left: 8, width: 32, height: 32,
+    borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center', alignItems: 'center' },
+  imgCount:      { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 3 },
   imgCountText:  { fontSize: 10, color: '#fff', fontWeight: 'bold' },
   cardBody:      { padding: 10, gap: 6 },
   productName:   { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
@@ -231,7 +264,8 @@ const s = StyleSheet.create({
   price:         { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
   oldPrice:      { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
   bottomRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  catPill:       { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
+  catPill:       { backgroundColor: PRIMARY + '12', borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
   catPillText:   { fontSize: 10, color: PRIMARY, fontWeight: '600' },
   stockText:     { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
   empty:         { alignItems: 'center', paddingTop: 60, gap: 12 },

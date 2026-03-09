@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
@@ -53,11 +54,8 @@ export default function WalletScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      setIsOpen(false);
-      setAmount('');
-      setCardNumber('');
-      setAmountError('');
-      setCardError('');
+      setIsOpen(false); setAmount(''); setCardNumber('');
+      setAmountError(''); setCardError('');
       Alert.alert('تم إرسال الطلب', 'سيتم مراجعة طلب السحب قريباً');
     },
     onError: (e: any) => {
@@ -104,39 +102,37 @@ export default function WalletScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.title}>المحفظة المالية</Text>
-      </View>
-
-      {/* Balance Card */}
-      <View style={s.balanceCard}>
-        <View style={s.balanceGlow} />
-        <View style={s.balanceTop}>
-          <Ionicons name="wallet-outline" size={32} color="rgba(255,255,255,0.15)" />
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={s.balanceLabel}>الرصيد المتاح للسحب</Text>
-            <Text style={s.balanceVal}>
-              {(user?.balance || 0).toLocaleString()}
-              <Text style={s.balanceUnit}> د.ع</Text>
-            </Text>
+      {/* ── Header Gradient ── */}
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        {/* بطاقة الرصيد داخل الهيدر */}
+        <View style={s.balanceCard}>
+          <View style={s.balanceRow}>
+            <View style={s.balanceIconBox}>
+              <Ionicons name="wallet" size={22} color="#fff" />
+            </View>
+            <View style={{ alignItems: 'flex-end', flex: 1 }}>
+              <Text style={s.balanceLabel}>الرصيد المتاح للسحب</Text>
+              <Text style={s.balanceVal}>
+                {(user?.balance || 0).toLocaleString()}
+                <Text style={s.balanceUnit}> د.ع</Text>
+              </Text>
+            </View>
           </View>
+          <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
+            <Ionicons name="arrow-up-circle-outline" size={20} color={PRIMARY} />
+            <Text style={s.withdrawBtnText}>سحب رصيد</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
-          <Ionicons name="arrow-up-circle-outline" size={20} color="#fff" />
-          <Text style={s.withdrawBtnText}>سحب رصيد</Text>
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
-      {/* History Title */}
+      {/* ── سجل السحوبات ── */}
       <View style={s.secHead}>
         <Ionicons name="time-outline" size={18} color={PRIMARY} />
         <Text style={s.secTitle}>سجل السحوبات</Text>
       </View>
 
-      {/* List */}
       {isLoading ? (
         <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />
       ) : (
@@ -147,8 +143,11 @@ export default function WalletScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={s.emptyBox}>
-              <Ionicons name="wallet-outline" size={48} color="#e5e7eb" />
-              <Text style={s.emptyText}>لا توجد سحوبات بعد</Text>
+              <View style={s.emptyIconCircle}>
+                <Ionicons name="wallet-outline" size={36} color="#9ca3af" />
+              </View>
+              <Text style={s.emptyTitle}>لا توجد سحوبات بعد</Text>
+              <Text style={s.emptyText}>اضغط "سحب رصيد" لتقديم طلبك</Text>
             </View>
           }
           renderItem={({ item }: any) => {
@@ -174,15 +173,16 @@ export default function WalletScreen() {
         />
       )}
 
-      {/* Withdraw Modal */}
+      {/* ── Modal السحب ── */}
       <Modal visible={isOpen} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
+            <View style={s.modalHandle} />
             <Text style={s.modalTitle}>طلب سحب جديد</Text>
 
             <View style={s.availableBox}>
               <Text style={s.availableVal}>{(user?.balance || 0).toLocaleString()} د.ع</Text>
-              <Text style={s.availableLabel}>الرصيد المتاح:</Text>
+              <Text style={s.availableLabel}>الرصيد المتاح</Text>
             </View>
 
             <View>
@@ -212,12 +212,10 @@ export default function WalletScreen() {
 
             <TouchableOpacity
               style={[s.confirmBtn, createWithdrawal.isPending && { opacity: 0.7 }]}
-              onPress={handleWithdraw} disabled={createWithdrawal.isPending}
-            >
+              onPress={handleWithdraw} disabled={createWithdrawal.isPending}>
               {createWithdrawal.isPending
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={s.confirmText}>تأكيد السحب</Text>
-              }
+                : <Text style={s.confirmText}>تأكيد السحب</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={s.cancelBtn} onPress={() => {
               setIsOpen(false); setAmountError(''); setCardError('');
@@ -233,41 +231,70 @@ export default function WalletScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: { paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  balanceCard: { margin: 16, backgroundColor: '#1f2937', borderRadius: 24, padding: 24, overflow: 'hidden', shadowColor: '#111827', shadowOpacity: 0.25, shadowRadius: 16, elevation: 6 },
-  balanceGlow: { position: 'absolute', top: -80, right: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(255,255,255,0.04)' },
-  balanceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  balanceLabel: { fontSize: 13, color: '#9ca3af', textAlign: 'right', marginBottom: 8 },
-  balanceVal: { fontSize: 40, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  balanceUnit: { fontSize: 20, color: '#6b7280' },
-  withdrawBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 48, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4 },
-  withdrawBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  secHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  secTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  emptyBox: { alignItems: 'center', paddingVertical: 48, gap: 12 },
-  emptyText: { fontSize: 14, color: '#9ca3af' },
-  withdrawCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  wIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  wInfo: { flex: 1, alignItems: 'flex-end', gap: 2 },
-  wAmount: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  wMeta:  { fontSize: 12, color: '#9ca3af' },
-  wDate:  { fontSize: 11, color: '#9ca3af' },
-  badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  badgeText: { fontSize: 11, fontWeight: 'bold' },
+  container:    { flex: 1, backgroundColor: '#f8fafc' },
+
+  // ── Header ──
+  header:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+
+  // بطاقة الرصيد داخل الهيدر
+  balanceCard:  { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20,
+    padding: 18, gap: 16 },
+  balanceRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  balanceIconBox:{ width: 46, height: 46, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center' },
+  balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
+  balanceVal:   { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
+  balanceUnit:  { fontSize: 18, color: 'rgba(255,255,255,0.8)' },
+  withdrawBtn:  { backgroundColor: '#fff', borderRadius: 14, height: 48,
+    flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  withdrawBtnText: { color: PRIMARY, fontWeight: 'bold', fontSize: 15 },
+
+  // ── Section ──
+  secHead:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 14 },
+  secTitle:     { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+
+  // ── Empty ──
+  emptyBox:     { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40,
+    backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  emptyTitle:   { fontSize: 15, fontWeight: 'bold', color: '#374151' },
+  emptyText:    { fontSize: 13, color: '#9ca3af' },
+
+  // ── بطاقة سحب ──
+  withdrawCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14,
+    flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 12,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  wIcon:        { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  wInfo:        { flex: 1, alignItems: 'flex-end', gap: 2 },
+  wAmount:      { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  wMeta:        { fontSize: 12, color: '#9ca3af' },
+  wDate:        { fontSize: 11, color: '#9ca3af' },
+  badge:        { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  badgeText:    { fontSize: 11, fontWeight: 'bold' },
+
+  // ── Modal ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 16 },
-  availableBox: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 14, flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#dbeafe' },
-  availableLabel: { fontSize: 13, color: '#2563eb' },
-  availableVal: { fontSize: 16, fontWeight: 'bold', color: '#2563eb' },
-  label: { fontSize: 13, fontWeight: '500', color: '#374151', textAlign: 'right', marginBottom: 8, marginTop: 12 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 14, fontSize: 15, color: '#111827', backgroundColor: '#f9fafb' },
-  inputError: { borderColor: '#dc2626', borderWidth: 1.5 },
-  errorText: { color: '#dc2626', fontSize: 12, marginTop: 4, marginRight: 4, textAlign: 'right' },
-  confirmBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 50, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
-  confirmText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  cancelBtn: { height: 44, justifyContent: 'center', alignItems: 'center' },
-  cancelText: { color: '#9ca3af', fontSize: 14 },
+  modalCard:    { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: 40 },
+  modalHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb',
+    alignSelf: 'center', marginBottom: 16 },
+  modalTitle:   { fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 16 },
+  availableBox: { backgroundColor: PRIMARY + '10', borderRadius: 14, padding: 14,
+    flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 16, borderWidth: 1, borderColor: PRIMARY + '25' },
+  availableLabel: { fontSize: 13, color: PRIMARY },
+  availableVal:   { fontSize: 16, fontWeight: 'bold', color: PRIMARY },
+  label:        { fontSize: 13, fontWeight: '500', color: '#374151', textAlign: 'right',
+    marginBottom: 8, marginTop: 12 },
+  input:        { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 14,
+    fontSize: 15, color: '#111827', backgroundColor: '#f9fafb' },
+  inputError:   { borderColor: '#dc2626', borderWidth: 1.5 },
+  errorText:    { color: '#dc2626', fontSize: 12, marginTop: 4, marginRight: 4, textAlign: 'right' },
+  confirmBtn:   { backgroundColor: PRIMARY, borderRadius: 14, height: 50,
+    justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  confirmText:  { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  cancelBtn:    { height: 44, justifyContent: 'center', alignItems: 'center' },
+  cancelText:   { color: '#9ca3af', fontSize: 14 },
 });

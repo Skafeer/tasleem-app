@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import api from '../src/lib/api';
@@ -32,25 +33,23 @@ export default function FavoritesScreen() {
   });
 
   const favorites = (allProducts as any[]).filter((p: any) => (favoriteIds as number[]).includes(p.id));
-
   const isLoading = loadingIds || loadingProducts;
-
   const getImages = (p: any) => p.images ? p.images.split(',').filter(Boolean) : p.imageUrl ? [p.imageUrl] : [];
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* هيدر */}
-      <View style={s.header}>
+      {/* ── Header Gradient ── */}
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-forward" size={22} color="#111827" />
+          <Ionicons name="arrow-forward" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>المنتجات المفضلة</Text>
         <View style={s.favCountBox}>
-          <Ionicons name="heart" size={14} color="#ef4444" />
+          <Ionicons name="heart" size={13} color="#fff" />
           <Text style={s.favCount}>{favorites.length}</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {isLoading ? (
         <View style={s.center}>
@@ -59,10 +58,10 @@ export default function FavoritesScreen() {
       ) : favorites.length === 0 ? (
         <View style={s.empty}>
           <View style={s.emptyIconBox}>
-            <Ionicons name="heart-outline" size={42} color="#9ca3af" />
+            <Ionicons name="heart-outline" size={42} color={PRIMARY} />
           </View>
           <Text style={s.emptyTitle}>لا توجد منتجات مفضلة</Text>
-          <Text style={s.emptyText}>اضغط على ايقونة القلب على أي منتج لحفظه هنا</Text>
+          <Text style={s.emptyText}>اضغط على أيقونة القلب على أي منتج لحفظه هنا</Text>
           <TouchableOpacity style={s.browseBtn} onPress={() => router.push('/')}>
             <Ionicons name="cube-outline" size={16} color="#fff" />
             <Text style={s.browseBtnText}>تصفح المنتجات</Text>
@@ -94,10 +93,7 @@ export default function FavoritesScreen() {
                       <Text style={s.discountText}>خصم {p.discount}%</Text>
                     </View>
                   )}
-                  {/* زر حذف من المفضلة */}
-                  <TouchableOpacity
-                    style={s.favBtn}
-                    onPress={() => removeFav.mutate(p.id)}>
+                  <TouchableOpacity style={s.favBtn} onPress={() => removeFav.mutate(p.id)}>
                     <Ionicons name="heart" size={18} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
@@ -122,29 +118,37 @@ export default function FavoritesScreen() {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
-  header:       { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14,
-    paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 10 },
-  backBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: '#f3f4f6',
+
+  // ── Header ──
+  header:       { flexDirection: 'row-reverse', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
+  backBtn:      { width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
-  headerTitle:  { flex: 1, fontSize: 17, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
+  headerTitle:  { flex: 1, fontSize: 17, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
   favCountBox:  { flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  favCount:     { fontSize: 13, fontWeight: 'bold', color: '#ef4444' },
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 5 },
+  favCount:     { fontSize: 13, fontWeight: 'bold', color: '#fff' },
 
   center:       { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
-  emptyIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#fee2e2',
+  // ── Empty ──
+  empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30 },
+  emptyIconBox: { width: 90, height: 90, borderRadius: 45,
+    backgroundColor: PRIMARY + '12',
     justifyContent: 'center', alignItems: 'center' },
   emptyTitle:   { fontSize: 17, fontWeight: 'bold', color: '#374151', textAlign: 'center' },
   emptyText:    { fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 20 },
   browseBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
+    backgroundColor: PRIMARY, borderRadius: 14,
+    paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
   browseBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
   list:         { padding: 14, gap: 12 },
   row:          { justifyContent: 'space-between', marginBottom: 12 },
 
+  // ── Cards ──
   card:         { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   imgBox:       { position: 'relative', overflow: 'hidden' },
@@ -153,8 +157,9 @@ const s = StyleSheet.create({
   discountBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444',
     borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  favBtn:       { position: 'absolute', top: 8, left: 8, width: 32, height: 32, borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
+  favBtn:       { position: 'absolute', top: 8, left: 8, width: 32, height: 32,
+    borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center', alignItems: 'center' },
   cardBody:     { padding: 10, gap: 6 },
   productName:  { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
   priceRow:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
