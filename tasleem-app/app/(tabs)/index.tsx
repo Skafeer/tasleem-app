@@ -84,20 +84,18 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header Gradient ── */}
+      {/* ── Header Gradient — نفس ترتيب البروفايل ── */}
       <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
-        {/* شعار — خلفية صفراء بارزة */}
-        <View style={s.logoBox}>
-          <Image source={require('../../assets/logo.png')} style={s.logoImg} resizeMode="contain" />
-        </View>
+        {/* الشعار يمين — بدون خلفية مثل البروفايل */}
+        <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
 
-        {/* نص الترحيب */}
+        {/* نص الترحيب وسط */}
         <View style={s.headerCenter}>
           <Text style={s.greeting} numberOfLines={1}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
           <Text style={s.subtitle}>{filtered.length} منتج متاح</Text>
         </View>
 
-        {/* زر الكارت */}
+        {/* زر الكارت يسار */}
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
           <Ionicons name="cart-outline" size={22} color="#fff" />
         </TouchableOpacity>
@@ -213,14 +211,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
 
-  // شعار — خلفية صفراء بارزة مع توهج
-  logoBox:      { width: 52, height: 52, borderRadius: 16,
-    backgroundColor: '#f5c518',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#f5c518', shadowOpacity: 0.8,
-    shadowRadius: 12, shadowOffset: { width: 0, height: 0 },
-    elevation: 8 },
-  logoImg:      { width: 40, height: 40, tintColor: '#fff' },
+  // شعار — مثل البروفايل بدون خلفية
+  headerLogo:   { width: 48, height: 48, borderRadius: 0 },
 
   // ── Search ──
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',

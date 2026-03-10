@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, Image, ScrollView,
   TouchableOpacity, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -136,9 +136,18 @@ export default function OrderDetailsScreen() {
 
           {order.items?.map((item: any, i: number) => (
             <View key={item.id} style={[s.productRow, i === order.items.length - 1 && { borderBottomWidth: 0 }]}>
-              <View style={s.productIcon}>
-                <Ionicons name="cube-outline" size={22} color={PRIMARY} />
-              </View>
+              {/* صورة المنتج */}
+              {item.product?.images || item.product?.imageUrl ? (
+                <Image
+                  source={{ uri: (item.product.images?.split(',')[0] || item.product.imageUrl) }}
+                  style={s.productImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={s.productIcon}>
+                  <Ionicons name="cube-outline" size={22} color={PRIMARY} />
+                </View>
+              )}
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={s.productName}>{item.product?.name || 'منتج'}</Text>
                 <Text style={s.productMeta}>
@@ -228,7 +237,8 @@ const s = StyleSheet.create({
 
   productRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 12,
     paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  productIcon:  { width: 44, height: 44, borderRadius: 12,
+  productImg:   { width: 56, height: 56, borderRadius: 12 },
+  productIcon:  { width: 56, height: 56, borderRadius: 12,
     backgroundColor: `${PRIMARY}12`, justifyContent: 'center', alignItems: 'center' },
   productName:  { fontSize: 13, fontWeight: 'bold', color: '#111827', marginBottom: 3 },
   productMeta:  { fontSize: 12, color: '#9ca3af' },

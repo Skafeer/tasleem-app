@@ -32,43 +32,47 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: '#9ca3af',
         tabBarStyle: {
           backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#f3f4f6',
+          borderTopWidth: 0,
           height: 64 + insets.bottom,
           paddingBottom: 10 + insets.bottom,
           paddingTop: 8,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -3 },
+          elevation: 12,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
       <Tabs.Screen name="index" options={{
         title: 'الرئيسية',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'storefront' : 'storefront-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="orders" options={{
         title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'receipt' : 'receipt-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'grid' : 'grid-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={24} color={color} />
         ),
         href: isAdmin ? '/(tabs)/admin' : null,
       }} />
       <Tabs.Screen name="wallet" options={{
         title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
         ),
       }} />
     </Tabs>

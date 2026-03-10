@@ -50,6 +50,8 @@ export default function OrdersScreen() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders'],
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data } = await api.get('/api/orders?limit=9999&page=1');
       // يتعامل مع pagination response و array عادي
