@@ -47,32 +47,32 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{
         title: 'الرئيسية',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'storefront' : 'storefront-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="orders" options={{
         title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
         ),
         href: isAdmin ? '/(tabs)/admin' : null,
       }} />
       <Tabs.Screen name="wallet" options={{
         title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'cash' : 'cash-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
         ),
       }} />
     </Tabs>
