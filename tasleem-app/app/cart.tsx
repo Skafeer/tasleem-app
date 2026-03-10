@@ -47,22 +47,26 @@ export default function CartScreen() {
   const subtotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
+    <SafeAreaView style={s.container} edges={['top']}>
+      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.header}>
+        <TouchableOpacity onPress={clearCart} disabled={cart.length === 0} style={s.trashBtn}>
+          <Ionicons name="trash-outline" size={20} color={cart.length ? "#fca5a5" : "rgba(255,255,255,0.3)"} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>السلة ({cart.length})</Text>
-        <TouchableOpacity onPress={clearCart} disabled={cart.length === 0}>
-          <Ionicons name="trash-outline" size={22} color={cart.length ? "#ef4444" : "#d1d5db"} />
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="arrow-forward" size={22} color="#fff" />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {cart.length === 0 ? (
         <View style={s.emptyBox}>
-          <Ionicons name="cart-outline" size={80} color="#d1d5db" />
-          <Text style={s.emptyText}>السلة فارغة</Text>
+          <View style={s.emptyIconBox}>
+            <Ionicons name="cart-outline" size={48} color="#9ca3af" />
+          </View>
+          <Text style={s.emptyTitle}>السلة فارغة</Text>
+          <Text style={s.emptySubText}>أضف منتجات من الصفحة الرئيسية</Text>
           <TouchableOpacity style={s.shopBtn} onPress={() => router.push('/(tabs)')}>
+            <Ionicons name="storefront-outline" size={16} color="#fff" />
             <Text style={s.shopBtnText}>تصفح المنتجات</Text>
           </TouchableOpacity>
         </View>
@@ -128,14 +132,19 @@ export default function CartScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14, paddingVertical: 14 },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#111827' },
-  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyText: { fontSize: 18, color: '#9ca3af', marginTop: 16, marginBottom: 24 },
-  shopBtn: { backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  trashBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#fff' },
+  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 40 },
+  emptyIconBox: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#f3f4f6',
+    justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151' },
+  emptySubText: { fontSize: 13, color: '#9ca3af' },
+  shopBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+    backgroundColor: PRIMARY, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 4 },
   shopBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
   cartItem: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 12,
     flexDirection: 'row-reverse', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 4 },

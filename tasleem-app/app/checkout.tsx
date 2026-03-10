@@ -136,20 +136,23 @@ export default function CheckoutScreen() {
   const profit = sellingTotal - costTotal - discount;
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
-        </TouchableOpacity>
+    <SafeAreaView style={s.container} edges={['top']}>
+      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.header}>
+        <View style={{ width: 38 }} />
         <Text style={s.headerTitle}>إتمام الطلب</Text>
-        <View style={{ width: 36 }} />
-      </View>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="arrow-forward" size={22} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-          <Ionicons name="person-outline" size={20} color={PRIMARY} />
-          <Text style={s.sectionTitle}>معلومات الزبون</Text>
-        </View>
+        <View style={s.sectionCard}>
+          <View style={s.sectionHeader}>
+            <View style={s.sectionIconBox}>
+              <Ionicons name="person-outline" size={18} color={PRIMARY} />
+            </View>
+            <Text style={s.sectionTitle}>معلومات الزبون</Text>
+          </View>
         
         <Text style={s.label}>اسم الزبون *</Text>
         <TextInput style={s.input} placeholder="أدخل الاسم الكامل"
@@ -195,10 +198,14 @@ export default function CheckoutScreen() {
           value={notes} onChangeText={setNotes} multiline
           textAlign="right" placeholderTextColor="#9ca3af" />
 
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-          <Ionicons name="pricetag-outline" size={20} color={PRIMARY} />
-          <Text style={s.sectionTitle}>كود الخصم</Text>
         </View>
+        <View style={s.sectionCard}>
+          <View style={s.sectionHeader}>
+            <View style={s.sectionIconBox}>
+              <Ionicons name="pricetag-outline" size={18} color={PRIMARY} />
+            </View>
+            <Text style={s.sectionTitle}>كود الخصم</Text>
+          </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity style={s.promoBtn}
             onPress={() => promoCode.trim() && verifyPromo.mutate(promoCode)}
@@ -218,11 +225,14 @@ export default function CheckoutScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={s.summary}>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-          <Ionicons name="receipt-outline" size={20} color={PRIMARY} />
-          <Text style={s.summaryTitle}>ملخص الطلب</Text>
         </View>
+        <View style={s.summary}>
+          <View style={s.sectionHeader}>
+            <View style={s.sectionIconBox}>
+              <Ionicons name="receipt-outline" size={18} color={PRIMARY} />
+            </View>
+            <Text style={s.summaryTitle}>ملخص الطلب</Text>
+          </View>
           <View style={s.summaryRow}>
             <Text style={s.summaryVal}>{sellingTotal.toLocaleString()} د.ع</Text>
             <Text style={s.summaryLabel}>المجموع الفرعي</Text>
@@ -286,17 +296,20 @@ export default function CheckoutScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14, paddingVertical: 14 },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#111827' },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827',
-    textAlign: 'right', marginTop: 20, marginBottom: 12 },
+  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#fff' },
+  sectionCard: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 14 },
+  sectionIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#0c6679' + '12',
+    justifyContent: 'center', alignItems: 'center' },
+  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   label: { fontSize: 13, color: '#374151', textAlign: 'right',
     marginBottom: 6, marginTop: 10, fontWeight: '600' },
   input: { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    padding: 12, fontSize: 14, color: '#111827', backgroundColor: '#fff', marginBottom: 10 },
+    padding: 12, fontSize: 14, color: '#111827', backgroundColor: '#f8fafc', marginBottom: 10 },
   selectBtn: { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
     padding: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
     backgroundColor: '#fff', marginBottom: 10 },
@@ -308,8 +321,7 @@ const s = StyleSheet.create({
   cancelPromoText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
   summary: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 20,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, elevation: 4 },
-  summaryTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827',
-    textAlign: 'right', marginBottom: 12 },
+  summaryTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827', marginBottom: 12 },
   summaryRow: { flexDirection: 'row-reverse', justifyContent: 'space-between',
     alignItems: 'center', paddingVertical: 6 },
   summaryLabel: { fontSize: 14, color: '#6b7280' },

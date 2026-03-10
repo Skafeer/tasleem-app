@@ -5,6 +5,7 @@ import {
   FlatList, Alert, Clipboard, Linking, useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -116,14 +117,14 @@ export default function ProductDetailScreen() {
   const sliderHeight = Math.min(width, 420);
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
+    <SafeAreaView style={s.container} edges={['top']}>
+      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.header}>
         <View style={{ width: 38 }} />
-      </View>
+        <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="arrow-forward" size={22} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Slider */}
@@ -347,11 +348,10 @@ export default function ProductDetailScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14, paddingVertical: 14 },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { flex: 1, fontSize: 15, fontWeight: 'bold', color: '#111827',
+  headerTitle: { flex: 1, fontSize: 15, fontWeight: 'bold', color: '#fff',
     textAlign: 'center', marginHorizontal: 8 },
   sliderBox: { position: 'relative', backgroundColor: '#f3f4f6' },
   downloadBtn: { position: 'absolute', top: 12, left: 12, width: 38, height: 38,
