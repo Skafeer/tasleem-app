@@ -1,17 +1,50 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Image, RefreshControl, useWindowDimensions,
+  TextInput, Image, RefreshControl, useWindowDimensions, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
 const PRIMARY = '#0c6679';
+
+
+// ── Skeleton Card ──
+function SkeletonCard({ width }: { width: number }) {
+  const anim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={[sk.card, { width, opacity: anim }]}>
+      <View style={[sk.img, { height: width }]} />
+      <View style={sk.body}>
+        <View style={sk.line} />
+        <View style={[sk.line, { width: '60%' }]} />
+        <View style={[sk.line, { width: '40%', marginTop: 4 }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+const sk = StyleSheet.create({
+  card:  { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  img:   { backgroundColor: '#e5e7eb', width: '100%' },
+  body:  { padding: 10, gap: 8 },
+  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '80%' },
+});
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -45,7 +78,7 @@ export default function HomeScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
   });
 
-  const { data: allProducts = [], refetch } = useQuery({
+  const { data: allProducts = [], refetch, isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data } = await api.get('/api/products?activeOnly=true');
@@ -114,6 +147,11 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
+      {isLoading ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 12, paddingTop: 12 }}>
+          {[...Array(6)].map((_, i) => <SkeletonCard key={i} width={CARD_WIDTH} />)}
+        </View>
+      ) : (
       <FlatList
         data={filtered}
         numColumns={2}
@@ -194,6 +232,7 @@ export default function HomeScreen() {
           );
         }}
       />
+      )}
     </SafeAreaView>
   );
 }

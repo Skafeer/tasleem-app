@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  FlatList, TextInput, ActivityIndicator, Alert
+  FlatList, TextInput, ActivityIndicator, Alert, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -41,6 +42,40 @@ const TAB_COLORS: any = {
 };
 
 const CANCELLABLE = ['pending', 'processing'];
+
+
+// ── Skeleton Row ──
+function SkeletonOrder() {
+  const anim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={[sko.card, { opacity: anim }]}>
+      <View style={sko.icon} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={sko.line} />
+        <View style={[sko.line, { width: '50%' }]} />
+      </View>
+      <View style={sko.badge} />
+    </Animated.View>
+  );
+}
+
+const sko = StyleSheet.create({
+  card:  { backgroundColor: '#fff', borderRadius: 18, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 10,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  icon:  { width: 46, height: 46, borderRadius: 14, backgroundColor: '#e5e7eb' },
+  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '75%' },
+  badge: { width: 60, height: 26, borderRadius: 8, backgroundColor: '#e5e7eb' },
+});
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -243,7 +278,9 @@ export default function OrdersScreen() {
 
       {/* List */}
       {isLoading ? (
-        <View style={s.center}><ActivityIndicator color={PRIMARY} size="large" /></View>
+        <View style={{ paddingTop: 8 }}>
+          {[...Array(5)].map((_, i) => <SkeletonOrder key={i} />)}
+        </View>
       ) : (
         <FlatList
           data={filtered}

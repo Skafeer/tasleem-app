@@ -1,15 +1,47 @@
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Image, ActivityIndicator, useWindowDimensions,
+  Image, ActivityIndicator, useWindowDimensions, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
+
+
+// ── Skeleton Card ──
+function SkeletonFavCard({ width }: { width: number }) {
+  const anim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={[skf.card, { width, opacity: anim }]}>
+      <View style={[skf.img, { height: width }]} />
+      <View style={skf.body}>
+        <View style={skf.line} />
+        <View style={[skf.line, { width: '55%' }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+const skf = StyleSheet.create({
+  card:  { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  img:   { backgroundColor: '#e5e7eb', width: '100%' },
+  body:  { padding: 10, gap: 8 },
+  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '80%' },
+});
 
 export default function FavoritesScreen() {
   const router = useRouter();
@@ -52,8 +84,8 @@ export default function FavoritesScreen() {
       </LinearGradient>
 
       {isLoading ? (
-        <View style={s.center}>
-          <ActivityIndicator size="large" color={PRIMARY} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 }}>
+          {[...Array(4)].map((_, i) => <SkeletonFavCard key={i} width={CARD_WIDTH} />)}
         </View>
       ) : favorites.length === 0 ? (
         <View style={s.empty}>
