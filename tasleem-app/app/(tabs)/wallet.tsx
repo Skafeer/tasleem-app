@@ -115,7 +115,7 @@ export default function WalletScreen() {
         </View>
       </View>
 
-      {/* بطاقة الرصيد — gradient محفوظ هنا فقط */}
+      {/* ── بطاقة الرصيد الرئيسية ── */}
       <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.balanceCardWrap}>
         <View style={s.balanceCard}>
           <View style={s.balanceRow}>
@@ -136,6 +136,30 @@ export default function WalletScreen() {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      {/* ── بطاقتا الأرباح ── */}
+      <View style={s.statsRow}>
+        <View style={[s.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
+          <View style={[s.statIcon, { backgroundColor: '#dcfce7' }]}>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#16a34a" />
+          </View>
+          <Text style={[s.statLabel, { color: '#14532d' }]}>الأرباح المحققة</Text>
+          <Text style={[s.statVal, { color: '#16a34a' }]}>
+            {(user?.balance || 0).toLocaleString()}
+          </Text>
+          <Text style={[s.statCurrency, { color: '#22c55e' }]}>د.ع</Text>
+        </View>
+        <View style={[s.statCard, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
+          <View style={[s.statIcon, { backgroundColor: '#ffedd5' }]}>
+            <Ionicons name="time-outline" size={20} color="#f97316" />
+          </View>
+          <Text style={[s.statLabel, { color: '#9a3412' }]}>الأرباح المنتظرة</Text>
+          <Text style={[s.statVal, { color: '#ea580c' }]}>
+            {(user?.pendingBalance || 0).toLocaleString()}
+          </Text>
+          <Text style={[s.statCurrency, { color: '#fb923c' }]}>د.ع</Text>
+        </View>
+      </View>
 
       {/* ── سجل السحوبات ── */}
       <View style={s.secHead}>
@@ -244,29 +268,35 @@ const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
 
   // ── Header ──
-  pageHeader:     { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+  pageHeader:      { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
     backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   pageHeaderTitle: { fontSize: 22, fontWeight: '900', color: '#111827', textAlign: 'right' },
   pageHeaderSub:   { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
   pageHeaderIcon:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#f0f9fa',
     borderWidth: 1.5, borderColor: '#e0f2f7', justifyContent: 'center', alignItems: 'center' },
-  balanceCardWrap: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6,
-    backgroundColor: '#f0f4f8' },
 
-  // بطاقة الرصيد داخل الهيدر
-  balanceCard:  { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20,
-    padding: 18, gap: 16 },
-  balanceRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
-  balanceIconBox:{ width: 46, height: 46, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center' },
-  balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-  balanceVal:   { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  balanceUnit:  { fontSize: 18, color: 'rgba(255,255,255,0.8)' },
-  withdrawBtn:  { backgroundColor: '#fff', borderRadius: 14, height: 48,
+  // ── بطاقة الرصيد ──
+  balanceCardWrap: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14 },
+  balanceCard:     { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: 18, gap: 16 },
+  balanceRow:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  balanceIconBox:  { width: 46, height: 46, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  balanceLabel:    { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
+  balanceVal:      { fontSize: 34, fontWeight: '900', color: '#fff', textAlign: 'right' },
+  balanceUnit:     { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
+  withdrawBtn:     { backgroundColor: '#fff', borderRadius: 14, height: 48,
     flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
   withdrawBtnText: { color: PRIMARY, fontWeight: 'bold', fontSize: 15 },
+
+  // ── بطاقتا الأرباح ──
+  statsRow:   { flexDirection: 'row', gap: 12, marginHorizontal: 14, marginBottom: 4 },
+  statCard:   { flex: 1, borderRadius: 18, padding: 14, alignItems: 'flex-end',
+    borderWidth: 1.5, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
+  statIcon:   { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  statLabel:  { fontSize: 11, fontWeight: '600', marginBottom: 4, textAlign: 'right' },
+  statVal:    { fontSize: 20, fontWeight: '900', textAlign: 'right' },
+  statCurrency: { fontSize: 10, fontWeight: '600', textAlign: 'right', marginTop: 1 },
 
   // ── Section ──
   secHead:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
