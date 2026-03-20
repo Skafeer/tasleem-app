@@ -123,15 +123,15 @@ export default function HomeScreen() {
           <Ionicons name="bag-outline" size={22} color={PRIMARY} />
         </TouchableOpacity>
 
-        {/* نص الترحيب وسط */}
+        {/* الشعار وسط */}
         <View style={s.headerCenter}>
-          <Text style={s.greeting} numberOfLines={1}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
-        </View>
-
-        {/* الشعار يمين */}
-        <View style={s.logoBox}>
           <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
         </View>
+
+        {/* أيقونة الإشعارات يمين */}
+        <TouchableOpacity onPress={() => router.push('/notifications')} style={s.notifBtn}>
+          <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Search ── */}
@@ -242,16 +242,16 @@ const s = StyleSheet.create({
 
   // ── Header ──
   header:       { flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 12, gap: 10,
+    paddingHorizontal: 14, paddingVertical: 10, gap: 10,
     backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  greeting:     { fontSize: 15, fontWeight: '800', color: '#0c6679' },
-  cartBtn:      { width: 42, height: 42, borderRadius: 13,
+  headerLogo:   { width: 100, height: 36 },
+  cartBtn:      { width: 40, height: 40, borderRadius: 12,
     backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7',
     justifyContent: 'center', alignItems: 'center' },
-  logoBox:      { width: 42, height: 42, borderRadius: 14,
-    backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
-  headerLogo:   { width: 30, height: 30, tintColor: '#fff' },
+  notifBtn:     { width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7',
+    justifyContent: 'center', alignItems: 'center' },
 
   // ── Search ──
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
