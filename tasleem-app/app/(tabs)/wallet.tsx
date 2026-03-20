@@ -104,9 +104,19 @@ export default function WalletScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header Gradient ── */}
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
-        {/* بطاقة الرصيد داخل الهيدر */}
+      {/* ── Header أبيض ── */}
+      <View style={s.pageHeader}>
+        <View>
+          <Text style={s.pageHeaderSub}>إدارة أرباحك</Text>
+          <Text style={s.pageHeaderTitle}>المحفظة</Text>
+        </View>
+        <View style={s.pageHeaderIcon}>
+          <Ionicons name="card-outline" size={22} color={PRIMARY} />
+        </View>
+      </View>
+
+      {/* بطاقة الرصيد — gradient محفوظ هنا فقط */}
+      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.balanceCardWrap}>
         <View style={s.balanceCard}>
           <View style={s.balanceRow}>
             <View style={s.balanceIconBox}>
@@ -234,7 +244,15 @@ const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#f8fafc' },
 
   // ── Header ──
-  header:       { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 },
+  pageHeader:     { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  pageHeaderTitle: { fontSize: 22, fontWeight: '900', color: '#111827', textAlign: 'right' },
+  pageHeaderSub:   { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
+  pageHeaderIcon:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#f0f9fa',
+    borderWidth: 1.5, borderColor: '#e0f2f7', justifyContent: 'center', alignItems: 'center' },
+  balanceCardWrap: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6,
+    backgroundColor: '#f0f4f8' },
 
   // بطاقة الرصيد داخل الهيدر
   balanceCard:  { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20,

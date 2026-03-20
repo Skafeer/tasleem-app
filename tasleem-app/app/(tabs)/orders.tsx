@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
@@ -213,10 +212,10 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* Header */}
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+      {/* ── Header أبيض ── */}
+      <View style={s.header}>
         <View style={s.headerContent}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={s.headerSub}>تتبع حالة طلباتك وأرباحك</Text>
             <Text style={s.headerTitle}>طلباتي</Text>
           </View>
@@ -245,7 +244,7 @@ export default function OrdersScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Tabs */}
       <View style={s.tabsWrap}>
@@ -307,12 +306,12 @@ const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#f8fafc' },
   center:     { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
 
-  header:        { paddingHorizontal: 16, paddingBottom: 16 },
+  header:        { paddingHorizontal: 16, paddingBottom: 12, paddingTop: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   headerContent: { flexDirection: 'row-reverse', justifyContent: 'space-between',
     alignItems: 'flex-start', paddingTop: 12, marginBottom: 14 },
-  headerTitle:   { fontSize: 26, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  headerSub:     { fontSize: 12, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginBottom: 2 },
-  activeCountBadge: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 16,
+  headerTitle:   { fontSize: 24, fontWeight: '900', color: '#111827', textAlign: 'right' },
+  headerSub:     { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
+  activeCountBadge: { backgroundColor: 'rgba(12,102,121,0.1)', borderRadius: 16,
     paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
   activeCountText:  { fontSize: 22, fontWeight: 'bold', color: '#fff' },
   activeCountLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },

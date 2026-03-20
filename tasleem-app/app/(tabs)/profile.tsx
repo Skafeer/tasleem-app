@@ -3,7 +3,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
 
@@ -37,14 +36,16 @@ export default function ProfileScreen() {
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* Header Gradient */}
-        <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+        {/* ── Header أبيض ── */}
+        <View style={s.header}>
           <View style={s.headerTop}>
             <Text style={s.headerTitle}>حسابي</Text>
-            <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
+            <View style={s.headerIconBox}>
+              <Ionicons name="person-circle-outline" size={24} color={PRIMARY} />
+            </View>
           </View>
 
-          {/* User Card inside gradient */}
+          {/* User Card */}
           <View style={s.userCard}>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
@@ -57,7 +58,7 @@ export default function ProfileScreen() {
               <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Balance Cards */}
         <View style={s.balanceRow}>
@@ -117,10 +118,10 @@ export default function ProfileScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
 
-  header: { paddingTop: 16, paddingHorizontal: 20, paddingBottom: 32 },
+  header: { paddingTop: 14, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   headerTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  headerLogo: { width: 48, height: 48, borderRadius: 0 },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#111827' },
+  headerIconBox: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7', justifyContent: 'center', alignItems: 'center' },
 
   userCard: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: 18,
     flexDirection: 'row', alignItems: 'center', gap: 14,

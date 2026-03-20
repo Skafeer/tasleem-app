@@ -44,16 +44,16 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
-      <Tabs.Screen name="index" options={{
-        title: 'الرئيسية',
+      <Tabs.Screen name="profile" options={{
+        title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
         ),
       }} />
-      <Tabs.Screen name="orders" options={{
-        title: 'طلباتي',
+      <Tabs.Screen name="wallet" options={{
+        title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
         ),
       }} />
       <Tabs.Screen name="admin" options={{
@@ -63,16 +63,16 @@ export default function TabsLayout() {
         ),
         href: isAdmin ? '/(tabs)/admin' : null,
       }} />
-      <Tabs.Screen name="wallet" options={{
-        title: 'المحفظة',
+      <Tabs.Screen name="orders" options={{
+        title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
         ),
       }} />
-      <Tabs.Screen name="profile" options={{
-        title: 'حسابي',
+      <Tabs.Screen name="index" options={{
+        title: 'الرئيسية',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
         ),
       }} />
     </Tabs>

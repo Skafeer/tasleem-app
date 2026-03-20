@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
@@ -115,24 +114,25 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header Gradient — نفس ترتيب البروفايل ── */}
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
-        {/* الشعار يمين — بدون خلفية مثل البروفايل */}
-        <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
+      {/* ── Header أبيض نظيف ── */}
+      <View style={s.header}>
+        {/* زر الكارت يسار */}
+        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
+          <Ionicons name="bag-outline" size={22} color={PRIMARY} />
+        </TouchableOpacity>
 
         {/* نص الترحيب وسط */}
         <View style={s.headerCenter}>
           <Text style={s.greeting} numberOfLines={1}>أهلاً، {user?.storeName || 'تاجر'} 👋</Text>
-          <Text style={s.subtitle}>{filtered.length} منتج متاح</Text>
         </View>
 
-        {/* زر الكارت يسار */}
-        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="cart-outline" size={22} color="#fff" />
-        </TouchableOpacity>
-      </LinearGradient>
+        {/* الشعار يمين */}
+        <View style={s.logoBox}>
+          <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
+        </View>
+      </View>
 
       {/* ── Search ── */}
       <View style={s.searchBox}>
@@ -242,16 +242,16 @@ const s = StyleSheet.create({
 
   // ── Header ──
   header:       { flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+    paddingHorizontal: 14, paddingVertical: 12, gap: 10,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  greeting:     { fontSize: 15, fontWeight: 'bold', color: '#fff' },
-  subtitle:     { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  greeting:     { fontSize: 15, fontWeight: '800', color: '#0c6679' },
   cartBtn:      { width: 42, height: 42, borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7',
     justifyContent: 'center', alignItems: 'center' },
-
-  // شعار — مثل البروفايل بدون خلفية
-  headerLogo:   { width: 48, height: 48, borderRadius: 0 },
+  logoBox:      { width: 42, height: 42, borderRadius: 14,
+    backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
+  headerLogo:   { width: 30, height: 30, tintColor: '#fff' },
 
   // ── Search ──
   searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
