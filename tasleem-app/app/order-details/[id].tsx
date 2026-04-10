@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
@@ -54,7 +53,7 @@ function SkeletonDetails() {
 }
 
 const sk = StyleSheet.create({
-  headerSkeleton: { height: 180, backgroundColor: '#e8edf2', marginBottom: 16 },
+  headerSkeleton: { height: 140, backgroundColor: '#fff', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e8edf2' },
   cardSkeleton: { backgroundColor: '#fff', borderRadius: 20, padding: 18, margin: 16, marginTop: 0, gap: 12 },
   line: { height: 14, backgroundColor: '#e8edf2', borderRadius: 7, width: '100%' },
 });
@@ -62,7 +61,7 @@ const sk = StyleSheet.create({
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['order', id],
@@ -116,11 +115,11 @@ export default function OrderDetailsScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* Header */}
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
+      {/* Header - بدون تدرج لوني */}
+      <View style={s.header}>
         <View style={s.headerRow}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#fff" />
+            <Ionicons name="chevron-forward" size={22} color="#111827" />
           </TouchableOpacity>
           <View style={{ alignItems: 'flex-end', flex: 1 }}>
             <Text style={s.headerTitle}>تفاصيل الطلب #{order.id}</Text>
@@ -128,7 +127,7 @@ export default function OrderDetailsScreen() {
           </View>
         </View>
 
-        {/* Status + Amount */}
+        {/* بطاقة المبلغ والحالة - بدون تدرج */}
         <View style={s.summaryCard}>
           <View style={s.summaryLeft}>
             <Text style={s.summaryLabel}>المبلغ الإجمالي</Text>
@@ -140,7 +139,7 @@ export default function OrderDetailsScreen() {
             <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -218,37 +217,42 @@ export default function OrderDetailsScreen() {
           ))}
         </View>
 
-        {/* ملخص مالي */}
-        <LinearGradient colors={['#111827', '#1f2937']} style={s.darkCard}>
+        {/* ملخص مالي - بدون تدرج لوني */}
+        <View style={s.darkCard}>
           <View style={s.cardHeader}>
-            <View style={[s.cardIconBox, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-              <Ionicons name="receipt-outline" size={18} color="#9ca3af" />
+            <View style={[s.cardIconBox, { backgroundColor: '#f3f4f6' }]}>
+              <Ionicons name="receipt-outline" size={18} color="#6b7280" />
             </View>
-            <Text style={[s.cardTitle, { color: '#9ca3af' }]}>ملخص التكاليف والربح</Text>
+            <Text style={[s.cardTitle, { color: '#374151' }]}>ملخص التكاليف والربح</Text>
           </View>
 
-          {[
-            { label: 'سعر البيع', value: (order.totalAmount - (order.shippingCost || 0))?.toLocaleString() + ' د.ع' },
-            { label: 'أجرة التوصيل', value: order.shippingCost?.toLocaleString() + ' د.ع' },
-          ].map((r, i) => (
-            <View key={i} style={s.darkRow}>
-              <Text style={s.darkVal}>{r.value}</Text>
-              <Text style={s.darkLabel}>{r.label}</Text>
-            </View>
-          ))}
+          <View style={s.darkRow}>
+            <Text style={s.darkVal}>{(order.totalAmount - (order.shippingCost || 0))?.toLocaleString()} د.ع</Text>
+            <Text style={s.darkLabel}>سعر البيع</Text>
+          </View>
+          
+          <View style={s.darkRow}>
+            <Text style={s.darkVal}>{order.shippingCost?.toLocaleString()} د.ع</Text>
+            <Text style={s.darkLabel}>أجرة التوصيل</Text>
+          </View>
 
           <View style={s.darkDivider} />
 
           <View style={s.darkRow}>
-            <Text style={[s.darkVal, { fontSize: 18 }]}>{order.totalAmount?.toLocaleString()} د.ع</Text>
-            <Text style={[s.darkLabel, { color: '#fff', fontWeight: 'bold' }]}>المبلغ المستحق من الزبون</Text>
+            <Text style={[s.darkVal, { fontSize: 18, fontWeight: 'bold', color: '#111827' }]}>
+              {order.totalAmount?.toLocaleString()} د.ع
+            </Text>
+            <Text style={[s.darkLabel, { fontWeight: 'bold', color: '#374151' }]}>المبلغ المستحق من الزبون</Text>
           </View>
           
-          <View style={[s.darkRow, s.profitRow]}>
-            <Text style={s.profitVal}>+{order.totalProfit?.toLocaleString()} د.ع</Text>
-            <Text style={s.profitLabel}>ربحك من هذا الطلب 🎉</Text>
+          <View style={s.profitRow}>
+            <View style={s.profitContent}>
+              <Ionicons name="trending-up-outline" size={18} color="#10b981" />
+              <Text style={s.profitLabel}>ربحك من هذا الطلب</Text>
+            </View>
+            <Text style={s.profitVal}>+{order.totalProfit?.toLocaleString()} د.ع 🎉</Text>
           </View>
-        </LinearGradient>
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -275,75 +279,186 @@ const s = StyleSheet.create({
   },
   backBtnEmptyText: { color: '#fff', fontWeight: '600' },
 
-  header: { paddingHorizontal: 16, paddingBottom: 20 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, marginBottom: 16 },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
+  // ── Header (بدون تدرج) ──
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
   },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  headerSub: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2, textAlign: 'right' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'right',
+  },
+  headerSub: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+    textAlign: 'right',
+  },
 
+  // ── Summary Card ──
   summaryCard: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#f8fafc',
     borderRadius: 18,
     padding: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
   summaryLeft: { alignItems: 'flex-end' },
-  summaryLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
-  summaryAmount: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  summaryCurrency: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  summaryLabel: { fontSize: 12, color: '#9ca3af', marginBottom: 4 },
+  summaryAmount: { fontSize: 28, fontWeight: 'bold', color: PRIMARY },
+  summaryCurrency: { fontSize: 14, color: '#9ca3af' },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
   statusText: { fontSize: 13, fontWeight: 'bold' },
 
   scroll: { padding: 16, paddingBottom: 40 },
 
+  // ── Cards ──
   card: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  cardIconBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  cardIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
 
+  // ── Info Grid ──
   infoGrid: { flexDirection: 'row', gap: 0 },
   infoBlock: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 8 },
-  infoDivider: { width: 1, backgroundColor: '#f3f4f6' },
+  infoDivider: { width: 1, backgroundColor: '#e8edf2' },
   infoLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 4 },
   infoValue: { fontSize: 14, fontWeight: '600', color: '#374151', textAlign: 'right' },
-  separator: { height: 1, backgroundColor: '#f3f4f6', marginVertical: 14 },
+  separator: { height: 1, backgroundColor: '#e8edf2', marginVertical: 12 },
   addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
+  // ── Products ──
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  productImg: { width: 56, height: 56, borderRadius: 12 },
-  productIcon: { width: 56, height: 56, borderRadius: 12, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  productImg: { width: 52, height: 52, borderRadius: 12 },
+  productIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   productName: { fontSize: 13, fontWeight: 'bold', color: '#111827', marginBottom: 3, textAlign: 'right' },
-  productMeta: { fontSize: 12, color: '#9ca3af', textAlign: 'right' },
+  productMeta: { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
   productTotal: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
 
-  darkCard: { borderRadius: 20, padding: 20, marginBottom: 14 },
-  darkRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-  darkLabel: { fontSize: 13, color: '#9ca3af' },
-  darkVal: { fontSize: 14, color: '#fff', fontWeight: 'bold' },
-  darkDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 6 },
-  profitRow: { backgroundColor: 'rgba(74,222,128,0.1)', borderRadius: 12, paddingHorizontal: 12, marginTop: 4 },
-  profitVal: { fontSize: 20, fontWeight: 'bold', color: '#4ade80' },
-  profitLabel: { fontSize: 13, color: '#4ade80', fontWeight: '600' },
+  // ── Financial Summary (بدون تدرج) ──
+  darkCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  darkRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  darkLabel: {
+    fontSize: 13,
+    color: '#9ca3af',
+  },
+  darkVal: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  darkDivider: {
+    height: 1,
+    backgroundColor: '#e8edf2',
+    marginVertical: 8,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  profitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  profitVal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#10b981',
+  },
+  profitLabel: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '600',
+  },
 });
