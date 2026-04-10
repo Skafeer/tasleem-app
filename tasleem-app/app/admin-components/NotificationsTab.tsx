@@ -15,7 +15,6 @@ const INFO    = '#3b82f6';
 const SUCCESS = '#10b981';
 
 const timeAgo = (date: string) => {
-  // إضافة Z لضمان تفسير التاريخ كـ UTC وليس توقيت محلي
   const utcDate = (date.endsWith('Z') || date.includes('+')) ? date : date + 'Z';
   const diff = Date.now() - new Date(utcDate).getTime();
   if (diff < 0) return 'الآن';
@@ -34,6 +33,27 @@ const getIcon = (data: any) => {
     if (d?.type === 'broadcast')         return { icon: 'megaphone-outline',   color: WARNING };
   } catch {}
   return { icon: 'notifications-outline', color: PRIMARY };
+};
+
+// ✅ الدالة الجديدة: فلترة إشعارات الأدمن فقط
+const isAdminBroadcast = (notification: any) => {
+  if (!notification.data) return true;
+  
+  try {
+    const data = typeof notification.data === 'string' 
+      ? JSON.parse(notification.data) 
+      : notification.data;
+    
+    // استبعاد جميع إشعارات النظام التلقائية
+    if (data?.type === 'order_status') return false;
+    if (data?.type === 'withdrawal_status') return false;
+    if (data?.type === 'system') return false;
+    
+    // قبول فقط إشعارات broadcast أو الإشعارات بدون type
+    return data?.type === 'broadcast' || !data?.type;
+  } catch {
+    return true;
+  }
 };
 
 const TEMPLATES = [
@@ -61,7 +81,7 @@ export default function NotificationsTab() {
       setTitle(''); setBody('');
       qc.invalidateQueries({ queryKey: ['admin-notifications'] });
     },
-    onError: () => toast.error('فشل الإرسال'),
+    onError: (err: any) => toast.error(err?.message || 'فشل الإرسال'),
   });
 
   const handleSend = () => {
@@ -70,7 +90,8 @@ export default function NotificationsTab() {
     broadcast.mutate();
   };
 
-  const all = notifs as any[];
+  // ✅ التعديل هنا: استخدام الفلترة بدلاً من عرض كل شيء
+  const adminNotifications = notifs.filter(isAdminBroadcast);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -88,7 +109,6 @@ export default function NotificationsTab() {
             </View>
           </View>
 
-          {/* قوالب سريعة */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={{ gap: 8 }}>
             {TEMPLATES.map(t => (
               <TouchableOpacity key={t.label} style={s.chip} onPress={() => { setTitle(t.title); setBody(t.body); }}>
@@ -97,7 +117,6 @@ export default function NotificationsTab() {
             ))}
           </ScrollView>
 
-          {/* العنوان */}
           <Text style={s.fieldLabel}>العنوان</Text>
           <View style={[s.inputBox, focusedField === 'title' && s.inputBoxFocused]}>
             <TextInput
@@ -113,11 +132,10 @@ export default function NotificationsTab() {
             <Ionicons name="text-outline" size={18} color={focusedField === 'title' ? PRIMARY : '#9ca3af'} />
           </View>
 
-          {/* الرسالة */}
           <Text style={s.fieldLabel}>الرسالة</Text>
           <View style={[s.inputBox, s.textareaBox, focusedField === 'body' && s.inputBoxFocused]}>
             <TextInput
-              style={[s.input, { height: 70, textAlignVertical: 'top' }]}
+              style={[s.input, s.textareaInput]}
               value={body}
               onChangeText={setBody}
               placeholder="اكتب رسالتك هنا..."
@@ -130,7 +148,6 @@ export default function NotificationsTab() {
             />
           </View>
 
-          {/* معاينة */}
           {(title || body) ? (
             <View style={s.preview}>
               <View style={s.previewIconBox}>
@@ -144,7 +161,6 @@ export default function NotificationsTab() {
             </View>
           ) : null}
 
-          {/* زر الإرسال */}
           <TouchableOpacity
             style={[s.sendBtn, (!title || !body || broadcast.isPending) && s.sendBtnOff]}
             onPress={handleSend}
@@ -159,29 +175,28 @@ export default function NotificationsTab() {
           </TouchableOpacity>
         </View>
 
-        {/* ── هيدر السجل ── */}
         <View style={s.logHeader}>
           <View style={s.logTitleRow}>
             <Text style={s.logTitle}>سجل الإشعارات</Text>
+            <Text style={s.logCount}>{adminNotifications.length} إشعار</Text>
           </View>
         </View>
 
-        {/* ── القائمة ── */}
         {isLoading ? (
           <ActivityIndicator color={PRIMARY} style={{ marginTop: 30 }} />
-        ) : all.length === 0 ? (
+        ) : adminNotifications.length === 0 ? (
           <View style={s.empty}>
             <View style={s.emptyIconBox}>
               <Ionicons name="notifications-off-outline" size={36} color="#9ca3af" />
             </View>
             <Text style={s.emptyTitle}>لا توجد إشعارات</Text>
-            <Text style={s.emptyText}>ستظهر الإشعارات هنا عند وصولها</Text>
+            <Text style={s.emptyText}>الإشعارات التي ترسلها ستظهر هنا</Text>
           </View>
         ) : (
-          all.map((n: any) => {
+          adminNotifications.map((n: any) => {
             const { icon, color } = getIcon(n.data);
             return (
-              <View key={n.id} style={[s.notifCard]}>
+              <View key={n.id} style={s.notifCard}>
                 <View style={[s.notifIconBox, { backgroundColor: color + '18' }]}>
                   <Ionicons name={icon as any} size={20} color={color} />
                 </View>
@@ -205,63 +220,61 @@ export default function NotificationsTab() {
 const s = StyleSheet.create({
   container: { padding: 14, paddingBottom: 60 },
 
-  // إرسال
-  sendCard:     { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 20,
+  sendCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 20,
     shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, elevation: 4 },
-  sendHeader:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 16 },
-  sendIconBox:  { width: 44, height: 44, borderRadius: 14, backgroundColor: PRIMARY,
+  sendHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 16 },
+  sendIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: PRIMARY,
     justifyContent: 'center', alignItems: 'center' },
-  sendTitle:    { fontSize: 15, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  sendSub:      { fontSize: 12, color: '#9ca3af', textAlign: 'right', marginTop: 2 },
+  sendTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
+  sendSub: { fontSize: 12, color: '#9ca3af', textAlign: 'right', marginTop: 2 },
 
-  chip:         { backgroundColor: PRIMARY + '12', borderRadius: 20, paddingHorizontal: 14,
+  chip: { backgroundColor: PRIMARY + '12', borderRadius: 20, paddingHorizontal: 14,
     paddingVertical: 8, borderWidth: 1, borderColor: PRIMARY + '30' },
-  chipText:     { fontSize: 12, color: PRIMARY, fontWeight: '600' },
+  chipText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
 
-  fieldLabel:   { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 8, fontWeight: '600' },
-  inputBox:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc',
+  fieldLabel: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 8, fontWeight: '600' },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc',
     borderRadius: 12, paddingHorizontal: 14, height: 50, gap: 10,
     borderWidth: 1.5, borderColor: '#e5e7eb', marginBottom: 14 },
   inputBoxFocused: { borderColor: PRIMARY, backgroundColor: '#fff' },
-  textareaBox:  { height: 'auto' as any, minHeight: 90, paddingVertical: 12, alignItems: 'flex-start' },
-  input:        { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' } as any,
+  textareaBox: { minHeight: 90, paddingVertical: 12, alignItems: 'flex-start' },
+  textareaInput: { height: 70, textAlignVertical: 'top' },
+  input: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  preview:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
+  preview: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
     backgroundColor: '#f0f9fb', borderRadius: 14, padding: 12, marginBottom: 16,
     borderWidth: 1, borderColor: PRIMARY + '30' },
   previewIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY + '15',
     justifyContent: 'center', alignItems: 'center' },
   previewTitle: { fontSize: 13, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  previewBody:  { fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 },
-  previewTag:   { backgroundColor: PRIMARY + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  previewBody: { fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 2 },
+  previewTag: { backgroundColor: PRIMARY + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   previewTagText: { fontSize: 10, color: PRIMARY, fontWeight: '700' },
 
-  sendBtn:      { backgroundColor: PRIMARY, borderRadius: 14, height: 52,
+  sendBtn: { backgroundColor: PRIMARY, borderRadius: 14, height: 52,
     flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8,
     shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  sendBtnOff:   { backgroundColor: '#9ca3af', shadowOpacity: 0 },
-  sendBtnText:  { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  sendBtnOff: { backgroundColor: '#9ca3af', shadowOpacity: 0 },
+  sendBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 
-  // سجل
-  logHeader:    { marginBottom: 14 },
-  logTitleRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
-  logTitle:     { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  logHeader: { marginBottom: 14 },
+  logTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  logTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  logCount: { fontSize: 12, color: '#9ca3af' },
 
-
-  // بطاقة الإشعار
-  notifCard:     { flexDirection: 'row-reverse', gap: 12, backgroundColor: '#fff',
+  notifCard: { flexDirection: 'row-reverse', gap: 12, backgroundColor: '#fff',
     borderRadius: 16, padding: 14, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  notifIconBox:  { width: 44, height: 44, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
-  notifContent:  { flex: 1 },
-  notifTopRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 },
-  notifTitle:    { flex: 1, fontSize: 13, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  notifTime:     { fontSize: 10, color: '#9ca3af' },
-  notifBody:     { fontSize: 12, color: '#6b7280', textAlign: 'right', lineHeight: 18 },
+  notifIconBox: { width: 44, height: 44, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  notifContent: { flex: 1 },
+  notifTopRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 4 },
+  notifTitle: { flex: 1, fontSize: 13, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
+  notifTime: { fontSize: 10, color: '#9ca3af' },
+  notifBody: { fontSize: 12, color: '#6b7280', textAlign: 'right', lineHeight: 18 },
 
-  empty:         { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  emptyIconBox:  { width: 72, height: 72, borderRadius: 36, backgroundColor: '#f3f4f6',
+  empty: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  emptyIconBox: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#f3f4f6',
     justifyContent: 'center', alignItems: 'center' },
-  emptyTitle:    { fontSize: 15, fontWeight: 'bold', color: '#374151' },
-  emptyText:     { fontSize: 13, color: '#9ca3af' },
+  emptyTitle: { fontSize: 15, fontWeight: 'bold', color: '#374151' },
+  emptyText: { fontSize: 13, color: '#9ca3af' },
 });
