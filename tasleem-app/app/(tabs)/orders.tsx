@@ -12,6 +12,7 @@ import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
+const BG      = '#f2f6f9';
 
 const STATUS: any = {
   pending:    { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
@@ -25,11 +26,11 @@ const STATUS: any = {
 };
 
 const TABS = [
-  { key: 'active',    label: 'نشط',    icon: 'flash-outline' },
-  { key: 'delivered', label: 'مكتمل',  icon: 'checkmark-circle-outline' },
-  { key: 'cancelled', label: 'ملغي',   icon: 'close-circle-outline' },
-  { key: 'postponed', label: 'مؤجل',   icon: 'pause-circle-outline' },
-  { key: 'returned',  label: 'راجع',   icon: 'arrow-undo-outline' },
+  { key: 'active',    label: 'نشط',   icon: 'flash-outline' },
+  { key: 'delivered', label: 'مكتمل', icon: 'checkmark-circle-outline' },
+  { key: 'cancelled', label: 'ملغي',  icon: 'close-circle-outline' },
+  { key: 'postponed', label: 'مؤجل',  icon: 'pause-circle-outline' },
+  { key: 'returned',  label: 'راجع',  icon: 'arrow-undo-outline' },
 ];
 
 const TAB_COLORS: any = {
@@ -41,15 +42,15 @@ const TAB_COLORS: any = {
 };
 
 const CANCELLABLE = ['pending', 'processing'];
+const PAGE_SIZE   = 20;
 
-
-// ── Skeleton Row ──
+// ── Skeleton ──
 function SkeletonOrder() {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1,   duration: 800, useNativeDriver: true }),
         Animated.timing(anim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
       ])
     ).start();
@@ -69,26 +70,26 @@ function SkeletonOrder() {
 const sko = StyleSheet.create({
   card:  { backgroundColor: '#fff', borderRadius: 18, padding: 16,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 16, marginBottom: 10,
+    marginHorizontal: 16, marginBottom: 10, borderWidth: 1, borderColor: '#e8edf2',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  icon:  { width: 46, height: 46, borderRadius: 14, backgroundColor: '#e5e7eb' },
-  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '75%' },
-  badge: { width: 60, height: 26, borderRadius: 8, backgroundColor: '#e5e7eb' },
+  icon:  { width: 46, height: 46, borderRadius: 14, backgroundColor: '#e8edf2' },
+  line:  { height: 12, backgroundColor: '#e8edf2', borderRadius: 6, width: '75%' },
+  badge: { width: 60, height: 26, borderRadius: 8, backgroundColor: '#e8edf2' },
 });
 
 export default function OrdersScreen() {
   const router = useRouter();
-  const qc = useQueryClient();
+  const qc     = useQueryClient();
   const [activeTab, setActiveTab] = useState('active');
-  const [search, setSearch] = useState('');
+  const [search, setSearch]       = useState('');
+  const [page, setPage]           = useState(1);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders'],
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data } = await api.get('/api/orders?limit=9999&page=1');
-      // يتعامل مع pagination response و array عادي
+      const { data } = await api.get(`/api/orders?limit=${PAGE_SIZE}&page=1`);
       const result = data?.data || data;
       return Array.isArray(result) ? result : [];
     },
@@ -136,17 +137,15 @@ export default function OrdersScreen() {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const dt = new Date(dateStr);
-    return dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const filtered = getFiltered(activeTab);
+  const filtered    = getFiltered(activeTab);
   const activeCount = getFiltered('active').length;
 
   const renderOrder = ({ item: o }: any) => {
-    const status = STATUS[o.status] || STATUS.pending;
+    const status    = STATUS[o.status] || STATUS.pending;
     const canCancel = CANCELLABLE.includes(o.status);
-
     return (
       <View style={s.orderCard}>
         <TouchableOpacity style={s.cardPressable} onPress={() => router.push(`/order-details/${o.id}`)} activeOpacity={0.7}>
@@ -183,7 +182,9 @@ export default function OrdersScreen() {
                     <Text style={s.profitText}>ربح: {o.totalProfit?.toLocaleString()} د.ع</Text>
                   </View>
                 )}
-                <Text style={s.orderAmount}>{o.totalAmount?.toLocaleString()} <Text style={{ fontSize: 11, color: '#9ca3af' }}>د.ع</Text></Text>
+                <Text style={s.orderAmount}>
+                  {o.totalAmount?.toLocaleString()} <Text style={{ fontSize: 11, color: '#9ca3af' }}>د.ع</Text>
+                </Text>
               </View>
             </View>
           </View>
@@ -212,16 +213,18 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header أبيض ── */}
+      {/* ── Header ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.headerSub}>تتبع حالة طلباتك وأرباحك</Text>
+          {/* العنوان يمين — الكبير فوق، الصغير تحت */}
+          <View style={s.headerTitles}>
             <Text style={s.headerTitle}>طلباتي</Text>
+            <Text style={s.headerSub}>تتبع حالة طلباتك وأرباحك</Text>
           </View>
+          {/* Badge العدد يسار */}
           {activeCount > 0 && (
             <View style={s.activeCountBadge}>
-              <Text style={s.activeCountText}>{activeCount}</Text>
+              <Text style={s.activeCountNum}>{activeCount}</Text>
               <Text style={s.activeCountLabel}>نشط</Text>
             </View>
           )}
@@ -246,7 +249,7 @@ export default function OrdersScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <View style={s.tabsWrap}>
         <FlatList
           horizontal
@@ -256,8 +259,8 @@ export default function OrdersScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
           renderItem={({ item: tab }) => {
             const isActive = activeTab === tab.key;
-            const colors = TAB_COLORS[tab.key];
-            const count = getFiltered(tab.key).length;
+            const colors   = TAB_COLORS[tab.key];
+            const count    = getFiltered(tab.key).length;
             return (
               <TouchableOpacity
                 style={[s.tabBtn, isActive && { backgroundColor: colors.bg, borderColor: colors.border }]}
@@ -275,7 +278,7 @@ export default function OrdersScreen() {
         />
       </View>
 
-      {/* List */}
+      {/* ── List ── */}
       {isLoading ? (
         <View style={{ paddingTop: 8 }}>
           {[...Array(5)].map((_, i) => <SkeletonOrder key={i} />)}
@@ -286,6 +289,7 @@ export default function OrdersScreen() {
           keyExtractor={(item: any) => item.id.toString()}
           renderItem={renderOrder}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={s.emptyBox}>
               <View style={s.emptyIcon}>
@@ -295,7 +299,6 @@ export default function OrdersScreen() {
               <Text style={s.emptyText}>لا توجد طلبات في هذه القائمة</Text>
             </View>
           }
-          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -303,76 +306,102 @@ export default function OrdersScreen() {
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#f8fafc' },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+  container: { flex: 1, backgroundColor: BG },
 
-  header:        { paddingHorizontal: 16, paddingBottom: 12, paddingTop: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  headerContent: { flexDirection: 'row-reverse', justifyContent: 'space-between',
-    alignItems: 'flex-start', paddingTop: 12, marginBottom: 14 },
-  headerTitle:   { fontSize: 24, fontWeight: '900', color: '#111827', textAlign: 'right' },
-  headerSub:     { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
-  activeCountBadge: { backgroundColor: 'rgba(12,102,121,0.1)', borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
-  activeCountText:  { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  activeCountLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },
+  // ── Header ──
+  header: {
+    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#e8edf2',
+  },
+  headerContent: {
+    flexDirection: 'row-reverse', justifyContent: 'space-between',
+    alignItems: 'flex-start', paddingTop: 4, marginBottom: 14,
+  },
+  headerTitles: { alignItems: 'flex-end' },
+  headerTitle:  { fontSize: 24, fontWeight: '900', color: '#0d1b2a' },
+  headerSub:    { fontSize: 11, color: '#64748b', marginTop: 3 },
 
-  searchBox:   { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, paddingHorizontal: 12, height: 44, gap: 8 },
-  searchInput: { flex: 1, fontSize: 13, color: '#111827' },
+  activeCountBadge: {
+    backgroundColor: 'rgba(12,102,121,0.1)', borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(12,102,121,0.2)',
+  },
+  activeCountNum:   { fontSize: 22, fontWeight: '900', color: PRIMARY },
+  activeCountLabel: { fontSize: 11, color: PRIMARY, fontWeight: '700', marginTop: 1 },
 
-  tabsWrap: { paddingVertical: 10, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 5,
+  searchBox: {
+    flexDirection: 'row-reverse', alignItems: 'center',
+    backgroundColor: '#f2f6f9', borderRadius: 14,
+    paddingHorizontal: 12, height: 44, gap: 8,
+    borderWidth: 1.5, borderColor: '#e8edf2',
+  },
+  searchInput: { flex: 1, fontSize: 13, color: '#0d1b2a' },
+
+  // ── Tabs ──
+  tabsWrap: {
+    paddingVertical: 10, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#e8edf2',
+  },
+  tabBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb' },
+    backgroundColor: '#f2f6f9', borderWidth: 1.5, borderColor: '#e8edf2',
+  },
   tabText:      { fontSize: 12, fontWeight: '700', color: '#9ca3af' },
-  tabBadge:     { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-  tabBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#6b7280' },
+  tabBadge:     { backgroundColor: '#e8edf2', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
+  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#64748b' },
 
-  orderCard: { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' },
+  // ── Order Card ──
+  orderCard: {
+    backgroundColor: '#fff', borderRadius: 18, marginBottom: 12,
+    borderWidth: 1, borderColor: '#e8edf2',
+    shadowColor: '#0d1b2a', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden',
+  },
   cardPressable: { padding: 14 },
   cardTop:       { flexDirection: 'row-reverse', gap: 12, alignItems: 'flex-start' },
-
-  orderIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  orderInfo:   { flex: 1, gap: 6 },
-  orderTopRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  orderId:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  badge:       { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  badgeText:   { fontSize: 11, fontWeight: 'bold' },
+  orderIcon:     { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  orderInfo:     { flex: 1, gap: 6 },
+  orderTopRow:   { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  orderId:       { fontSize: 15, fontWeight: '800', color: '#0d1b2a' },
+  badge:         { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  badgeText:     { fontSize: 11, fontWeight: '700' },
 
   customerRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   customerName: { fontSize: 13, color: '#374151', fontWeight: '600', textAlign: 'right', flex: 1 },
   provinceTag:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 3,
-    backgroundColor: '#f3f4f6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  provinceText: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+    backgroundColor: '#f2f6f9', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  provinceText: { fontSize: 10, color: '#64748b', fontWeight: '600' },
 
   dateRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   dateText: { fontSize: 11, color: '#9ca3af' },
 
   amountRow:   { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  orderAmount: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  orderAmount: { fontSize: 15, fontWeight: '800', color: '#0d1b2a' },
   profitTag:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
     backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   profitText:  { fontSize: 11, color: '#10b981', fontWeight: '700' },
 
-  cardFooter: { flexDirection: 'row-reverse', borderTopWidth: 1,
-    borderTopColor: '#f3f4f6', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  cancelBtn:            { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+  cardFooter: {
+    flexDirection: 'row-reverse', borderTopWidth: 1,
+    borderTopColor: '#e8edf2', paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+  },
+  cancelBtn:             { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
     justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
     backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
-  cancelBtnDisabled:    { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' },
-  cancelBtnText:        { fontSize: 12, fontWeight: '700', color: '#ef4444' },
-  cancelBtnTextDisabled:{ color: '#d1d5db' },
+  cancelBtnDisabled:     { backgroundColor: '#f2f6f9', borderColor: '#e8edf2' },
+  cancelBtnText:         { fontSize: 12, fontWeight: '700', color: '#ef4444' },
+  cancelBtnTextDisabled: { color: '#d1d5db' },
   detailsBtn:     { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
     justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
     backgroundColor: PRIMARY + '10', borderWidth: 1, borderColor: PRIMARY + '30' },
   detailsBtnText: { fontSize: 12, fontWeight: '700', color: PRIMARY },
 
+  // ── Empty ──
   emptyBox:   { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  emptyIcon:  { width: 80, height: 80, borderRadius: 24, backgroundColor: `${PRIMARY}15`,
-    justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151' },
+  emptyIcon:  { width: 80, height: 80, borderRadius: 40,
+    backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151' },
   emptyText:  { fontSize: 13, color: '#9ca3af' },
 });
