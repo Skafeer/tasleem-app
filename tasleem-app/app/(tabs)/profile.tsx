@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,91 +28,107 @@ export default function ProfileScreen() {
     router.replace('/auth');
   };
 
+  // ✅ إضافة خاصية route لكل عنصر
   const menuItems = [
-    { key: 'profile-edit', label: 'الملف الشخصي', icon: 'person-outline', color: '#3b82f6', bg: '#eff6ff', route: '/profile-edit' },
-    { key: 'favorites', label: 'المنتجات المفضلة', icon: 'heart-outline', color: '#ef4444', bg: '#fef2f2', route: '/favorites' },
-    { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', color: '#8b5cf6', bg: '#f5f3ff', route: '/withdraw-history' },
-    { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', color: '#10b981', bg: '#ecfdf5', route: '/stats' },
-    { key: 'privacy', label: 'سياسة الخصوصية', icon: 'shield-checkmark-outline', color: '#f59e0b', bg: '#fffbeb', route: '/privacy' },
-    { key: 'support', label: 'الدعم الفني', icon: 'headset-outline', color: '#8b5cf6', bg: '#f5f3ff', route: '/support' },
-    { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', color: '#06b6d4', bg: '#ecfeff', route: '/contact' },
+    { key: 'profile-edit', label: 'الملف الشخصي', icon: 'person-outline', color: '#3b82f6', gradient: ['#3b82f6', '#2563eb'], route: '/profile-edit' },
+    { key: 'favorites', label: 'المنتجات المفضلة', icon: 'heart-outline', color: '#ef4444', gradient: ['#ef4444', '#dc2626'], route: '/favorites' },
+    { key: 'withdrawals', label: 'سجل السحوبات', icon: 'time-outline', color: '#8b5cf6', gradient: ['#8b5cf6', '#7c3aed'], route: '/withdraw-history' },
+    { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', color: '#10b981', gradient: ['#10b981', '#059669'], route: '/stats' },
+    { key: 'privacy', label: 'سياسة الخصوصية', icon: 'shield-checkmark-outline', color: '#f59e0b', gradient: ['#f59e0b', '#d97706'], route: '/privacy' },
+    { key: 'support', label: 'الدعم الفني', icon: 'headset-outline', color: '#8b5cf6', gradient: ['#8b5cf6', '#7c3aed'], route: '/support' },
+    { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', color: '#06b6d4', gradient: ['#06b6d4', '#0891b2'], route: '/contact' },
   ];
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
 
-        {/* ── Header موحد مع باقي الصفحات ── */}
+        {/* ── Header معكوس RTL ── */}
         <View style={s.header}>
-          <View style={s.headerContent}>
-            <View style={{ width: 40 }} />
-            <Text style={s.headerTitle}>حسابي</Text>
-            <View style={s.headerIconBox}>
-              <Ionicons name="person-circle-outline" size={22} color={PRIMARY} />
+          <View style={s.headerIconBox}>
+            <Ionicons name="person-circle-outline" size={22} color={PRIMARY} />
+          </View>
+          <Text style={s.headerTitle}>حسابي</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* ── بطاقة المستخدم الرئيسية مع تدرج ── */}
+        <LinearGradient
+          colors={[PRIMARY, '#0a8a9f', '#0c6679']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.heroCard}>
+          <View style={s.heroContent}>
+            <View style={s.avatarContainer}>
+              <View style={s.avatarRing}>
+                <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
+              </View>
+              <View style={s.onlineDot} />
             </View>
+            <View style={s.userInfo}>
+              <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
+              <Text style={s.userId}>ID: {user?.merchantId || '------'}</Text>
+              <View style={s.roleBadge}>
+                <Ionicons name={user?.role === 'admin' ? 'shield-checkmark' : 'storefront'} size={12} color="#fff" />
+                <Text style={s.roleText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* ── بطاقات الأرباح بتصميم جديد ── */}
+        <View style={s.statsGrid}>
+          <View style={[s.statCard, s.statCardPending]}>
+            <View style={s.statIconWrapper}>
+              <Ionicons name="time-outline" size={24} color="#f97316" />
+            </View>
+            <Text style={s.statLabel}>الأرباح المنتظرة</Text>
+            <Text style={s.statValue}>{(user?.pendingBalance || 0).toLocaleString('ar-IQ')}</Text>
+            <Text style={s.statCurrency}>دينار عراقي</Text>
+          </View>
+
+          <View style={[s.statCard, s.statCardEarned]}>
+            <View style={s.statIconWrapper}>
+              <Ionicons name="checkmark-circle-outline" size={24} color="#16a34a" />
+            </View>
+            <Text style={s.statLabel}>الأرباح المحققة</Text>
+            <Text style={s.statValue}>{(user?.balance || 0).toLocaleString('ar-IQ')}</Text>
+            <Text style={s.statCurrency}>دينار عراقي</Text>
           </View>
         </View>
 
-        {/* ── بطاقة المستخدم ── */}
-        <View style={s.userCard}>
-          <View style={s.userInfo}>
-            <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
-            <Text style={s.userId}>ID: {user?.merchantId || '------'}</Text>
-            <View style={s.badge}>
-              <Text style={s.badgeText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
-            </View>
-          </View>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
-          </View>
-        </View>
-
-        {/* ── بطاقات الأرباح ── */}
-        <View style={s.balanceRow}>
-          <View style={[s.balanceCard, s.balanceCardPending]}>
-            <View style={[s.balanceIconBox, s.balanceIconPending]}>
-              <Ionicons name="time-outline" size={20} color="#f97316" />
-            </View>
-            <Text style={[s.balanceLabel, s.balanceLabelPending]}>الأرباح المنتظرة</Text>
-            <Text style={[s.balanceValue, s.balanceValuePending]}>
-              {(user?.pendingBalance || 0).toLocaleString('ar-IQ')}
-            </Text>
-            <Text style={s.balanceCurrency}>د.ع</Text>
-          </View>
-
-          <View style={[s.balanceCard, s.balanceCardEarned]}>
-            <View style={[s.balanceIconBox, s.balanceIconEarned]}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#16a34a" />
-            </View>
-            <Text style={[s.balanceLabel, s.balanceLabelEarned]}>الأرباح المحققة</Text>
-            <Text style={[s.balanceValue, s.balanceValueEarned]}>
-              {(user?.balance || 0).toLocaleString('ar-IQ')}
-            </Text>
-            <Text style={s.balanceCurrency}>د.ع</Text>
-          </View>
-        </View>
-
-        {/* ── قائمة الخيارات ── */}
-        <View style={s.menuContainer}>
+        {/* ── قائمة الخيارات بتصميم جديد ── */}
+        <View style={s.menuSection}>
+          <Text style={s.menuSectionTitle}>القائمة</Text>
           {menuItems.map((item, idx) => (
             <TouchableOpacity
               key={item.key}
               style={[s.menuItem, idx === menuItems.length - 1 && { borderBottomWidth: 0 }]}
               onPress={() => router.push(item.route as any)}
               activeOpacity={0.7}>
-              <View style={[s.menuIconBox, { backgroundColor: item.bg }]}>
-                <Ionicons name={item.icon as any} size={18} color={item.color} />
-              </View>
+              <LinearGradient
+                colors={item.gradient as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.menuIconGradient}>
+                <Ionicons name={item.icon as any} size={18} color="#fff" />
+              </LinearGradient>
               <Text style={s.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+              <Ionicons name="chevron-back" size={16} color="#d1d5db" />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* ── زر تسجيل الخروج ── */}
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-          <Text style={s.logoutText}>تسجيل الخروج</Text>
+          <LinearGradient
+            colors={['#fef2f2', '#fee2e2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.logoutGradient}>
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+            <Text style={s.logoutText}>تسجيل الخروج</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <Text style={s.version}>إصدار التطبيق 1.0.0</Text>
@@ -124,18 +141,16 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 20 },
 
-  // ── Header موحد ──
+  // ── Header معكوس ──
   header: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8edf2',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
   },
   headerTitle: {
     fontSize: 18,
@@ -153,164 +168,176 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── بطاقة المستخدم ──
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#fff',
+  // ── Hero Card (بطاقة المستخدم الرئيسية) ──
+  heroCard: {
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 20,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatarRing: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4ade80',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   userInfo: {
     flex: 1,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   userName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
     marginBottom: 4,
   },
   userId: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: 'rgba(255,255,255,0.7)',
     marginBottom: 8,
   },
-  badge: {
-    backgroundColor: PRIMARY + '12',
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  badgeText: {
+  roleText: {
     fontSize: 11,
-    color: PRIMARY,
-    fontWeight: '600',
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: PRIMARY,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#d4eef3',
-  },
-  avatarText: {
-    fontSize: 22,
-    fontWeight: 'bold',
     color: '#fff',
+    fontWeight: '600',
   },
 
   // ── بطاقات الأرباح ──
-  balanceRow: {
+  statsGrid: {
     flexDirection: 'row',
     gap: 12,
     marginHorizontal: 16,
     marginBottom: 20,
   },
-  balanceCard: {
+  statCard: {
     flex: 1,
-    borderRadius: 18,
-    padding: 14,
-    alignItems: 'flex-end',
-    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16,
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  balanceCardPending: {
+  statCardPending: {
     backgroundColor: '#fff7ed',
+    borderWidth: 1,
     borderColor: '#fed7aa',
   },
-  balanceCardEarned: {
+  statCardEarned: {
     backgroundColor: '#f0fdf4',
+    borderWidth: 1,
     borderColor: '#bbf7d0',
   },
-  balanceIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  statIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  balanceIconPending: {
-    backgroundColor: '#ffedd5',
-  },
-  balanceIconEarned: {
-    backgroundColor: '#dcfce7',
-  },
-  balanceLabel: {
+  statLabel: {
     fontSize: 11,
     fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'right',
+    marginBottom: 6,
+    textAlign: 'center',
+    color: '#374151',
   },
-  balanceLabelPending: {
-    color: '#9a3412',
-  },
-  balanceLabelEarned: {
-    color: '#14532d',
-  },
-  balanceValue: {
+  statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'right',
+    textAlign: 'center',
   },
-  balanceValuePending: {
-    color: '#ea580c',
-  },
-  balanceValueEarned: {
-    color: '#16a34a',
-  },
-  balanceCurrency: {
+  statCurrency: {
     fontSize: 10,
-    fontWeight: '500',
     color: '#9ca3af',
-    textAlign: 'right',
-    marginTop: 2,
+    marginTop: 4,
+    textAlign: 'center',
   },
 
-  // ── قائمة الخيارات ──
-  menuContainer: {
+  // ── قائمة الخيارات بتصميم جديد ──
+  menuSection: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#e8edf2',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  menuSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9ca3af',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
-    gap: 12,
+    gap: 14,
   },
-  menuIconBox: {
+  menuIconGradient: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -324,18 +351,18 @@ const s = StyleSheet.create({
 
   // ── زر تسجيل الخروج ──
   logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#fef2f2',
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 16,
     borderRadius: 16,
+    overflow: 'hidden',
+  },
+  logoutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#fecaca',
   },
   logoutText: {
     fontSize: 14,

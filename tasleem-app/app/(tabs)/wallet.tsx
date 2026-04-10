@@ -151,13 +151,13 @@ export default function WalletScreen() {
     <View style={s.container}>
       <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
 
-        {/* ── Header موحد مع باقي الصفحات ── */}
+        {/* ── Header معكوس RTL ── */}
         <View style={s.header}>
-          <View style={{ width: 40 }} />
-          <Text style={s.headerTitle}>المحفظة</Text>
           <TouchableOpacity style={s.headerIconBtn}>
             <Ionicons name="card-outline" size={22} color={PRIMARY} />
           </TouchableOpacity>
+          <Text style={s.headerTitle}>المحفظة</Text>
+          <View style={{ width: 40 }} />
         </View>
 
         <ScrollView
@@ -167,20 +167,20 @@ export default function WalletScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
           }>
 
-          {/* ── بطاقة الرصيد (مصغرة ومتناسبة) ── */}
+          {/* بطاقة الرصيد */}
           <LinearGradient
             colors={[PRIMARY, '#0a8a9f', '#0c6679']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.mainCard}>
             <View style={s.cardTop}>
-              <View style={s.cardChip}>
-                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" />
-                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" style={{ marginLeft: -16 }} />
-              </View>
               <View style={s.liveIndicator}>
                 <LiveDot />
                 <Text style={s.liveText}>مباشر</Text>
+              </View>
+              <View style={s.cardChip}>
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" />
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" style={{ marginLeft: -16 }} />
               </View>
             </View>
             
@@ -196,7 +196,7 @@ export default function WalletScreen() {
             </TouchableOpacity>
           </LinearGradient>
 
-          {/* ── إحصائيات متقدمة ── */}
+          {/* إحصائيات متقدمة */}
           <View style={s.statsContainer}>
             <View style={s.progressSection}>
               <View style={s.progressCircle}>
@@ -234,7 +234,7 @@ export default function WalletScreen() {
             </View>
           </View>
 
-          {/* ── إجمالي السحوبات ── */}
+          {/* إجمالي السحوبات */}
           {totalWithdrawn > 0 && (
             <View style={s.totalWithdrawnCard}>
               <Text style={s.totalWithdrawnLabel}>إجمالي السحوبات</Text>
@@ -242,18 +242,18 @@ export default function WalletScreen() {
             </View>
           )}
 
-          {/* ── عنوان سجل السحوبات ── */}
+          {/* عنوان سجل السحوبات */}
           <View style={s.historyHeader}>
+            <View style={s.historyBadge}>
+              <Text style={s.historyBadgeText}>{withdrawals.length}</Text>
+            </View>
             <View style={s.historyTitleContainer}>
               <Ionicons name="list-outline" size={20} color={PRIMARY} />
               <Text style={s.historyTitle}>سجل السحوبات</Text>
             </View>
-            <View style={s.historyBadge}>
-              <Text style={s.historyBadgeText}>{withdrawals.length}</Text>
-            </View>
           </View>
 
-          {/* ── سجل السحوبات ── */}
+          {/* سجل السحوبات */}
           {isLoading && withdrawals.length === 0 ? (
             <View style={s.loadingContainer}>
               <ActivityIndicator size="large" color={PRIMARY} />
@@ -280,10 +280,10 @@ export default function WalletScreen() {
                     </View>
                     <View style={s.timelineContent}>
                       <View style={s.timelineHeader}>
-                        <Text style={s.timelineAmount}>{item.amount?.toLocaleString()} د.ع</Text>
                         <View style={[s.timelineBadge, { backgroundColor: st.bg }]}>
                           <Text style={[s.timelineBadgeText, { color: st.color }]}>{st.label}</Text>
                         </View>
+                        <Text style={s.timelineAmount}>{item.amount?.toLocaleString()} د.ع</Text>
                       </View>
                       <Text style={s.timelineMeta}>
                         {item.method === 'mastercard' ? PAYMENT_METHOD_ARABIC : item.method}
@@ -297,7 +297,7 @@ export default function WalletScreen() {
           )}
         </ScrollView>
 
-        {/* ── Modal السحب ── */}
+        {/* Modal السحب */}
         <Modal visible={isOpen} transparent animationType="slide">
           <View style={s.modalOverlay}>
             <View style={s.modalCard}>
@@ -373,7 +373,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   safeArea: { flex: 1 },
 
-  // ── Header موحد مع باقي الصفحات ──
+  // Header معكوس
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -400,11 +400,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  scrollContent: {
-    paddingBottom: 40,
-  },
+  scrollContent: { paddingBottom: 40 },
 
-  // ── بطاقة الرصيد (مصغرة) ──
   mainCard: {
     marginHorizontal: 16,
     marginTop: 16,
@@ -427,7 +424,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   cardBalance: {
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     marginBottom: 24,
   },
   cardLabel: {
@@ -481,7 +478,6 @@ const s = StyleSheet.create({
     color: PRIMARY,
   },
 
-  // ── إحصائيات متقدمة ──
   statsContainer: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -527,7 +523,7 @@ const s = StyleSheet.create({
   },
   progressLabels: {
     flex: 1,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   progressTitle: {
     fontSize: 13,
@@ -577,7 +573,6 @@ const s = StyleSheet.create({
     backgroundColor: '#e8edf2',
   },
 
-  // ── إجمالي السحوبات ──
   totalWithdrawnCard: {
     backgroundColor: '#fef3c7',
     marginHorizontal: 16,
@@ -599,7 +594,6 @@ const s = StyleSheet.create({
     color: '#d97706',
   },
 
-  // ── سجل السحوبات ──
   historyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -629,7 +623,6 @@ const s = StyleSheet.create({
     color: '#fff',
   },
 
-  // ── Timeline ──
   timeline: {
     paddingHorizontal: 16,
   },
@@ -640,7 +633,7 @@ const s = StyleSheet.create({
   },
   timelineLine: {
     position: 'absolute',
-    left: 13,
+    right: 13,
     top: 26,
     bottom: -16,
     width: 2,
@@ -652,7 +645,8 @@ const s = StyleSheet.create({
     borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginLeft: 12,
+    marginRight: 0,
     zIndex: 2,
   },
   timelineContent: {
@@ -686,16 +680,15 @@ const s = StyleSheet.create({
   timelineMeta: {
     fontSize: 10,
     color: '#6b7280',
-    textAlign: 'right',
+    textAlign: 'left',
     marginBottom: 3,
   },
   timelineDate: {
     fontSize: 9,
     color: '#9ca3af',
-    textAlign: 'right',
+    textAlign: 'left',
   },
 
-  // ── Loading & Empty ──
   loadingContainer: {
     paddingVertical: 50,
     alignItems: 'center',
@@ -728,7 +721,6 @@ const s = StyleSheet.create({
     color: '#9ca3af',
   },
 
-  // ── Modal ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -789,7 +781,7 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#374151',
-    textAlign: 'right',
+    textAlign: 'left',
     marginBottom: 5,
     marginTop: 10,
   },
@@ -802,6 +794,7 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: '#111827',
     backgroundColor: '#f8fafc',
+    textAlign: 'left',
   },
   inputErr: {
     borderColor: DANGER,
@@ -810,7 +803,7 @@ const s = StyleSheet.create({
     color: DANGER,
     fontSize: 11,
     marginTop: 3,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   confirmBtn: {
     backgroundColor: PRIMARY,
