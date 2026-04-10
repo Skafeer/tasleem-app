@@ -20,9 +20,11 @@ interface Notification {
   data: string | null;
   is_read: boolean;
   created_at: string;
+  user_id: number;
 }
 
 const timeAgo = (date: string) => {
+  if (!date) return 'الآن';
   const utcDate = (date.endsWith('Z') || date.includes('+')) ? date : date + 'Z';
   const diff = Date.now() - new Date(utcDate).getTime();
   if (diff < 0) return 'الآن';
@@ -39,7 +41,9 @@ const timeAgo = (date: string) => {
 const getNotificationIcon = (notification: Notification) => {
   if (notification.data) {
     try {
-      const data = JSON.parse(notification.data);
+      const data = typeof notification.data === 'string' 
+        ? JSON.parse(notification.data) 
+        : notification.data;
       if (data?.type === 'order_status') return { icon: 'bag-check-outline', color: '#3b82f6', bg: '#3b82f610' };
       if (data?.type === 'withdrawal_status') return { icon: 'wallet-outline', color: '#10b981', bg: '#10b98110' };
       if (data?.type === 'broadcast') return { icon: 'megaphone-outline', color: '#f59e0b', bg: '#f59e0b10' };
@@ -55,14 +59,34 @@ export default function NotificationsScreen() {
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Fetch notifications
-  const { data: notifications = [], isLoading, refetch } = useQuery({
+  // ✅ استخدام الـ API الصحيح - نفس الـ endpoint الذي يعمل في admin
+  const { data: notifications = [], isLoading, refetch, error } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: async () => {
-      const { data } = await api.get('/api/notifications/user');
-      return data.sort((a: Notification, b: Notification) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      try {
+        // محاولة جلب الإشعارات من endpoint المستخدم
+        const { data } = await api.get('/api/notifications');
+        
+        // فلترة الإشعارات لهذا المستخدم فقط
+        // إذا كان الـ API يعيد كل الإشعارات، نقوم بفلترتها
+        let userNotifications = data;
+        
+        // إذا كانت البيانات تحتوي على خاصية user_id، فلترها للمستخدم الحالي
+        // وإلا اعتبر كل الإشعارات للمستخدم الحالي
+        if (Array.isArray(data) && data.length > 0 && data[0]?.user_id) {
+          // جلب المستخدم الحالي
+          const { data: user } = await api.get('/api/auth/me');
+          userNotifications = data.filter((n: any) => n.user_id === user.id);
+        }
+        
+        // ترتيب من الأحدث إلى الأقدم
+        return userNotifications.sort((a: Notification, b: Notification) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      } catch (err) {
+        console.error('Error fetching notifications:', err);
+        return [];
+      }
     },
     refetchInterval: 30000,
   });
@@ -74,16 +98,25 @@ export default function NotificationsScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
+      qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
+    },
+    onError: (err) => {
+      console.error('Error marking as read:', err);
     },
   });
 
   // Mark all as read mutation
   const markAllAsRead = useMutation({
     mutationFn: async () => {
+      // إرسال طلب لتحديد الكل كمقروء
       await api.post('/api/notifications/mark-all-read');
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
+      qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
+    },
+    onError: (err) => {
+      console.error('Error marking all as read:', err);
     },
   });
 
@@ -94,7 +127,11 @@ export default function NotificationsScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
+      qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
       setModalVisible(false);
+    },
+    onError: (err) => {
+      console.error('Error deleting notification:', err);
     },
   });
 
@@ -107,8 +144,12 @@ export default function NotificationsScreen() {
   const handleNotificationPress = (notification: Notification) => {
     if (!notification.is_read) {
       markAsRead.mutate(notification.id);
+      // تحديث الحالة محلياً
+      const updatedNotification = { ...notification, is_read: true };
+      setSelectedNotification(updatedNotification);
+    } else {
+      setSelectedNotification(notification);
     }
-    setSelectedNotification(notification);
     setModalVisible(true);
   };
 
@@ -176,7 +217,9 @@ export default function NotificationsScreen() {
             style={s.markAllBtn} 
             onPress={() => markAllAsRead.mutate()}
             disabled={markAllAsRead.isPending}>
-            <Text style={s.markAllText}>تحديد الكل كمقروء</Text>
+            <Text style={s.markAllText}>
+              {markAllAsRead.isPending ? 'جاري...' : 'تحديد الكل كمقروء'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -197,8 +240,19 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      {/* Notifications List */}
-      {isLoading ? (
+      {/* Error State */}
+      {error ? (
+        <View style={s.emptyContainer}>
+          <View style={s.emptyIconBox}>
+            <Ionicons name="alert-circle-outline" size={50} color="#ef4444" />
+          </View>
+          <Text style={s.emptyTitle}>حدث خطأ</Text>
+          <Text style={s.emptyText}>لم نتمكن من تحميل الإشعارات</Text>
+          <TouchableOpacity style={s.retryBtn} onPress={onRefresh}>
+            <Text style={s.retryText}>إعادة المحاولة</Text>
+          </TouchableOpacity>
+        </View>
+      ) : isLoading ? (
         <View style={s.loadingContainer}>
           <ActivityIndicator size="large" color={PRIMARY} />
           <Text style={s.loadingText}>جاري تحميل الإشعارات...</Text>
@@ -409,6 +463,16 @@ const s = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: '#9ca3af',
+  },
+  retryBtn: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
