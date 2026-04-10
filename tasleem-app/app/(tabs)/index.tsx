@@ -350,7 +350,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Notification button - navigates to /notifications page */}
-        <TouchableOpacity onPress={() => router.push('/notifications')} style={s.notifBtn}>
+        <TouchableOpacity onPress={() => router.push('/notification')} style={s.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
           {unreadCount > 0 && (
             <View style={s.notifBadge}>
