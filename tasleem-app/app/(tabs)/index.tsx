@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions, Animated
@@ -6,7 +6,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
@@ -100,14 +99,25 @@ export default function HomeScreen() {
 
   const banners    = rawBanners as any[];
   const products   = (allProducts as any[]).filter((p: any) => p.stock > 0);
-  const allCats    = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
-  const categories = ['الكل', ...Array.from(new Set(allCats))];
-  const filtered   = products.filter((p: any) => {
-    const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
-    return (activeCategory === 'الكل' || cats.includes(activeCategory)) && (!search || p.name.includes(search));
-  });
+  
+  // ✅ استخدام useMemo لتحسين الأداء
+  const categories = useMemo(() => {
+    const allCats = products.flatMap((p: any) => 
+      p.category ? p.category.split(',').map((c: string) => c.trim()) : []
+    );
+    return ['الكل', ...Array.from(new Set(allCats))];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    return products.filter((p: any) => {
+      const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+      return (activeCategory === 'الكل' || cats.includes(activeCategory)) && 
+             (!search || p.name.includes(search));
+    });
+  }, [products, activeCategory, search]);
 
   const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
+  
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
     return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
@@ -161,9 +171,9 @@ export default function HomeScreen() {
         <FlatList
           data={filtered}
           numColumns={2}
-          keyExtractor={i => String((i as any).id)}
+          keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
           contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 32, gap: 12 }}
-          columnWrapperStyle={{ gap: 12, flexDirection: 'row-reverse' }}
+          columnWrapperStyle={{ gap: 12, justifyContent: 'space-between' }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
@@ -172,11 +182,11 @@ export default function HomeScreen() {
               <View style={s.categoriesWrapper}>
                 <FlatList
                   horizontal
-                  data={categories as string[]}
+                  data={categories}
                   showsHorizontalScrollIndicator={false}
                   style={s.catList}
                   contentContainerStyle={s.catListContent}
-                  keyExtractor={i => i}
+                  keyExtractor={item => item}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[s.catBtn, activeCategory === item && s.catBtnActive]}
