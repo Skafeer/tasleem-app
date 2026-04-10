@@ -1,10 +1,11 @@
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const PRIMARY = '#0c6679';
+const BG = '#f2f6f9';
 
 const SECTIONS = [
   { icon: 'shield-checkmark-outline', title: 'جمع المعلومات', content: 'نقوم بجمع المعلومات التي تقدمها عند إنشاء حسابك، بما في ذلك اسم المتجر ورقم الهاتف والعنوان. نستخدم هذه المعلومات لتقديم خدماتنا وتحسين تجربتك على المنصة.' },
@@ -31,24 +32,27 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
-        <View style={s.headerRow}>
+      {/* ── Header موحد ── */}
+      <View style={s.header}>
+        <View style={s.headerContent}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-forward" size={22} color="#fff" />
+            <Ionicons name="chevron-forward" size={22} color="#111827" />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>سياسة الخصوصية والشروط</Text>
-          <View style={{ width: 38 }} />
+          <Text style={s.headerTitle}>سياسة الخصوصية</Text>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={s.heroCard}>
-          <View style={s.heroIcon}>
-            <Ionicons name="shield-checkmark-outline" size={32} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.heroTitle}>نحن نحمي خصوصيتك</Text>
-            <Text style={s.heroSub}>آخر تحديث: يناير 2026</Text>
-          </View>
+      </View>
+
+      {/* بطاقة الترحيب */}
+      <View style={s.heroCard}>
+        <View style={s.heroIcon}>
+          <Ionicons name="shield-checkmark-outline" size={28} color={PRIMARY} />
         </View>
-      </LinearGradient>
+        <View style={s.heroText}>
+          <Text style={s.heroTitle}>نحن نحمي خصوصيتك</Text>
+          <Text style={s.heroSub}>آخر تحديث: يناير 2026</Text>
+        </View>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
@@ -66,7 +70,7 @@ export default function PrivacyScreen() {
 
         <View style={s.termsCard}>
           <View style={s.termsTop}>
-            <View style={s.cardIcon}>
+            <View style={[s.cardIcon, { backgroundColor: '#f5f3ff' }]}>
               <Ionicons name="document-text-outline" size={20} color="#8b5cf6" />
             </View>
             <Text style={s.cardTitle}>شروط الاستخدام</Text>
@@ -90,34 +94,172 @@ export default function PrivacyScreen() {
 }
 
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#f8fafc' },
-  header:      { paddingHorizontal: 16, paddingBottom: 24 },
-  headerRow:   { flexDirection: 'row-reverse', alignItems: 'center',
-    justifyContent: 'space-between', paddingTop: 12, marginBottom: 20 },
-  backBtn:     { width: 38, height: 38, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#fff' },
-  heroCard:    { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 18, padding: 16,
-    flexDirection: 'row-reverse', alignItems: 'center', gap: 14 },
-  heroIcon:    { width: 56, height: 56, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  heroTitle:   { fontSize: 16, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  heroSub:     { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4, textAlign: 'right' },
-  scroll:      { padding: 16, paddingBottom: 40 },
-  card:        { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  cardTop:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 12 },
-  cardIcon:    { width: 40, height: 40, borderRadius: 12, backgroundColor: `${PRIMARY}12`,
-    justifyContent: 'center', alignItems: 'center' },
-  cardTitle:   { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  cardContent: { fontSize: 13, color: '#6b7280', textAlign: 'right', lineHeight: 22 },
-  termsCard:   { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  termsTop:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 16 },
-  termItem:    { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  termDot:     { width: 8, height: 8, borderRadius: 4, backgroundColor: PRIMARY, marginTop: 6 },
-  termText:    { flex: 1, fontSize: 13, color: '#6b7280', textAlign: 'right', lineHeight: 22 },
-  footerNote:  { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8,
-    backgroundColor: `${PRIMARY}08`, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: `${PRIMARY}20` },
-  footerText:  { flex: 1, fontSize: 12, color: '#6b7280', textAlign: 'right', lineHeight: 20 },
+  container: { flex: 1, backgroundColor: BG },
+
+  // Header موحد
+  header: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+
+  // بطاقة الترحيب
+  heroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroText: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  heroTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  heroSub: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+
+  scroll: { padding: 16, paddingBottom: 40 },
+
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  cardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  cardContent: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'right',
+    lineHeight: 22,
+  },
+
+  termsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  termsTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  termItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  termDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: PRIMARY,
+    marginTop: 7,
+  },
+  termText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'right',
+    lineHeight: 22,
+  },
+
+  footerNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: PRIMARY + '08',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: PRIMARY + '20',
+  },
+  footerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'right',
+    lineHeight: 20,
+  },
 });

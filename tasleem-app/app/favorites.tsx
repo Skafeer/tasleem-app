@@ -1,19 +1,19 @@
+import React from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Image, ActivityIndicator, useWindowDimensions, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
+const BG = '#f2f6f9';
 
-
-// ── Skeleton Card ──
+// Skeleton Card
 function SkeletonFavCard({ width }: { width: number }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
@@ -36,11 +36,10 @@ function SkeletonFavCard({ width }: { width: number }) {
 }
 
 const skf = StyleSheet.create({
-  card:  { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  img:   { backgroundColor: '#e5e7eb', width: '100%' },
-  body:  { padding: 10, gap: 8 },
-  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '80%' },
+  card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  img: { backgroundColor: '#e8edf2', width: '100%' },
+  body: { padding: 10, gap: 8 },
+  line: { height: 12, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
 export default function FavoritesScreen() {
@@ -69,19 +68,21 @@ export default function FavoritesScreen() {
   const getImages = (p: any) => p.images ? p.images.split(',').filter(Boolean) : p.imageUrl ? [p.imageUrl] : [];
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header Gradient ── */}
-      <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-forward" size={22} color="#fff" />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>المنتجات المفضلة</Text>
-        <View style={s.favCountBox}>
-          <Ionicons name="heart" size={13} color="#fff" />
-          <Text style={s.favCount}>{favorites.length}</Text>
+      {/* ── Header موحد ── */}
+      <View style={s.header}>
+        <View style={s.headerContent}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-forward" size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>المنتجات المفضلة</Text>
+          <View style={s.favCountBox}>
+            <Ionicons name="heart" size={12} color={PRIMARY} />
+            <Text style={s.favCount}>{favorites.length}</Text>
+          </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {isLoading ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 14 }}>
@@ -90,7 +91,7 @@ export default function FavoritesScreen() {
       ) : favorites.length === 0 ? (
         <View style={s.empty}>
           <View style={s.emptyIconBox}>
-            <Ionicons name="heart-outline" size={42} color={PRIMARY} />
+            <Ionicons name="heart-outline" size={42} color="#9ca3af" />
           </View>
           <Text style={s.emptyTitle}>لا توجد منتجات مفضلة</Text>
           <Text style={s.emptyText}>اضغط على أيقونة القلب على أي منتج لحفظه هنا</Text>
@@ -110,7 +111,7 @@ export default function FavoritesScreen() {
           renderItem={({ item: p }: any) => {
             const imgs = getImages(p);
             const hasDiscount = p.discount > 0;
-            const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
+            const discounted = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
             return (
               <TouchableOpacity
                 style={[s.card, { width: CARD_WIDTH }]}
@@ -126,7 +127,7 @@ export default function FavoritesScreen() {
                     </View>
                   )}
                   <TouchableOpacity style={s.favBtn} onPress={() => removeFav.mutate(p.id)}>
-                    <Ionicons name="heart" size={18} color="#ef4444" />
+                    <Ionicons name="heart" size={16} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
                 <View style={s.cardBody}>
@@ -149,55 +150,73 @@ export default function FavoritesScreen() {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: BG },
 
-  // ── Header ──
-  header:       { flexDirection: 'row-reverse', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
-  backBtn:      { width: 38, height: 38, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center' },
-  headerTitle:  { flex: 1, fontSize: 17, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  favCountBox:  { flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 5 },
-  favCount:     { fontSize: 13, fontWeight: 'bold', color: '#fff' },
-
-  center:       { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  // ── Empty ──
-  empty:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30 },
-  emptyIconBox: { width: 90, height: 90, borderRadius: 45,
+  // Header موحد
+  header: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  favCountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: PRIMARY + '12',
-    justifyContent: 'center', alignItems: 'center' },
-  emptyTitle:   { fontSize: 17, fontWeight: 'bold', color: '#374151', textAlign: 'center' },
-  emptyText:    { fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 20 },
-  browseBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14,
-    paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  favCount: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
+
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30 },
+  emptyIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151', textAlign: 'center' },
+  emptyText: { fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 20 },
+  browseBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PRIMARY, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
   browseBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  list:         { padding: 14, gap: 12 },
-  row:          { justifyContent: 'space-between', marginBottom: 12 },
+  list: { padding: 14, gap: 12 },
+  row: { justifyContent: 'space-between', marginBottom: 12 },
 
-  // ── Cards ──
-  card:         { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  imgBox:       { position: 'relative', overflow: 'hidden' },
-  img:          { width: '100%', height: '100%' },
+  card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  imgBox: { position: 'relative', overflow: 'hidden' },
+  img: { width: '100%', height: '100%' },
   imgPlaceholder: { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  discountBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444',
-    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  favBtn:       { position: 'absolute', top: 8, left: 8, width: 32, height: 32,
-    borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center', alignItems: 'center' },
-  cardBody:     { padding: 10, gap: 6 },
-  productName:  { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  priceRow:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  price:        { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
-  oldPrice:     { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
-  catPill:      { backgroundColor: PRIMARY + '12', borderRadius: 6,
-    paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-end' },
-  catPillText:  { fontSize: 10, color: PRIMARY, fontWeight: '600' },
+  discountBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  discountText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  favBtn: { position: 'absolute', top: 8, left: 8, width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center' },
+  cardBody: { padding: 10, gap: 6 },
+  productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-start' },
+  price: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
+  oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
+  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-start' },
+  catPillText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
 });
