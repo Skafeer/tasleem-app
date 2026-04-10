@@ -100,7 +100,6 @@ export default function HomeScreen() {
   const banners    = rawBanners as any[];
   const products   = (allProducts as any[]).filter((p: any) => p.stock > 0);
   
-  // ✅ استخدام useMemo لتحسين الأداء
   const categories = useMemo(() => {
     const allCats = products.flatMap((p: any) => 
       p.category ? p.category.split(',').map((c: string) => c.trim()) : []
@@ -126,23 +125,23 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header ── */}
+      {/* ── Header معكوس (RTL) ── */}
       <View style={s.header}>
-        {/* السلة يسار */}
-        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="bag-outline" size={22} color={PRIMARY} />
-        </TouchableOpacity>
+        {/* ترحيب يمين (الآن أول عنصر من اليمين) */}
+        <View style={s.greetBox}>
+          <Text style={s.greetName} numberOfLines={1}>{user?.storeName || 'تاجر'}</Text>
+          <Text style={s.greetSub}>{filtered.length} منتج</Text>
+        </View>
 
         {/* الشعار وسط */}
         <View style={s.headerCenter}>
           <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
         </View>
 
-        {/* ترحيب يمين */}
-        <View style={s.greetBox}>
-          <Text style={s.greetName} numberOfLines={1}>{user?.storeName || 'تاجر'}</Text>
-          <Text style={s.greetSub}>{filtered.length} منتج</Text>
-        </View>
+        {/* السلة يسار (الآن آخر عنصر) */}
+        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
+          <Ionicons name="bag-outline" size={22} color={PRIMARY} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Search ── */}
@@ -172,13 +171,13 @@ export default function HomeScreen() {
           data={filtered}
           numColumns={2}
           keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 32, gap: 12 }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 32 }}
           columnWrapperStyle={{ gap: 12, justifyContent: 'space-between' }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
             <>
-              {/* Categories */}
+              {/* Categories - RTL */}
               <View style={s.categoriesWrapper}>
                 <FlatList
                   horizontal
@@ -196,8 +195,10 @@ export default function HomeScreen() {
                   )}
                 />
               </View>
-              {/* Banner */}
-              <BannerSlider banners={banners} containerWidth={width} />
+              {/* Banner مع حواف منحنية */}
+              <View style={s.bannerWrapper}>
+                <BannerSlider banners={banners} containerWidth={width} />
+              </View>
             </>
           }
           ListEmptyComponent={
@@ -209,7 +210,7 @@ export default function HomeScreen() {
               <Text style={s.emptyText}>سيتم إضافة منتجات قريباً</Text>
             </View>
           }
-          renderItem={({ item: p }: any) => {
+          renderItem={({ item: p, index }) => {
             const imgs        = getImages(p);
             const hasDiscount = p.discount > 0;
             const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
@@ -226,7 +227,7 @@ export default function HomeScreen() {
                         <Ionicons name="image-outline" size={28} color="#d1d5db" />
                       </View>
                   }
-                  {/* Badges */}
+                  {/* Badges - معكوسة للRTL */}
                   {p.isRenewable && (
                     <View style={s.renewBadge}>
                       <Text style={s.renewText}>قابل للتجديد</Text>
@@ -287,37 +288,48 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header ──
+  // ── Header معكوس (RTL) ──
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+    flexDirection: 'row', 
+    alignItems: 'center',
+    justifyContent: 'space-between', // توزيع متساوي
+    paddingHorizontal: 14, 
+    paddingVertical: 10, 
     backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#e8edf2',
+    borderBottomWidth: 1, 
+    borderBottomColor: '#e8edf2',
   },
-  headerCenter: { flex: 1, alignItems: 'center' },
+  headerCenter: { alignItems: 'center' },
   headerLogo:   { width: 100, height: 36 },
   cartBtn: {
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#d4eef3',
     justifyContent: 'center', alignItems: 'center',
   },
-  greetBox:  { alignItems: 'flex-end' },
-  greetName: { fontSize: 13, fontWeight: '800', color: '#0d1b2a', maxWidth: 90 },
-  greetSub:  { fontSize: 10, color: '#64748b', marginTop: 1 },
+  greetBox:  { alignItems: 'flex-start' }, // تغير من flex-end إلى flex-start
+  greetName: { fontSize: 13, fontWeight: '800', color: '#0d1b2a', maxWidth: 90, textAlign: 'left' },
+  greetSub:  { fontSize: 10, color: '#64748b', marginTop: 1, textAlign: 'left' },
 
   // ── Search ──
   searchBox: {
-    flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    marginHorizontal: 12, marginVertical: 10, borderRadius: 14,
-    paddingHorizontal: 14, height: 46,
-    borderWidth: 1.5, borderColor: '#e8edf2', gap: 8,
+    flexDirection: 'row', // تغير من row-reverse إلى row
+    alignItems: 'center', 
+    backgroundColor: '#fff',
+    marginHorizontal: 12, 
+    marginVertical: 10, 
+    borderRadius: 14,
+    paddingHorizontal: 14, 
+    height: 46,
+    borderWidth: 1.5, 
+    borderColor: '#e8edf2', 
+    gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
 
   // ── Categories ──
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList:           { maxHeight: 44 },
-  catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
+  catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center', flexDirection: 'row' },
   catBtn: {
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e8edf2',
@@ -326,53 +338,87 @@ const s = StyleSheet.create({
   catText:       { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
 
+  // ── Banner Wrapper (حواف منحنية) ──
+  bannerWrapper: {
+    marginHorizontal: 4,
+    marginBottom: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+
   // ── Cards ──
   card: {
-    backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden',
-    shadowColor: '#0d1b2a', shadowOpacity: 0.07, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 }, elevation: 3,
-    borderWidth: 1, borderColor: '#e8edf2',
+    backgroundColor: '#fff', 
+    borderRadius: 18, 
+    overflow: 'hidden',
+    shadowColor: '#0d1b2a', 
+    shadowOpacity: 0.07, 
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 }, 
+    elevation: 3,
+    borderWidth: 1, 
+    borderColor: '#e8edf2',
   },
   imgBox:        { position: 'relative', overflow: 'hidden' },
   img:           { width: '100%', height: '100%' },
   imgPlaceholder: { backgroundColor: '#f2f6f9', justifyContent: 'center', alignItems: 'center' },
 
+  // Badges معكوسة للRTL
   renewBadge: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: PRIMARY, borderRadius: 8,
-    paddingHorizontal: 7, paddingVertical: 3,
+    position: 'absolute', 
+    top: 8, 
+    right: 8, // باقي يمين لأن RTL يعكسها
+    backgroundColor: PRIMARY, 
+    borderRadius: 8,
+    paddingHorizontal: 7, 
+    paddingVertical: 3,
   },
   renewText: { fontSize: 9, color: '#fff', fontWeight: '700' },
 
   discountBadge: {
-    position: 'absolute', top: 8, left: 8,
-    backgroundColor: '#ef4444', borderRadius: 8,
-    paddingHorizontal: 7, paddingVertical: 3,
+    position: 'absolute', 
+    top: 8, 
+    left: 8, // باقي يسار
+    backgroundColor: '#ef4444', 
+    borderRadius: 8,
+    paddingHorizontal: 7, 
+    paddingVertical: 3,
   },
   discountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
 
   favBtn: {
-    position: 'absolute', bottom: 8, left: 8,
-    width: 30, height: 30, borderRadius: 10,
+    position: 'absolute', 
+    bottom: 8, 
+    right: 8, // تغير من left إلى right
+    width: 30, 
+    height: 30, 
+    borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center', 
+    alignItems: 'center',
   },
   favBtnActive: { backgroundColor: 'rgba(255,255,255,0.9)' },
 
   imgCount: {
-    position: 'absolute', bottom: 8, right: 8,
+    position: 'absolute', 
+    bottom: 8, 
+    left: 8, // تغير من right إلى left
     backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2,
-    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderRadius: 6, 
+    paddingHorizontal: 5, 
+    paddingVertical: 2,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 3,
   },
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
 
   cardBody:    { padding: 10, gap: 5 },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
-  priceRow:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  priceRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-start' },
   price:       { fontSize: 14, fontWeight: '900', color: PRIMARY },
   oldPrice:    { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through' },
-  bottomRow:   { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  bottomRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   catPill:     { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
   catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
   stockText:   { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
