@@ -15,7 +15,7 @@ const PRIMARY = '#0c6679';
 const GOLD = '#f59e0b';
 const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
-const BG_GRADIENT = ['#f8fafc', '#e8edf2'] as const;
+const BG = '#f2f6f9';
 
 const STATUS: any = {
   pending:  { label: 'قيد المعالجة', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
@@ -26,68 +26,6 @@ const STATUS: any = {
 
 const PAYMENT_METHOD = 'mastercard';
 const PAYMENT_METHOD_ARABIC = 'ماستر كارد';
-
-// Animated Circular Progress - Version مُصلحة
-function CircularProgress({ progress, size = 80, color = SUCCESS }: { 
-  progress: number; 
-  size?: number; 
-  color?: string;
-}) {
-  const animatedValue = useRef(new Animated.Value(0)).current;
-  
-  useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: progress,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start();
-  }, [progress]);
-
-  // حساب الـ circumference
-  const radius = (size - 16) / 2;
-  const circumference = 2 * Math.PI * radius;
-  
-  const strokeDashoffset = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, 0],
-  });
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* الخلفية */}
-      <View
-        style={{
-          position: 'absolute',
-          width: size - 16,
-          height: size - 16,
-          borderRadius: (size - 16) / 2,
-          borderWidth: 6,
-          borderColor: '#e2e8f0',
-        }}
-      />
-      {/* التقدم المتحرك */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          width: size - 16,
-          height: size - 16,
-          borderRadius: (size - 16) / 2,
-          borderWidth: 6,
-          borderColor: color,
-          borderTopColor: 'transparent',
-          borderRightColor: 'transparent',
-          transform: [{ rotate: '-90deg' }],
-          // @ts-ignore - strokeDashoffset is valid for Animated.View
-          strokeDashoffset,
-          strokeDasharray: circumference,
-        }}
-      />
-      <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827' }}>
-        {Math.round(progress * 100)}%
-      </Text>
-    </View>
-  );
-}
 
 // Live dot animation
 function LiveDot() {
@@ -111,7 +49,6 @@ export default function WalletScreen() {
   const [amountError, setAmountError] = useState('');
   const [cardError, setCardError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const scrollY = useRef(new Animated.Value(0)).current;
 
   const { data: user, refetch: refetchUser } = useQuery({
     queryKey: ['user'],
@@ -206,83 +143,74 @@ export default function WalletScreen() {
     return `${date} · ${time}`;
   };
 
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
   const totalWithdrawn = withdrawals.reduce((sum: number, w: any) => sum + (w.status === 'paid' ? w.amount : 0), 0);
   const totalBalance = (user?.balance || 0) + (user?.pendingBalance || 0);
   const progress = totalBalance > 0 ? (user?.balance || 0) / totalBalance : 0;
 
   return (
-    <LinearGradient colors={BG_GRADIENT} style={s.container}>
-      <SafeAreaView style={s.safeArea} edges={['top']}>
+    <View style={s.container}>
+      <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
 
-        {/* Header مع تأثير شفاف عند التمرير */}
-        <Animated.View style={[s.header, { 
-          backgroundColor: headerOpacity.interpolate({
-            inputRange: [0, 0.5, 1],
-            outputRange: ['transparent', 'rgba(255,255,255,0.8)', '#fff']
-          }) 
-        }]}>
-          <View style={s.headerContent}>
-            <View style={{ width: 40 }} />
-            <Text style={s.headerTitle}>المحفظة</Text>
-            <TouchableOpacity style={s.headerIconBtn} onPress={() => {}}>
-              <Ionicons name="card-outline" size={22} color={PRIMARY} />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+        {/* ── Header موحد مع باقي الصفحات ── */}
+        <View style={s.header}>
+          <View style={{ width: 40 }} />
+          <Text style={s.headerTitle}>المحفظة</Text>
+          <TouchableOpacity style={s.headerIconBtn}>
+            <Ionicons name="card-outline" size={22} color={PRIMARY} />
+          </TouchableOpacity>
+        </View>
 
-        <Animated.ScrollView
+        <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.scrollContent}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: false }
-          )}
-          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
           }>
 
-          {/* بطاقة الرصيد الرئيسية - تصميم بطاقة فيزا */}
+          {/* ── بطاقة الرصيد (مصغرة ومتناسبة) ── */}
           <LinearGradient
             colors={[PRIMARY, '#0a8a9f', '#0c6679']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.mainCard}>
-            <View style={s.cardChip}>
-              <Ionicons name="ellipse-outline" size={30} color="rgba(255,255,255,0.3)" />
-              <Ionicons name="ellipse-outline" size={30} color="rgba(255,255,255,0.3)" style={{ marginLeft: -20 }} />
+            <View style={s.cardTop}>
+              <View style={s.cardChip}>
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" />
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" style={{ marginLeft: -16 }} />
+              </View>
+              <View style={s.liveIndicator}>
+                <LiveDot />
+                <Text style={s.liveText}>مباشر</Text>
+              </View>
             </View>
+            
             <View style={s.cardBalance}>
               <Text style={s.cardLabel}>الرصيد المتاح</Text>
               <Text style={s.cardAmount}>{(user?.balance || 0).toLocaleString()}</Text>
               <Text style={s.cardCurrency}>دينار عراقي</Text>
             </View>
-            <View style={s.cardFooter}>
-              <View style={s.liveIndicator}>
-                <LiveDot />
-                <Text style={s.liveText}>مباشر</Text>
-              </View>
-              <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
-                <Ionicons name="arrow-up-circle-outline" size={18} color={PRIMARY} />
-                <Text style={s.withdrawBtnText}>سحب رصيد</Text>
-              </TouchableOpacity>
-            </View>
+
+            <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
+              <Ionicons name="arrow-up-circle-outline" size={18} color={PRIMARY} />
+              <Text style={s.withdrawBtnText}>سحب رصيد</Text>
+            </TouchableOpacity>
           </LinearGradient>
 
-          {/* إحصائيات متقدمة */}
+          {/* ── إحصائيات متقدمة ── */}
           <View style={s.statsContainer}>
             <View style={s.progressSection}>
-              <CircularProgress progress={progress} size={90} color={SUCCESS} />
+              <View style={s.progressCircle}>
+                <View style={s.progressRing}>
+                  <Text style={s.progressPercent}>{Math.round(progress * 100)}%</Text>
+                </View>
+              </View>
               <View style={s.progressLabels}>
                 <Text style={s.progressTitle}>تقدم الأرباح</Text>
                 <Text style={s.progressSub}>
-                  {(user?.balance || 0).toLocaleString()} محققة / {(user?.pendingBalance || 0).toLocaleString()} منتظرة
+                  {(user?.balance || 0).toLocaleString()} محققة
+                </Text>
+                <Text style={s.progressSub2}>
+                  {(user?.pendingBalance || 0).toLocaleString()} منتظرة
                 </Text>
               </View>
             </View>
@@ -306,7 +234,7 @@ export default function WalletScreen() {
             </View>
           </View>
 
-          {/* شريط إجمالي السحوبات */}
+          {/* ── إجمالي السحوبات ── */}
           {totalWithdrawn > 0 && (
             <View style={s.totalWithdrawnCard}>
               <Text style={s.totalWithdrawnLabel}>إجمالي السحوبات</Text>
@@ -314,7 +242,7 @@ export default function WalletScreen() {
             </View>
           )}
 
-          {/* عنوان سجل السحوبات مع تصميم جديد */}
+          {/* ── عنوان سجل السحوبات ── */}
           <View style={s.historyHeader}>
             <View style={s.historyTitleContainer}>
               <Ionicons name="list-outline" size={20} color={PRIMARY} />
@@ -325,7 +253,7 @@ export default function WalletScreen() {
             </View>
           </View>
 
-          {/* سجل السحوبات - تصميم Timeline */}
+          {/* ── سجل السحوبات ── */}
           {isLoading && withdrawals.length === 0 ? (
             <View style={s.loadingContainer}>
               <ActivityIndicator size="large" color={PRIMARY} />
@@ -367,9 +295,9 @@ export default function WalletScreen() {
               })}
             </View>
           )}
-        </Animated.ScrollView>
+        </ScrollView>
 
-        {/* Modal السحب - تصميم جديد */}
+        {/* ── Modal السحب ── */}
         <Modal visible={isOpen} transparent animationType="slide">
           <View style={s.modalOverlay}>
             <View style={s.modalCard}>
@@ -437,30 +365,24 @@ export default function WalletScreen() {
           </View>
         </Modal>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: BG },
   safeArea: { flex: 1 },
-  scrollContent: { paddingBottom: 40 },
 
-  // Header مع تأثير
+  // ── Header موحد مع باقي الصفحات ──
   header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
   },
   headerTitle: {
     fontSize: 18,
@@ -478,55 +400,60 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // بطاقة الرصيد الرئيسية
+  scrollContent: {
+    paddingBottom: 40,
+  },
+
+  // ── بطاقة الرصيد (مصغرة) ──
   mainCard: {
     marginHorizontal: 16,
-    marginTop: 80,
+    marginTop: 16,
     marginBottom: 16,
-    borderRadius: 28,
-    padding: 20,
+    borderRadius: 24,
+    padding: 18,
     shadowColor: PRIMARY,
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   cardChip: {
     flexDirection: 'row',
-    marginBottom: 30,
+    alignItems: 'center',
   },
   cardBalance: {
     alignItems: 'flex-end',
     marginBottom: 24,
   },
   cardLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   cardAmount: {
-    fontSize: 42,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
-    letterSpacing: -1,
+    letterSpacing: -0.5,
   },
   cardCurrency: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.6)',
-    marginTop: 4,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 2,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   liveDot: {
     width: 6,
@@ -535,18 +462,18 @@ const s = StyleSheet.create({
     backgroundColor: '#4ade80',
   },
   liveText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#fff',
     fontWeight: '600',
   },
   withdrawBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#fff',
     borderRadius: 30,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   withdrawBtnText: {
     fontSize: 13,
@@ -554,7 +481,7 @@ const s = StyleSheet.create({
     color: PRIMARY,
   },
 
-  // إحصائيات متقدمة
+  // ── إحصائيات متقدمة ──
   statsContainer: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -562,32 +489,61 @@ const s = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
   progressSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingBottom: 16,
+    gap: 14,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
-    marginBottom: 16,
+    marginBottom: 14,
+  },
+  progressCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: SUCCESS + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressPercent: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: SUCCESS,
   },
   progressLabels: {
     flex: 1,
     alignItems: 'flex-end',
   },
   progressTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 4,
   },
   progressSub: {
     fontSize: 11,
+    color: SUCCESS,
+    fontWeight: '600',
+  },
+  progressSub2: {
+    fontSize: 11,
     color: '#9ca3af',
+    marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',
@@ -597,53 +553,53 @@ const s = StyleSheet.create({
   statItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#111827',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#9ca3af',
   },
   statDivider: {
     width: 1,
-    height: 40,
+    height: 35,
     backgroundColor: '#e8edf2',
   },
 
-  // إجمالي السحوبات
+  // ── إجمالي السحوبات ──
   totalWithdrawnCard: {
     backgroundColor: '#fef3c7',
     marginHorizontal: 16,
     marginBottom: 20,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   totalWithdrawnLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#92400e',
     fontWeight: '600',
   },
   totalWithdrawnValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#d97706',
   },
 
-  // سجل السحوبات
+  // ── سجل السحوبات ──
   historyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -654,18 +610,18 @@ const s = StyleSheet.create({
   historyTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   historyTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#111827',
   },
   historyBadge: {
     backgroundColor: PRIMARY,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   historyBadgeText: {
     fontSize: 10,
@@ -673,27 +629,27 @@ const s = StyleSheet.create({
     color: '#fff',
   },
 
-  // Timeline تصميم جديد
+  // ── Timeline ──
   timeline: {
     paddingHorizontal: 16,
   },
   timelineItem: {
     flexDirection: 'row',
     position: 'relative',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   timelineLine: {
     position: 'absolute',
-    left: 14,
-    top: 28,
-    bottom: -20,
+    left: 13,
+    top: 26,
+    bottom: -16,
     width: 2,
     backgroundColor: '#e2e8f0',
   },
   timelineDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -702,7 +658,7 @@ const s = StyleSheet.create({
   timelineContent: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 12,
     borderWidth: 1,
     borderColor: '#e8edf2',
@@ -711,121 +667,121 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   timelineAmount: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#111827',
   },
   timelineBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
   },
   timelineBadgeText: {
     fontSize: 9,
     fontWeight: 'bold',
   },
   timelineMeta: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#6b7280',
     textAlign: 'right',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   timelineDate: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#9ca3af',
     textAlign: 'right',
   },
 
-  // Loading و Empty
+  // ── Loading & Empty ──
   loadingContainer: {
-    paddingVertical: 60,
+    paddingVertical: 50,
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9ca3af',
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 50,
     gap: 12,
   },
   emptyIconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: PRIMARY + '10',
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#374151',
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#9ca3af',
   },
 
-  // Modal جديد
+  // ── Modal ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    paddingBottom: 40,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 32,
   },
   modalHandle: {
-    width: 50,
+    width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#e2e8f0',
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: PRIMARY + '15',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   availBox: {
     backgroundColor: PRIMARY + '10',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   availLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: PRIMARY,
     fontWeight: '600',
   },
   availVal: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: PRIMARY,
   },
@@ -834,15 +790,15 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     textAlign: 'right',
-    marginBottom: 6,
-    marginTop: 12,
+    marginBottom: 5,
+    marginTop: 10,
   },
   input: {
     borderWidth: 1.5,
     borderColor: '#e8edf2',
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 14,
     color: '#111827',
     backgroundColor: '#f8fafc',
@@ -853,16 +809,16 @@ const s = StyleSheet.create({
   errText: {
     color: DANGER,
     fontSize: 11,
-    marginTop: 4,
+    marginTop: 3,
     textAlign: 'right',
   },
   confirmBtn: {
     backgroundColor: PRIMARY,
-    borderRadius: 14,
-    height: 50,
+    borderRadius: 12,
+    height: 46,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 18,
   },
   confirmBtnDisabled: {
     opacity: 0.7,
@@ -870,16 +826,16 @@ const s = StyleSheet.create({
   confirmText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 15,
   },
   cancelBtn: {
-    height: 44,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   cancelText: {
     color: '#64748b',
-    fontSize: 14,
+    fontSize: 13,
   },
 });
