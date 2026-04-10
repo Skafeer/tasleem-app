@@ -47,7 +47,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component with React.memo (بدون تقييم) ──
+// ── Product Card Component ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -79,7 +79,6 @@ const ProductCard = React.memo(({
           </View>
         )}
         
-        {/* Badges */}
         {product.isRenewable && (
           <View style={s.renewBadge}>
             <Text style={s.renewText}>قابل للتجديد</Text>
@@ -92,7 +91,6 @@ const ProductCard = React.memo(({
           </View>
         )}
         
-        {/* Images counter */}
         {imgs.length > 1 && (
           <View style={s.imgCount}>
             <Ionicons name="images-outline" size={10} color="#fff" />
@@ -100,7 +98,6 @@ const ProductCard = React.memo(({
           </View>
         )}
         
-        {/* Favorite button */}
         <TouchableOpacity
           style={[s.favBtn, isFav && s.favBtnActive]}
           onPress={() => onToggleFav(product.id, isFav)}
@@ -116,7 +113,6 @@ const ProductCard = React.memo(({
       <View style={s.cardBody}>
         <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
 
-        {/* Price Section */}
         <View style={s.priceSection}>
           {hasDiscount && (
             <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
@@ -127,7 +123,6 @@ const ProductCard = React.memo(({
           </View>
         </View>
 
-        {/* Category Pill */}
         <View style={s.bottomRow}>
           <View style={s.catPill}>
             <Text style={s.catPillText} numberOfLines={1}>{product.category}</Text>
@@ -137,7 +132,6 @@ const ProductCard = React.memo(({
           </Text>
         </View>
         
-        {/* Quick Add Button */}
         <TouchableOpacity 
           style={s.quickAddBtn}
           onPress={() => onQuickAdd(product.id)}>
@@ -149,7 +143,6 @@ const ProductCard = React.memo(({
   );
 });
 
-// ── Category Icons ──
 const categoryIcons: Record<string, string> = {
   'الكل': 'grid-outline',
   'الكترونيات': 'phone-portrait-outline',
@@ -172,7 +165,6 @@ export default function HomeScreen() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState<number>(0);
   
-  // Filter state
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
@@ -242,7 +234,6 @@ export default function HomeScreen() {
     },
   });
 
-  // Fetch cart count
   useEffect(() => {
     const fetchCartCount = async () => {
       try {
@@ -266,7 +257,6 @@ export default function HomeScreen() {
     return ['الكل', ...Array.from(new Set(allCats))];
   }, [products]);
 
-  // Apply filters and sorting
   const filtered = useMemo(() => {
     let result = products.filter((p: any) => {
       const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
@@ -359,6 +349,7 @@ export default function HomeScreen() {
           <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
         </View>
 
+        {/* Notification button - navigates to /notifications page */}
         <TouchableOpacity onPress={() => router.push('/notifications')} style={s.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
           {unreadCount > 0 && (
@@ -425,8 +416,8 @@ export default function HomeScreen() {
           data={filtered}
           numColumns={2}
           keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 32 }}
-          columnWrapperStyle={{ gap: 12, justifyContent: 'space-between' }}
+          contentContainerStyle={s.flatListContent}
+          columnWrapperStyle={s.columnWrapper}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
@@ -454,7 +445,6 @@ export default function HomeScreen() {
                 />
               </View>
               
-              {/* Banner with curved corners - smooth animation */}
               <View style={s.bannerWrapper}>
                 <BannerSlider banners={banners} containerWidth={width} />
               </View>
@@ -624,6 +614,18 @@ const s = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
 
+  // ── FlatList Styles (مع إضافة مسافة عمودية) ──
+  flatListContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 32,
+    gap: 16, // المسافة العمودية بين الصفوف
+  },
+  columnWrapper: {
+    gap: 12, // المسافة الأفقية بين البطاقات
+    justifyContent: 'space-between',
+    marginBottom: 16, // مسافة إضافية بين الصفوف
+  },
+
   // ── Search Wrapper ──
   searchWrapper: {
     flexDirection: 'row',
@@ -705,7 +707,7 @@ const s = StyleSheet.create({
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
 
-  // ── Banner (curved from bottom) ──
+  // ── Banner ──
   bannerWrapper: {
     marginHorizontal: 12,
     marginBottom: 16,

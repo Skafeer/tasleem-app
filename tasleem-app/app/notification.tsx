@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import api from '../../src/lib/api';
+import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
