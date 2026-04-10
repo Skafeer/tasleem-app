@@ -14,7 +14,7 @@ import BannerSlider from '../admin-components/BannerSlider';
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-// ── Skeleton Card with Shimmer Effect ──
+// ── Skeleton Card ──
 function SkeletonCard({ width }: { width: number }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
@@ -47,7 +47,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component with React.memo ──
+// ── Product Card Component with React.memo (بدون تقييم) ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -115,13 +115,6 @@ const ProductCard = React.memo(({
 
       <View style={s.cardBody}>
         <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
-        
-        {/* Rating Row - Mock for now, should come from API */}
-        <View style={s.ratingRow}>
-          <Ionicons name="star" size={12} color="#fbbf24" />
-          <Text style={s.ratingText}>4.5</Text>
-          <Text style={s.reviewCount}>(128)</Text>
-        </View>
 
         {/* Price Section */}
         <View style={s.priceSection}>
@@ -183,7 +176,21 @@ export default function HomeScreen() {
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
-    sortBy: 'newest', // newest, price_asc, price_desc, popular
+    sortBy: 'newest',
+  });
+
+  // Fetch unread notifications count
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['unread-notifications-count'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/api/notifications/unread-count');
+        return data.count || 0;
+      } catch {
+        return 0;
+      }
+    },
+    refetchInterval: 30000,
   });
 
   const { data: favoriteIds = [] } = useQuery({
@@ -270,7 +277,6 @@ export default function HomeScreen() {
       return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice;
     });
     
-    // Apply sorting
     switch (filters.sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.wholesalePrice - b.wholesalePrice);
@@ -281,7 +287,7 @@ export default function HomeScreen() {
       case 'popular':
         result.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
         break;
-      default: // newest
+      default:
         result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     
@@ -317,7 +323,6 @@ export default function HomeScreen() {
     try {
       await api.post('/api/cart', { productId: id, quantity: 1 });
       setCartCount(prev => prev + 1);
-      // Optional: Show toast notification
     } catch (error) {
       console.error('Failed to add to cart:', error);
     }
@@ -338,9 +343,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header محسن ── */}
+      {/* ── Header ── */}
       <View style={s.header}>
-        {/* Cart button with badge */}
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
           <Ionicons name="bag-outline" size={22} color={PRIMARY} />
           {cartCount > 0 && (
@@ -350,15 +354,18 @@ export default function HomeScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Logo + Welcome */}
         <View style={s.headerCenter}>
           <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
           <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
         </View>
 
-        {/* Notifications button */}
         <TouchableOpacity onPress={() => router.push('/notifications')} style={s.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
+          {unreadCount > 0 && (
+            <View style={s.notifBadge}>
+              <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -382,7 +389,6 @@ export default function HomeScreen() {
           ) : null}
         </View>
         
-        {/* Filter Button */}
         <TouchableOpacity style={s.filterBtn} onPress={() => setFilterModal(true)}>
           <Ionicons name="options-outline" size={20} color={PRIMARY} />
         </TouchableOpacity>
@@ -425,7 +431,6 @@ export default function HomeScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
             <>
-              {/* Categories with Icons */}
               <View style={s.categoriesWrapper}>
                 <FlatList
                   horizontal
@@ -449,12 +454,11 @@ export default function HomeScreen() {
                 />
               </View>
               
-              {/* Banner with curved corners */}
+              {/* Banner with curved corners - smooth animation */}
               <View style={s.bannerWrapper}>
                 <BannerSlider banners={banners} containerWidth={width} />
               </View>
               
-              {/* Results count */}
               <View style={s.resultHeader}>
                 <Text style={s.resultCount}>{filtered.length} منتج</Text>
                 <TouchableOpacity onPress={resetFilters}>
@@ -501,7 +505,6 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Price Range */}
               <Text style={s.filterLabel}>نطاق السعر (د.ع)</Text>
               <View style={s.priceRange}>
                 <TextInput
@@ -523,7 +526,6 @@ export default function HomeScreen() {
                 />
               </View>
 
-              {/* Sort Options */}
               <Text style={s.filterLabel}>ترتيب حسب</Text>
               {[
                 { id: 'newest', label: 'الأحدث' },
@@ -559,7 +561,7 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header محسن ──
+  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -606,7 +608,21 @@ const s = StyleSheet.create({
     backgroundColor: '#f0f9fa',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
 
   // ── Search Wrapper ──
   searchWrapper: {
@@ -689,12 +705,16 @@ const s = StyleSheet.create({
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
 
-  // ── Banner ──
+  // ── Banner (curved from bottom) ──
   bannerWrapper: {
     marginHorizontal: 12,
     marginBottom: 16,
     borderRadius: 24,
     overflow: 'hidden',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
 
   // ── Results Header ──
@@ -776,10 +796,6 @@ const s = StyleSheet.create({
 
   cardBody: { padding: 10, gap: 6 },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
-  
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'flex-start' },
-  ratingText: { fontSize: 11, fontWeight: '600', color: '#374151' },
-  reviewCount: { fontSize: 10, color: '#94a3b8' },
   
   priceSection: { marginVertical: 4 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
