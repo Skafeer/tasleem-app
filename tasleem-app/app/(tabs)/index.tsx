@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions, Animated,
-  Modal, ScrollView
+  Modal, ScrollView, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,14 +47,14 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component ──
+// ── Product Card Component (مع زر عرض التفاصيل بدلاً من الإضافة للسلة) ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
   CARD_WIDTH, 
   onPress, 
   onToggleFav,
-  onQuickAdd 
+  onViewDetails 
 }: any) => {
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
@@ -132,11 +132,12 @@ const ProductCard = React.memo(({
           </Text>
         </View>
         
+        {/* زر عرض التفاصيل بدلاً من أضف للسلة */}
         <TouchableOpacity 
-          style={s.quickAddBtn}
-          onPress={() => onQuickAdd(product.id)}>
-          <Ionicons name="add-circle-outline" size={18} color={PRIMARY} />
-          <Text style={s.quickAddText}>أضف للسلة</Text>
+          style={s.detailsBtn}
+          onPress={() => onViewDetails(product.id)}>
+          <Ionicons name="eye-outline" size={18} color={PRIMARY} />
+          <Text style={s.detailsBtnText}>عرض التفاصيل</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -159,6 +160,7 @@ export default function HomeScreen() {
   const CARD_WIDTH = (width - 48) / 2;
 
   const [search, setSearch] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>(''); // البحث الفعلي بعد الضغط
   const [activeCategory, setActiveCategory] = useState<string>('الكل');
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterModal, setFilterModal] = useState<boolean>(false);
@@ -234,6 +236,7 @@ export default function HomeScreen() {
     },
   });
 
+  // Fetch cart count
   useEffect(() => {
     const fetchCartCount = async () => {
       try {
@@ -257,11 +260,12 @@ export default function HomeScreen() {
     return ['الكل', ...Array.from(new Set(allCats))];
   }, [products]);
 
+  // Apply filters and sorting (باستخدام searchQuery وليس search)
   const filtered = useMemo(() => {
     let result = products.filter((p: any) => {
       const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
       const matchesCategory = activeCategory === 'الكل' || cats.includes(activeCategory);
-      const matchesSearch = !search || p.name.includes(search);
+      const matchesSearch = !searchQuery || p.name.includes(searchQuery);
       const matchesMinPrice = !filters.minPrice || p.wholesalePrice >= Number(filters.minPrice);
       const matchesMaxPrice = !filters.maxPrice || p.wholesalePrice <= Number(filters.maxPrice);
       return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice;
@@ -282,7 +286,7 @@ export default function HomeScreen() {
     }
     
     return result;
-  }, [products, activeCategory, search, filters]);
+  }, [products, activeCategory, searchQuery, filters]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -290,11 +294,28 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const handleSearch = (text: string) => {
-    setSearch(text);
-    if (text && !recentSearches.includes(text) && text.length > 2) {
-      setRecentSearches(prev => [text, ...prev].slice(0, 5));
+  // دالة البحث - تُسمى عند الضغط على زر البحث أو زر Enter
+  const performSearch = () => {
+    Keyboard.dismiss();
+    if (search.trim()) {
+      setSearchQuery(search);
+      // حفظ البحث في السجل إذا كان جديداً
+      if (!recentSearches.includes(search) && search.length > 2) {
+        setRecentSearches(prev => [search, ...prev].slice(0, 5));
+      }
+    } else {
+      setSearchQuery('');
     }
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    setSearchQuery('');
+  };
+
+  const handleRecentSearchPress = (term: string) => {
+    setSearch(term);
+    setSearchQuery(term);
   };
 
   const clearRecentSearch = (term: string) => {
@@ -305,18 +326,13 @@ export default function HomeScreen() {
     router.push(`/products/${id}`);
   }, [router]);
 
+  const handleViewDetails = useCallback((id: number) => {
+    router.push(`/products/${id}`);
+  }, [router]);
+
   const handleToggleFav = useCallback((id: number, isFav: boolean) => {
     toggleFav.mutate({ id, isFav });
   }, [toggleFav]);
-
-  const handleQuickAdd = useCallback(async (id: number) => {
-    try {
-      await api.post('/api/cart', { productId: id, quantity: 1 });
-      setCartCount(prev => prev + 1);
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-    }
-  }, []);
 
   const applyFilters = () => {
     setFilterModal(false);
@@ -349,7 +365,6 @@ export default function HomeScreen() {
           <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
         </View>
 
-        {/* Notification button - navigates to /notifications page */}
         <TouchableOpacity onPress={() => router.push('/notification')} style={s.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
           {unreadCount > 0 && (
@@ -363,18 +378,21 @@ export default function HomeScreen() {
       {/* ── Search Box with Filter ── */}
       <View style={s.searchWrapper}>
         <View style={s.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9ca3af" />
+          <TouchableOpacity onPress={performSearch}>
+            <Ionicons name="search-outline" size={18} color="#9ca3af" />
+          </TouchableOpacity>
           <TextInput
             style={s.searchInput}
             placeholder="ابحث عن منتج..."
             value={search}
-            onChangeText={handleSearch}
+            onChangeText={setSearch}
             placeholderTextColor="#9ca3af"
             textAlign="right"
             returnKeyType="search"
+            onSubmitEditing={performSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity onPress={clearSearch}>
               <Ionicons name="close-circle" size={18} color="#9ca3af" />
             </TouchableOpacity>
           ) : null}
@@ -385,8 +403,8 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Recent Searches */}
-      {search === '' && recentSearches.length > 0 && (
+      {/* Recent Searches - تظهر فقط عندما لا يوجد بحث نشط */}
+      {searchQuery === '' && recentSearches.length > 0 && (
         <View style={s.recentSearch}>
           <View style={s.recentHeader}>
             <Text style={s.recentTitle}>عمليات البحث الأخيرة</Text>
@@ -396,7 +414,7 @@ export default function HomeScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.recentList}>
             {recentSearches.map(term => (
-              <TouchableOpacity key={term} style={s.recentChip} onPress={() => setSearch(term)}>
+              <TouchableOpacity key={term} style={s.recentChip} onPress={() => handleRecentSearchPress(term)}>
                 <Text style={s.recentChipText}>{term}</Text>
                 <TouchableOpacity onPress={() => clearRecentSearch(term)}>
                   <Ionicons name="close-circle" size={14} color="#9ca3af" />
@@ -477,7 +495,7 @@ export default function HomeScreen() {
               CARD_WIDTH={CARD_WIDTH}
               onPress={handleProductPress}
               onToggleFav={handleToggleFav}
-              onQuickAdd={handleQuickAdd}
+              onViewDetails={handleViewDetails}
             />
           )}
         />
@@ -614,16 +632,16 @@ const s = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
 
-  // ── FlatList Styles (مع إضافة مسافة عمودية) ──
+  // ── FlatList Styles ──
   flatListContent: {
     paddingHorizontal: 12,
     paddingBottom: 32,
-    gap: 16, // المسافة العمودية بين الصفوف
+    gap: 16,
   },
   columnWrapper: {
-    gap: 12, // المسافة الأفقية بين البطاقات
+    gap: 12,
     justifyContent: 'space-between',
-    marginBottom: 16, // مسافة إضافية بين الصفوف
+    marginBottom: 16,
   },
 
   // ── Search Wrapper ──
@@ -811,7 +829,7 @@ const s = StyleSheet.create({
   stockText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
   stockLow: { color: '#ef4444' },
   
-  quickAddBtn: {
+  detailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -821,7 +839,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     marginTop: 6,
   },
-  quickAddText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
+  detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 
   // ── Empty State ──
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
