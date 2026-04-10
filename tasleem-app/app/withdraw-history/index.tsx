@@ -41,14 +41,14 @@ export default function WithdrawHistoryScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header موحد ── */}
+      {/* ── Header معكوس RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>سجل السحوبات</Text>
           <View style={{ width: 40 }} />
+          <Text style={s.headerTitle}>سجل السحوبات</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -58,12 +58,12 @@ export default function WithdrawHistoryScreen() {
         <Text style={s.summaryVal}>{total.toLocaleString('ar-IQ')} <Text style={s.summaryUnit}>د.ع</Text></Text>
         <View style={s.chips}>
           <View style={s.chip}>
-            <Ionicons name="wallet-outline" size={12} color={PRIMARY} />
             <Text style={s.chipText}>{ws.length} طلب إجمالي</Text>
+            <Ionicons name="wallet-outline" size={12} color={PRIMARY} />
           </View>
           <View style={[s.chip, { backgroundColor: '#ecfdf5' }]}>
-            <Ionicons name="checkmark-circle-outline" size={12} color="#059669" />
             <Text style={[s.chipText, { color: '#059669' }]}>{approved} مقبول</Text>
+            <Ionicons name="checkmark-circle-outline" size={12} color="#059669" />
           </View>
         </View>
       </View>
@@ -89,14 +89,14 @@ export default function WithdrawHistoryScreen() {
             const st = STATUS[item.status] || STATUS.pending;
             return (
               <View style={s.card}>
-                <View style={[s.cardIcon, { backgroundColor: st.bg }]}>
-                  <Ionicons name={st.icon} size={22} color={st.color} />
-                </View>
                 <View style={s.cardInfo}>
                   <Text style={s.cardAmount}>{item.amount?.toLocaleString('ar-IQ')} <Text style={s.cardCurrency}>د.ع</Text></Text>
                   <Text style={s.cardMethod}>{item.method === 'mastercard' ? 'ماستر كارد' : item.method}</Text>
                   {item.accountDetails && <Text style={s.cardDetail}>•••• {item.accountDetails.slice(-4)}</Text>}
                   <Text style={s.cardDate}>{formatDate(item.createdAt)}</Text>
+                </View>
+                <View style={[s.cardIcon, { backgroundColor: st.bg }]}>
+                  <Ionicons name={st.icon} size={22} color={st.color} />
                 </View>
                 <View style={[s.badge, { backgroundColor: st.bg }]}>
                   <Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text>
@@ -114,7 +114,6 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  // Header موحد
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -160,7 +159,7 @@ const s = StyleSheet.create({
   summaryLabel: { fontSize: 12, color: '#9ca3af', textAlign: 'right', marginBottom: 6 },
   summaryVal: { fontSize: 28, fontWeight: 'bold', color: PRIMARY, textAlign: 'right' },
   summaryUnit: { fontSize: 14, color: '#9ca3af' },
-  chips: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  chips: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 14 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: PRIMARY + '12', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   chipText: { fontSize: 11, fontWeight: '600', color: PRIMARY },
 
@@ -170,7 +169,7 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151' },
   emptyText: { fontSize: 13, color: '#9ca3af' },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12, borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  card: { backgroundColor: '#fff', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12, borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   cardIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   cardInfo: { flex: 1, alignItems: 'flex-end', gap: 3 },
   cardAmount: { fontSize: 16, fontWeight: 'bold', color: '#111827' },

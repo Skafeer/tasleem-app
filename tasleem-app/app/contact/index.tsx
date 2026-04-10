@@ -27,25 +27,25 @@ export default function ContactScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header موحد ── */}
+      {/* ── Header معكوس RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>تواصل معنا</Text>
           <View style={{ width: 40 }} />
+          <Text style={s.headerTitle}>تواصل معنا</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* بطاقة الترحيب */}
       <View style={s.heroCard}>
-        <View style={s.heroIcon}>
-          <Ionicons name="chatbubbles-outline" size={28} color={PRIMARY} />
-        </View>
         <View style={s.heroText}>
           <Text style={s.heroTitle}>كيف يمكننا مساعدتك؟</Text>
           <Text style={s.heroSub}>فريق الدعم متاح للمساعدة في أي وقت</Text>
+        </View>
+        <View style={s.heroIcon}>
+          <Ionicons name="chatbubbles-outline" size={28} color={PRIMARY} />
         </View>
       </View>
 
@@ -66,10 +66,10 @@ export default function ContactScreen() {
 
         <View style={s.hoursCard}>
           <View style={s.hoursTop}>
+            <Text style={s.hoursTitle}>ساعات العمل</Text>
             <View style={s.hoursIcon}>
               <Ionicons name="time-outline" size={18} color={PRIMARY} />
             </View>
-            <Text style={s.hoursTitle}>ساعات العمل</Text>
           </View>
           {[
             { day: 'السبت - الخميس', time: '9 صباحاً - 10 مساءً' },
@@ -87,8 +87,8 @@ export default function ContactScreen() {
           {FAQS.map((faq, i) => (
             <View key={i} style={s.faqCard}>
               <View style={s.faqQ}>
-                <View style={s.faqNum}><Text style={s.faqNumText}>{i + 1}</Text></View>
                 <Text style={s.faqQText}>{faq.q}</Text>
+                <View style={s.faqNum}><Text style={s.faqNumText}>{i + 1}</Text></View>
               </View>
               <Text style={s.faqA}>{faq.a}</Text>
             </View>
@@ -103,7 +103,6 @@ export default function ContactScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // Header موحد
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -135,6 +134,7 @@ const s = StyleSheet.create({
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 14,
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -159,7 +159,7 @@ const s = StyleSheet.create({
   },
   heroText: {
     flex: 1,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   heroTitle: {
     fontSize: 15,
@@ -180,7 +180,7 @@ const s = StyleSheet.create({
   contactLabel: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
   contactDesc: { fontSize: 11, color: '#9ca3af', textAlign: 'center' },
   hoursCard: { backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  hoursTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  hoursTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
   hoursIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   hoursTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   hoursRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
@@ -188,7 +188,7 @@ const s = StyleSheet.create({
   hoursTime: { fontSize: 14, fontWeight: '600', color: '#374151' },
   faqList: { gap: 12 },
   faqCard: { backgroundColor: '#fff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  faqQ: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
+  faqQ: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 },
   faqNum: { width: 28, height: 28, borderRadius: 10, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
   faqNumText: { fontSize: 13, fontWeight: 'bold', color: PRIMARY },
   faqQText: { flex: 1, fontSize: 14, fontWeight: 'bold', color: '#111827', textAlign: 'right', lineHeight: 22 },

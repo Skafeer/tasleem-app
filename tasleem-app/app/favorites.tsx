@@ -70,17 +70,17 @@ export default function FavoritesScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header موحد ── */}
+      {/* ── Header معكوس RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>المنتجات المفضلة</Text>
           <View style={s.favCountBox}>
-            <Ionicons name="heart" size={12} color={PRIMARY} />
             <Text style={s.favCount}>{favorites.length}</Text>
+            <Ionicons name="heart" size={12} color={PRIMARY} />
           </View>
+          <Text style={s.headerTitle}>المنتجات المفضلة</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -96,8 +96,8 @@ export default function FavoritesScreen() {
           <Text style={s.emptyTitle}>لا توجد منتجات مفضلة</Text>
           <Text style={s.emptyText}>اضغط على أيقونة القلب على أي منتج لحفظه هنا</Text>
           <TouchableOpacity style={s.browseBtn} onPress={() => router.push('/')}>
-            <Ionicons name="cube-outline" size={16} color="#fff" />
             <Text style={s.browseBtnText}>تصفح المنتجات</Text>
+            <Ionicons name="cube-outline" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
       ) : (
@@ -152,7 +152,6 @@ export default function FavoritesScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // Header موحد
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,

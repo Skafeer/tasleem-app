@@ -32,25 +32,25 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header موحد ── */}
+      {/* ── Header معكوس RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>سياسة الخصوصية</Text>
           <View style={{ width: 40 }} />
+          <Text style={s.headerTitle}>سياسة الخصوصية</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* بطاقة الترحيب */}
+      {/* بطاقة الترحيب - معكوسة */}
       <View style={s.heroCard}>
-        <View style={s.heroIcon}>
-          <Ionicons name="shield-checkmark-outline" size={28} color={PRIMARY} />
-        </View>
         <View style={s.heroText}>
           <Text style={s.heroTitle}>نحن نحمي خصوصيتك</Text>
           <Text style={s.heroSub}>آخر تحديث: يناير 2026</Text>
+        </View>
+        <View style={s.heroIcon}>
+          <Ionicons name="shield-checkmark-outline" size={28} color={PRIMARY} />
         </View>
       </View>
 
@@ -59,10 +59,10 @@ export default function PrivacyScreen() {
         {SECTIONS.map((sec, i) => (
           <View key={i} style={s.card}>
             <View style={s.cardTop}>
+              <Text style={s.cardTitle}>{sec.title}</Text>
               <View style={s.cardIcon}>
                 <Ionicons name={sec.icon as any} size={20} color={PRIMARY} />
               </View>
-              <Text style={s.cardTitle}>{sec.title}</Text>
             </View>
             <Text style={s.cardContent}>{sec.content}</Text>
           </View>
@@ -70,22 +70,22 @@ export default function PrivacyScreen() {
 
         <View style={s.termsCard}>
           <View style={s.termsTop}>
+            <Text style={s.cardTitle}>شروط الاستخدام</Text>
             <View style={[s.cardIcon, { backgroundColor: '#f5f3ff' }]}>
               <Ionicons name="document-text-outline" size={20} color="#8b5cf6" />
             </View>
-            <Text style={s.cardTitle}>شروط الاستخدام</Text>
           </View>
           {TERMS.map((term, i) => (
             <View key={i} style={s.termItem}>
-              <View style={s.termDot} />
               <Text style={s.termText}>{term}</Text>
+              <View style={s.termDot} />
             </View>
           ))}
         </View>
 
         <View style={s.footerNote}>
-          <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
           <Text style={s.footerText}>باستخدامك لمنصة تسليم، فإنك توافق على سياسة الخصوصية وشروط الاستخدام المذكورة أعلاه.</Text>
+          <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
         </View>
 
       </ScrollView>
@@ -96,7 +96,6 @@ export default function PrivacyScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // Header موحد
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -125,10 +124,10 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
-  // بطاقة الترحيب
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 14,
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -153,7 +152,7 @@ const s = StyleSheet.create({
   },
   heroText: {
     flex: 1,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   heroTitle: {
     fontSize: 15,
@@ -183,6 +182,7 @@ const s = StyleSheet.create({
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
   },
@@ -221,12 +221,14 @@ const s = StyleSheet.create({
   termsTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
   },
   termItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: 10,
     marginBottom: 12,
   },
@@ -248,6 +250,7 @@ const s = StyleSheet.create({
   footerNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: 10,
     backgroundColor: PRIMARY + '08',
     borderRadius: 16,

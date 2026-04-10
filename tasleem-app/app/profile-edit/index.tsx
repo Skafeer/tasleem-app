@@ -61,14 +61,14 @@ export default function ProfileEditScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header موحد ── */}
+      {/* ── Header معكوس RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>تعديل الملف الشخصي</Text>
           <View style={{ width: 40 }} />
+          <Text style={s.headerTitle}>تعديل الملف الشخصي</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -86,10 +86,10 @@ export default function ProfileEditScreen() {
         {/* معلومات المتجر */}
         <View style={s.card}>
           <View style={s.cardHeader}>
+            <Text style={s.cardTitle}>معلومات المتجر</Text>
             <View style={s.cardIconBox}>
               <Ionicons name="storefront-outline" size={18} color={PRIMARY} />
             </View>
-            <Text style={s.cardTitle}>معلومات المتجر</Text>
           </View>
 
           <Text style={s.label}>اسم المتجر <Text style={s.req}>*</Text></Text>
@@ -114,17 +114,17 @@ export default function ProfileEditScreen() {
             onPress={handleSave} disabled={updateProfile.isPending}>
             {updateProfile.isPending
               ? <ActivityIndicator color="#fff" />
-              : <><Ionicons name="checkmark-outline" size={18} color="#fff" /><Text style={s.saveBtnText}>حفظ التغييرات</Text></>}
+              : <><Text style={s.saveBtnText}>حفظ التغييرات</Text><Ionicons name="checkmark-outline" size={18} color="#fff" /></>}
           </TouchableOpacity>
         </View>
 
         {/* تغيير كلمة المرور */}
         <View style={s.card}>
           <View style={s.cardHeader}>
+            <Text style={s.cardTitle}>تغيير كلمة المرور</Text>
             <View style={s.cardIconBox}>
               <Ionicons name="lock-closed-outline" size={18} color="#8b5cf6" />
             </View>
-            <Text style={s.cardTitle}>تغيير كلمة المرور</Text>
           </View>
 
           <Text style={s.label}>كلمة المرور الحالية</Text>
@@ -149,7 +149,7 @@ export default function ProfileEditScreen() {
             onPress={handleChangePassword} disabled={updateProfile.isPending}>
             {updateProfile.isPending
               ? <ActivityIndicator color={PRIMARY} />
-              : <><Ionicons name="key-outline" size={18} color={PRIMARY} /><Text style={s.passBtnText}>تغيير كلمة المرور</Text></>}
+              : <><Text style={s.passBtnText}>تغيير كلمة المرور</Text><Ionicons name="key-outline" size={18} color={PRIMARY} /></>}
           </TouchableOpacity>
         </View>
 
@@ -162,7 +162,6 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  // Header موحد
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -227,7 +226,7 @@ const s = StyleSheet.create({
 
   scroll: { padding: 16, paddingBottom: 40 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   cardIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   label: { fontSize: 12, fontWeight: '500', color: '#374151', textAlign: 'right', marginBottom: 6, marginTop: 12 },
