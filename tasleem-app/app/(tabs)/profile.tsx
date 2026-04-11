@@ -42,7 +42,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
 
-        {/* ── Header معكوس RTL (أيقونة يمين + عنوان وسط + فراغ يسار) ── */}
+        {/* ── Header معكوس RTL ── */}
         <View style={s.header}>
           <View style={{ width: 40 }} />
           <Text style={s.headerTitle}>حسابي</Text>
@@ -75,7 +75,7 @@ export default function ProfileScreen() {
           </View>
         </LinearGradient>
 
-        {/* ── بطاقات الأرباح (معكوسة: منتظرة يمين، محققة يسار) ── */}
+        {/* ── بطاقات الأرباح ── */}
         <View style={s.statsGrid}>
           <View style={[s.statCard, s.statCardPending]}>
             <View style={s.statIconWrapper}>
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── قائمة الخيارات (معكوسة) ── */}
+        {/* ── قائمة الخيارات (الترتيب الصحيح) ── */}
         <View style={s.menuSection}>
           <Text style={s.menuSectionTitle}>القائمة</Text>
           {menuItems.map((item, idx) => (
@@ -105,8 +105,10 @@ export default function ProfileScreen() {
               style={[s.menuItem, idx === menuItems.length - 1 && { borderBottomWidth: 0 }]}
               onPress={() => router.push(item.route as any)}
               activeOpacity={0.7}>
+              {/* السهم على اليسار */}
               <Ionicons name="chevron-back" size={16} color="#d1d5db" />
-              <Text style={s.menuLabel}>{item.label}</Text>
+              
+              {/* الأيقونة الملونة تسبق النص (على اليمين) */}
               <LinearGradient
                 colors={item.gradient as any}
                 start={{ x: 0, y: 0 }}
@@ -114,6 +116,9 @@ export default function ProfileScreen() {
                 style={s.menuIconGradient}>
                 <Ionicons name={item.icon as any} size={18} color="#fff" />
               </LinearGradient>
+              
+              {/* النص في المنتصف */}
+              <Text style={s.menuLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -140,7 +145,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 20 },
 
-  // ── Header معكوس RTL (أيقونة يمين، عنوان وسط، فراغ يسار) ──
+  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -167,7 +172,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Hero Card (بطاقة المستخدم الرئيسية) معكوسة ──
+  // ── Hero Card ──
   heroCard: {
     marginHorizontal: 16,
     marginTop: 16,
@@ -242,7 +247,7 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ── بطاقات الأرباح (معكوسة: منتظرة يمين، محققة يسار) ──
+  // ── بطاقات الأرباح ──
   statsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -301,7 +306,7 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── قائمة الخيارات (معكوسة: أيقونة التدرج يمين، النص وسط، السهم يسار) ──
+  // ── قائمة الخيارات (الترتيب الصحيح: سهم ← أيقونة ← نص) ──
   menuSection: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -327,12 +332,11 @@ const s = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
-    gap: 14,
+    gap: 12,
   },
   menuIconGradient: {
     width: 38,
@@ -349,7 +353,7 @@ const s = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // ── زر تسجيل الخروج (معكوس) ──
+  // ── زر تسجيل الخروج ──
   logoutBtn: {
     marginHorizontal: 16,
     marginTop: 8,
