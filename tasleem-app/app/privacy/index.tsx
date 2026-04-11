@@ -32,60 +32,63 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header معكوس RTL ── */}
+      {/* ── Header RTL (زر رجوع يمين، عنوان وسط) ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <View style={{ width: 40 }} />
-          <Text style={s.headerTitle}>سياسة الخصوصية</Text>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
+          <Text style={s.headerTitle}>سياسة الخصوصية</Text>
+          <View style={{ width: 40 }} />
         </View>
       </View>
 
-      {/* بطاقة الترحيب - معكوسة */}
+      {/* ── بطاقة الترحيب ── */}
       <View style={s.heroCard}>
+        <View style={s.heroIcon}>
+          <Ionicons name="shield-checkmark-outline" size={28} color={PRIMARY} />
+        </View>
         <View style={s.heroText}>
           <Text style={s.heroTitle}>نحن نحمي خصوصيتك</Text>
           <Text style={s.heroSub}>آخر تحديث: يناير 2026</Text>
-        </View>
-        <View style={s.heroIcon}>
-          <Ionicons name="shield-checkmark-outline" size={28} color={PRIMARY} />
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
+        {/* الأقسام */}
         {SECTIONS.map((sec, i) => (
           <View key={i} style={s.card}>
-            <View style={s.cardTop}>
-              <Text style={s.cardTitle}>{sec.title}</Text>
+            <View style={s.cardHeader}>
               <View style={s.cardIcon}>
                 <Ionicons name={sec.icon as any} size={20} color={PRIMARY} />
               </View>
+              <Text style={s.cardTitle}>{sec.title}</Text>
             </View>
             <Text style={s.cardContent}>{sec.content}</Text>
           </View>
         ))}
 
+        {/* شروط الاستخدام */}
         <View style={s.termsCard}>
-          <View style={s.termsTop}>
-            <Text style={s.cardTitle}>شروط الاستخدام</Text>
+          <View style={s.termsHeader}>
             <View style={[s.cardIcon, { backgroundColor: '#f5f3ff' }]}>
               <Ionicons name="document-text-outline" size={20} color="#8b5cf6" />
             </View>
+            <Text style={s.cardTitle}>شروط الاستخدام</Text>
           </View>
           {TERMS.map((term, i) => (
             <View key={i} style={s.termItem}>
-              <Text style={s.termText}>{term}</Text>
               <View style={s.termDot} />
+              <Text style={s.termText}>{term}</Text>
             </View>
           ))}
         </View>
 
+        {/* ملاحظة ختامية */}
         <View style={s.footerNote}>
-          <Text style={s.footerText}>باستخدامك لمنصة تسليم، فإنك توافق على سياسة الخصوصية وشروط الاستخدام المذكورة أعلاه.</Text>
           <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
+          <Text style={s.footerText}>باستخدامك لمنصة تسليم، فإنك توافق على سياسة الخصوصية وشروط الاستخدام المذكورة أعلاه.</Text>
         </View>
 
       </ScrollView>
@@ -96,6 +99,7 @@ export default function PrivacyScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
+  // ── Header RTL (زر رجوع يمين، عنوان وسط) ──
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -124,10 +128,10 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
+  // ── بطاقة الترحيب ──
   heroCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 14,
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -167,6 +171,7 @@ const s = StyleSheet.create({
 
   scroll: { padding: 16, paddingBottom: 40 },
 
+  // ── البطاقات ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -179,10 +184,9 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  cardTop: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 12,
   },
@@ -206,6 +210,7 @@ const s = StyleSheet.create({
     lineHeight: 22,
   },
 
+  // ── شروط الاستخدام ──
   termsCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -218,17 +223,15 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  termsTop: {
+  termsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
   },
   termItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
     gap: 10,
     marginBottom: 12,
   },
@@ -247,10 +250,10 @@ const s = StyleSheet.create({
     lineHeight: 22,
   },
 
+  // ── ملاحظة ختامية ──
   footerNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
     gap: 10,
     backgroundColor: PRIMARY + '08',
     borderRadius: 16,
