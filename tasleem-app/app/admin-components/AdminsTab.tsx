@@ -11,6 +11,7 @@ import { toast } from '../../src/lib/toast';
 const PRIMARY = '#0c6679';
 const DANGER = '#ef4444';
 const WARNING = '#f59e0b';
+const SUCCESS = '#10b981';
 const BG = '#f2f6f9';
 
 const ALL_PERMISSIONS = [
@@ -93,11 +94,7 @@ export default function AdminsTab() {
   const confirmDemote = (admin: any) => {
     Alert.alert('تحويل لتاجر', `هل تريد تحويل "${admin.storeName}" من أدمن لتاجر؟`, [
       { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'تحويل',
-        style: 'destructive',
-        onPress: () => demoteMutation.mutate(admin.id),
-      },
+      { text: 'تحويل', style: 'destructive', onPress: () => demoteMutation.mutate(admin.id) },
     ]);
   };
 
@@ -131,15 +128,19 @@ export default function AdminsTab() {
               setSelectedPerms([]);
               setSearch('');
             }}>
-            <Text style={s.backBtnText}>رجوع</Text>
             <Ionicons name="chevron-back" size={18} color={PRIMARY} />
+            <Text style={s.backBtnText}>رجوع</Text>
           </TouchableOpacity>
           <Text style={s.pageTitle}>ترقية تاجر لأدمن</Text>
+          <View style={s.headerIcon}>
+            <Ionicons name="shield-outline" size={22} color={PRIMARY} />
+          </View>
         </View>
 
         {!selectedUser ? (
           <>
             <View style={s.searchRow}>
+              <Ionicons name="search-outline" size={18} color="#9ca3af" />
               <TextInput
                 style={s.searchInput}
                 value={search}
@@ -148,7 +149,11 @@ export default function AdminsTab() {
                 placeholderTextColor="#9ca3af"
                 textAlign="right"
               />
-              <Ionicons name="search-outline" size={18} color="#9ca3af" />
+              {search ? (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Ionicons name="close-circle" size={17} color="#9ca3af" />
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             {loadingUsers ? (
@@ -164,14 +169,14 @@ export default function AdminsTab() {
                   key={u.id}
                   style={s.merchantRow}
                   onPress={() => setSelectedUser(u)}>
-                  <Ionicons name="chevron-back" size={18} color="#d1d5db" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.merchantName}>{u.storeName}</Text>
-                    <Text style={s.merchantPhone}>{u.phone}</Text>
-                  </View>
                   <View style={s.merchantAvatar}>
                     <Text style={s.merchantAvatarText}>{u.storeName?.charAt(0)}</Text>
                   </View>
+                  <View style={s.merchantInfo}>
+                    <Text style={s.merchantName}>{u.storeName}</Text>
+                    <Text style={s.merchantPhone}>{u.phone}</Text>
+                  </View>
+                  <Ionicons name="chevron-back" size={18} color="#d1d5db" />
                 </TouchableOpacity>
               ))
             )}
@@ -182,7 +187,7 @@ export default function AdminsTab() {
               <View style={s.merchantAvatar}>
                 <Text style={s.merchantAvatarText}>{selectedUser.store_name?.charAt(0)}</Text>
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={s.selectedInfo}>
                 <Text style={s.merchantName}>{selectedUser.store_name}</Text>
                 <Text style={s.merchantPhone}>{selectedUser.phone}</Text>
               </View>
@@ -219,8 +224,8 @@ export default function AdminsTab() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Text style={s.promoteBtnText}>ترقية لأدمن</Text>
                   <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                  <Text style={s.promoteBtnText}>ترقية لأدمن</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -240,7 +245,7 @@ export default function AdminsTab() {
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={s.addBtnText}>ترقية تاجر</Text>
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={s.headerCenter}>
           <Text style={s.pageTitle}>إدارة الأدمنية</Text>
           <Text style={s.pageSub}>{adminList.length} أدمن مسجل</Text>
         </View>
@@ -262,7 +267,7 @@ export default function AdminsTab() {
           let perms: string[] = [];
           try {
             perms = JSON.parse(admin.permissions || '[]');
-          } catch {}
+          } catch { }
           const isEditing = editingId === admin.id;
 
           return (
@@ -285,7 +290,7 @@ export default function AdminsTab() {
                     </TouchableOpacity>
                   </View>
                 )}
-                <View style={{ flex: 1 }}>
+                <View style={s.adminInfo}>
                   <View style={s.nameRow}>
                     <Text style={s.adminName}>{admin.storeName}</Text>
                     {isSuperAdmin && (
@@ -349,15 +354,15 @@ export default function AdminsTab() {
                     ))}
                   </View>
                   <TouchableOpacity
-                    style={[s.promoteBtn, { marginTop: 8 }, editMutation.isPending && { opacity: 0.7 }]}
+                    style={[s.saveBtn, editMutation.isPending && { opacity: 0.7 }]}
                     onPress={() => editMutation.mutate(admin.id)}
                     disabled={editMutation.isPending}>
                     {editMutation.isPending ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <>
-                        <Text style={s.promoteBtnText}>حفظ الصلاحيات</Text>
                         <Ionicons name="checkmark" size={18} color="#fff" />
+                        <Text style={s.saveBtnText}>حفظ الصلاحيات</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -374,6 +379,7 @@ export default function AdminsTab() {
 const s = StyleSheet.create({
   container: { padding: 14, paddingBottom: 60 },
 
+  // هيدر
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -381,24 +387,27 @@ const s = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
   },
+  headerCenter: { flex: 1, alignItems: 'center' },
   headerIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: PRIMARY + '15',
+    backgroundColor: PRIMARY + '12',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
   pageTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#111827',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   pageSub: {
     fontSize: 12,
     color: '#9ca3af',
-    textAlign: 'right',
+    textAlign: 'center',
     marginTop: 2,
   },
   addBtn: {
@@ -416,11 +425,12 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // رجوع
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: PRIMARY + '15',
+    backgroundColor: PRIMARY + '12',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -431,6 +441,7 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
   },
 
+  // بحث
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -440,11 +451,17 @@ const s = StyleSheet.create({
     height: 50,
     gap: 10,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: '#e8edf2',
     marginBottom: 14,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' } as any,
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
+    textAlign: 'right',
+  },
 
+  // بطاقة التاجر في القائمة
   merchantRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -458,12 +475,14 @@ const s = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
   merchantAvatar: {
     width: 44,
     height: 44,
     borderRadius: 13,
-    backgroundColor: PRIMARY + '15',
+    backgroundColor: PRIMARY + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -472,6 +491,7 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
     color: PRIMARY,
   },
+  merchantInfo: { flex: 1, alignItems: 'flex-end' },
   merchantName: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -485,19 +505,22 @@ const s = StyleSheet.create({
     marginTop: 3,
   },
 
+  // الحساب المختار
   selectedCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    backgroundColor: PRIMARY + '10',
+    backgroundColor: PRIMARY + '08',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1.5,
     borderColor: PRIMARY + '30',
   },
+  selectedInfo: { flex: 1, alignItems: 'flex-end' },
 
+  // صلاحيات
   sectionLabel: {
     fontSize: 13,
     fontWeight: 'bold',
@@ -535,6 +558,7 @@ const s = StyleSheet.create({
     color: '#fff',
   },
 
+  // زر الترقية
   promoteBtn: {
     backgroundColor: PRIMARY,
     borderRadius: 14,
@@ -549,7 +573,23 @@ const s = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
   },
+  saveBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    height: 52,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
 
+  // بطاقة الأدمن
   adminCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -559,6 +599,8 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
   },
   adminCardSuper: {
     borderWidth: 1.5,
@@ -576,18 +618,20 @@ const s = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: PRIMARY + '15',
+    backgroundColor: PRIMARY + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
   adminAvatarSuper: {
     backgroundColor: '#fef3c7',
   },
+  adminInfo: { flex: 1, alignItems: 'flex-end' },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   adminName: {
     fontSize: 15,
@@ -629,7 +673,7 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: PRIMARY + '15',
+    backgroundColor: PRIMARY + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -637,11 +681,12 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: WARNING + '15',
+    backgroundColor: WARNING + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
+  // عرض الصلاحيات
   permsDisplay: {
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
@@ -651,6 +696,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+    justifyContent: 'flex-end',
   },
   permTag: {
     flexDirection: 'row',
@@ -672,6 +718,7 @@ const s = StyleSheet.create({
     textAlign: 'right',
   },
 
+  // تعديل
   editSection: {
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
@@ -685,6 +732,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
 
+  // فارغ
   empty: {
     alignItems: 'center',
     paddingVertical: 50,
