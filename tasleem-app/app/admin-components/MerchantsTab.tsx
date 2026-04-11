@@ -9,21 +9,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
-const PRIMARY  = '#0c6679';
-const SUCCESS  = '#10b981';
+const PRIMARY = '#0c6679';
+const SUCCESS = '#10b981';
 const SECONDARY = '#f5a006';
-const DANGER   = '#ef4444';
+const DANGER = '#ef4444';
+const BG = '#f2f6f9';
 
 export default function MerchantsTab() {
   const qc = useQueryClient();
-  const [editUser, setEditUser]   = useState<any>(null);
-  const [editForm, setEditForm]   = useState<any>({});
-  const [showPass, setShowPass]   = useState(false);
-  const [search, setSearch]       = useState('');
+  const [editUser, setEditUser] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [showPass, setShowPass] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
-    queryFn: async () => { const { data } = await api.get('/api/admin/users'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/admin/users');
+      return data;
+    },
     refetchInterval: 30000,
   });
 
@@ -48,19 +52,23 @@ export default function MerchantsTab() {
   const openEdit = (u: any) => {
     setEditForm({
       storeName: u.storeName || '',
-      phone:     u.phone     || '',
-      address:   u.address   || '',
-      balance:   String(u.balance ?? 0),
-      password:  '',
+      phone: u.phone || '',
+      address: u.address || '',
+      balance: String(u.balance ?? 0),
+      password: '',
     });
     setShowPass(false);
     setEditUser(u);
   };
 
-
   const deleteMerchant = useMutation({
-    mutationFn: async (id: number) => { await api.delete(`/api/admin/users/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); toast.success('تم حذف حساب التاجر'); },
+    mutationFn: async (id: number) => {
+      await api.delete(`/api/admin/users/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('تم حذف حساب التاجر');
+    },
     onError: () => toast.error('فشل حذف الحساب'),
   });
 
@@ -76,8 +84,14 @@ export default function MerchantsTab() {
   };
 
   const handleSave = () => {
-    if (!editForm.storeName.trim()) { toast.warning('يرجى إدخال اسم المتجر'); return; }
-    if (!editForm.phone.trim())     { toast.warning('يرجى إدخال رقم الهاتف'); return; }
+    if (!editForm.storeName.trim()) {
+      toast.warning('يرجى إدخال اسم المتجر');
+      return;
+    }
+    if (!editForm.phone.trim()) {
+      toast.warning('يرجى إدخال رقم الهاتف');
+      return;
+    }
     updateUser.mutate({ id: editUser.id, data: editForm });
   };
 
@@ -91,24 +105,28 @@ export default function MerchantsTab() {
     )
     .sort((a: any, b: any) => b.id - a.id);
 
-  if (isLoading) return (
-    <View style={s.center}>
-      <ActivityIndicator size="large" color={PRIMARY} />
-      <Text style={s.loadingTxt}>جاري تحميل التجار...</Text>
-    </View>
-  );
+  if (isLoading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={s.loadingTxt}>جاري تحميل التجار...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* بحث */}
+      {/* شريط البحث */}
       <View style={s.searchWrap}>
         <Ionicons name="search-outline" size={17} color="#9ca3af" />
         <TextInput
           style={s.searchInput}
           placeholder="ابحث باسم المتجر أو الهاتف..."
-          value={search} onChangeText={setSearch}
-          placeholderTextColor="#9ca3af" textAlign="right"
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor="#9ca3af"
+          textAlign="right"
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch('')}>
@@ -117,11 +135,11 @@ export default function MerchantsTab() {
         ) : null}
       </View>
 
-      {/* القائمة */}
+      {/* قائمة التجار */}
       <FlatList
         data={merchants}
         keyExtractor={(item: any) => item.id.toString()}
-        contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+        contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={s.center}>
@@ -138,12 +156,14 @@ export default function MerchantsTab() {
                 <View style={s.avatar}>
                   <Text style={s.avatarTxt}>{u.storeName?.charAt(0) || '؟'}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', flex: 1 }}>
+                <View style={s.merchantInfo}>
                   <Text style={s.storeName}>{u.storeName}</Text>
                   <Text style={s.merchantId}>رقم التاجر: #{u.merchantId || u.id}</Text>
                 </View>
               </View>
             </View>
+
+            {/* أزرار الإجراءات */}
             <View style={s.actionsRow}>
               <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(u)}>
                 <Ionicons name="trash-outline" size={14} color={DANGER} />
@@ -163,7 +183,7 @@ export default function MerchantsTab() {
                 <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.phone, 'رقم الهاتف')}>
                   <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                 </TouchableOpacity>
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={s.infoRight}>
                   <Text style={s.infoLabel}>رقم الهاتف</Text>
                   <Text style={s.infoVal}>{u.phone || '—'}</Text>
                 </View>
@@ -174,7 +194,7 @@ export default function MerchantsTab() {
                   <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.address, 'العنوان')}>
                     <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                   </TouchableOpacity>
-                  <View style={{ alignItems: 'flex-end' }}>
+                  <View style={s.infoRight}>
                     <Text style={s.infoLabel}>العنوان</Text>
                     <Text style={s.infoVal}>{u.address}</Text>
                   </View>
@@ -201,7 +221,6 @@ export default function MerchantsTab() {
                 </Text>
               </View>
             </View>
-
           </View>
         )}
       />
@@ -222,26 +241,46 @@ export default function MerchantsTab() {
               <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
 
                 <Text style={s.inputLabel}>اسم المتجر</Text>
-                <TextInput style={s.input} value={editForm.storeName}
+                <TextInput
+                  style={s.input}
+                  value={editForm.storeName}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, storeName: v }))}
-                  placeholder="اسم المتجر" placeholderTextColor="#9ca3af" textAlign="right" />
+                  placeholder="اسم المتجر"
+                  placeholderTextColor="#9ca3af"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>رقم الهاتف</Text>
-                <TextInput style={s.input} value={editForm.phone}
+                <TextInput
+                  style={s.input}
+                  value={editForm.phone}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, phone: v }))}
-                  placeholder="رقم الهاتف" placeholderTextColor="#9ca3af"
-                  keyboardType="phone-pad" textAlign="right" />
+                  placeholder="رقم الهاتف"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>العنوان</Text>
-                <TextInput style={s.input} value={editForm.address}
+                <TextInput
+                  style={s.input}
+                  value={editForm.address}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, address: v }))}
-                  placeholder="العنوان (اختياري)" placeholderTextColor="#9ca3af" textAlign="right" />
+                  placeholder="العنوان (اختياري)"
+                  placeholderTextColor="#9ca3af"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>الرصيد المتاح (د.ع)</Text>
-                <TextInput style={s.input} value={editForm.balance}
+                <TextInput
+                  style={s.input}
+                  value={editForm.balance}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, balance: v }))}
-                  placeholder="0" placeholderTextColor="#9ca3af"
-                  keyboardType="numeric" textAlign="right" />
+                  placeholder="0"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>كلمة المرور الجديدة</Text>
                 <View style={s.passRow}>
@@ -249,7 +288,7 @@ export default function MerchantsTab() {
                     <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color="#6b7280" />
                   </TouchableOpacity>
                   <TextInput
-                    style={[s.input, { flex: 1, marginBottom: 0 }]}
+                    style={[s.input, s.passInput]}
                     value={editForm.password}
                     onChangeText={v => setEditForm((p: any) => ({ ...p, password: v }))}
                     placeholder="اتركها فارغة إن لم تريد التغيير"
@@ -262,14 +301,18 @@ export default function MerchantsTab() {
               </ScrollView>
 
               <View style={s.modalFooter}>
-                <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={updateUser.isPending}>
-                  {updateUser.isPending
-                    ? <ActivityIndicator color="#fff" />
-                    : <>
-                        <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                        <Text style={s.saveBtnTxt}>حفظ التعديلات</Text>
-                      </>
-                  }
+                <TouchableOpacity
+                  style={[s.saveBtn, updateUser.isPending && { opacity: 0.7 }]}
+                  onPress={handleSave}
+                  disabled={updateUser.isPending}>
+                  {updateUser.isPending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                      <Text style={s.saveBtnTxt}>حفظ التعديلات</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -277,59 +320,187 @@ export default function MerchantsTab() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
+  listContent: { padding: 12, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
-  emptyTxt:   { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+  emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
 
-  searchWrap:  { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 12, gap: 8, borderWidth: 1.5, borderColor: '#e5e7eb' },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 12,
+    marginVertical: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+  },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  card:       { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
-  avatarRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  avatar:     { width: 46, height: 46, borderRadius: 23, backgroundColor: PRIMARY + '20', justifyContent: 'center', alignItems: 'center' },
-  avatarTxt:  { fontSize: 20, fontWeight: 'bold', color: PRIMARY },
-  storeName:  { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: PRIMARY + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarTxt: { fontSize: 20, fontWeight: 'bold', color: PRIMARY },
+  merchantInfo: { alignItems: 'flex-end', flex: 1 },
+  storeName: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
   merchantId: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
-  actionsRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
-  editBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: PRIMARY + '12', borderWidth: 1, borderColor: PRIMARY + '30' },
+
+  actionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: PRIMARY + '12',
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
+  },
   editBtnTxt: { fontSize: 12, fontWeight: '700', color: PRIMARY },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: DANGER + '12',
+    borderWidth: 1,
+    borderColor: DANGER + '30',
+  },
+  deleteBtnTxt: { fontSize: 12, fontWeight: '700', color: DANGER },
 
   divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
 
-  section:  { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  infoLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  infoLabel:{ fontSize: 10, color: '#9ca3af', fontWeight: '600', textAlign: 'right' },
-  infoVal:  { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  copyBtn:  { width: 30, height: 30, borderRadius: 9, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
+  section: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  infoLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  infoRight: { alignItems: 'flex-end' },
+  infoLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600', textAlign: 'right' },
+  infoVal: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
+  copyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-  balanceRow:     { flexDirection: 'row-reverse', backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 14 },
-  balanceBox:     { flex: 1, alignItems: 'center', gap: 4 },
+  balanceRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  balanceBox: { flex: 1, alignItems: 'center', gap: 4 },
   balanceDivider: { width: 1, backgroundColor: '#e5e7eb' },
-  balanceLabel:   { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
-  balanceVal:     { fontSize: 14, fontWeight: 'bold' },
+  balanceLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
+  balanceVal: { fontSize: 14, fontWeight: 'bold' },
 
-  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  modalCard:     { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
-  modalHeader:   { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  modalTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  modalCloseBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  modalBody:     { padding: 20, paddingBottom: 10 },
-  modalFooter:   { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '92%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  modalCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: { padding: 20, paddingBottom: 10 },
+  modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
 
-  inputLabel: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 6, marginTop: 12, fontWeight: '600' },
-  input:      { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 11, fontSize: 14, color: '#111827', backgroundColor: '#f9fafb', marginBottom: 4 },
-  passRow:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  passToggle: { width: 42, height: 44, borderRadius: 12, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#e5e7eb' },
+  inputLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'right',
+    marginBottom: 6,
+    marginTop: 12,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 11,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    marginBottom: 4,
+  },
+  passRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  passToggle: {
+    width: 42,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  passInput: { flex: 1, marginBottom: 0 },
 
-  saveBtn:    { backgroundColor: PRIMARY, borderRadius: 14, height: 50, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  deleteBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: DANGER + '12', borderWidth: 1, borderColor: DANGER + '30' },
-  deleteBtnTxt: { fontSize: 12, fontWeight: '700', color: DANGER },
+  saveBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    height: 50,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
   saveBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });
