@@ -70,14 +70,19 @@ export default function FavoritesScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header معكوس RTL ── */}
+      {/* ── Header معكوس RTL بالكامل ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
+          {/* عداد المفضلة في اليسار */}
           <View style={s.favCountBox}>
             <Text style={s.favCount}>{favorites.length}</Text>
             <Ionicons name="heart" size={12} color={PRIMARY} />
           </View>
+          
+          {/* العنوان في المنتصف */}
           <Text style={s.headerTitle}>المنتجات المفضلة</Text>
+          
+          {/* زر الرجوع في اليمين */}
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
@@ -115,27 +120,44 @@ export default function FavoritesScreen() {
             return (
               <TouchableOpacity
                 style={[s.card, { width: CARD_WIDTH }]}
-                onPress={() => router.push(`/products/${p.id}`)}>
+                onPress={() => router.push(`/products/${p.id}`)}
+                activeOpacity={0.92}>
+                
                 <View style={[s.imgBox, { height: CARD_WIDTH }]}>
-                  {imgs[0]
-                    ? <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
-                    : <View style={[s.img, s.imgPlaceholder]}><Ionicons name="image-outline" size={28} color="#d1d5db" /></View>
-                  }
-                  {hasDiscount && (
-                    <View style={s.discountBadge}>
-                      <Text style={s.discountText}>خصم {p.discount}%</Text>
+                  {imgs[0] ? (
+                    <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.img, s.imgPlaceholder]}>
+                      <Ionicons name="image-outline" size={28} color="#d1d5db" />
                     </View>
                   )}
-                  <TouchableOpacity style={s.favBtn} onPress={() => removeFav.mutate(p.id)}>
+                  
+                  {/* خصم */}
+                  {hasDiscount && (
+                    <View style={s.discountBadge}>
+                      <Text style={s.discountText}>-{p.discount}%</Text>
+                    </View>
+                  )}
+                  
+                  {/* زر إزالة المفضلة */}
+                  <TouchableOpacity 
+                    style={s.favBtn} 
+                    onPress={() => removeFav.mutate(p.id)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Ionicons name="heart" size={16} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
+                
                 <View style={s.cardBody}>
                   <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
+                  
                   <View style={s.priceRow}>
-                    {hasDiscount && <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>}
+                    {hasDiscount && (
+                      <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>
+                    )}
                     <Text style={s.price}>{Math.round(discounted).toLocaleString()} د.ع</Text>
                   </View>
+                  
                   <View style={s.catPill}>
                     <Text style={s.catPillText} numberOfLines={1}>{p.category}</Text>
                   </View>
@@ -152,6 +174,7 @@ export default function FavoritesScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
+  // ── Header معكوس RTL بالكامل ──
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -194,6 +217,7 @@ const s = StyleSheet.create({
     color: PRIMARY,
   },
 
+  // ── Empty State ──
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30 },
   emptyIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151', textAlign: 'center' },
@@ -201,21 +225,97 @@ const s = StyleSheet.create({
   browseBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PRIMARY, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
   browseBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  list: { padding: 14, gap: 12 },
-  row: { justifyContent: 'space-between', marginBottom: 12 },
+  // ── القائمة ──
+  list: { padding: 14, paddingBottom: 20, gap: 12 },
+  row: { justifyContent: 'space-between', marginBottom: 12, gap: 12 },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#e8edf2', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  imgBox: { position: 'relative', overflow: 'hidden' },
-  img: { width: '100%', height: '100%' },
-  imgPlaceholder: { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  discountBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  discountText: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  favBtn: { position: 'absolute', top: 8, left: 8, width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.9)', justifyContent: 'center', alignItems: 'center' },
-  cardBody: { padding: 10, gap: 6 },
-  productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-start' },
-  price: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
-  oldPrice: { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
-  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-start' },
-  catPillText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
+  // ── بطاقة المنتج ──
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  imgBox: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  img: {
+    width: '100%',
+    height: '100%',
+  },
+  imgPlaceholder: {
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  discountText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  favBtn: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardBody: {
+    padding: 10,
+    gap: 6,
+  },
+  productName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'right',
+    lineHeight: 18,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'flex-start',
+  },
+  price: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
+  oldPrice: {
+    fontSize: 11,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  catPill: {
+    backgroundColor: PRIMARY + '12',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  catPillText: {
+    fontSize: 10,
+    color: PRIMARY,
+    fontWeight: '600',
+  },
 });
