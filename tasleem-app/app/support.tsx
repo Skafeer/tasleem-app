@@ -1,18 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
-  Clipboard, Alert, Image,
+  Clipboard, Alert, Image, RefreshControl, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
+const BG = '#f2f6f9';
 
 const formatTime = (date: string) => {
   const d = date.endsWith('Z') || date.includes('+') ? date : date + 'Z';
@@ -24,16 +24,44 @@ const formatDate = (date: string) => {
   return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 };
 
+// Skeleton Component
+function SkeletonMessage() {
+  const animatedValue = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(animatedValue, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={{ opacity: animatedValue }}>
+      <View style={s.skeletonRow}>
+        <View style={s.skeletonAvatar} />
+        <View style={s.skeletonBubble}>
+          <View style={s.skeletonLine} />
+          <View style={[s.skeletonLine, { width: '60%' }]} />
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function SupportScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const [message, setMessage] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const { data: messages = [], isLoading } = useQuery({
+  const { data: messages = [], isLoading, refetch } = useQuery({
     queryKey: ['support-messages'],
-    queryFn: async () => { const { data } = await api.get('/api/support/messages'); return data; },
+    queryFn: async () => { 
+      const { data } = await api.get('/api/support/messages'); 
+      return data; 
+    },
     refetchInterval: 10000,
   });
 
@@ -50,6 +78,12 @@ export default function SupportScreen() {
     },
   });
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
   const handleSend = () => {
     if (!message.trim()) return;
     sendMutation.mutate({ msg: message.trim() });
@@ -57,7 +91,10 @@ export default function SupportScreen() {
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); return; }
+    if (status !== 'granted') { 
+      Alert.alert('تنبيه', 'يرجى السماح بالوصول إلى الصور'); 
+      return; 
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.5,
@@ -69,8 +106,11 @@ export default function SupportScreen() {
       const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
       const { data } = await api.post('/api/support/upload-image', { imageBase64: base64 });
       sendMutation.mutate({ msg: '', imageUrl: data.url });
-    } catch { Alert.alert('خطأ', 'فشل رفع الصورة'); }
-    finally { setUploadingImage(false); }
+    } catch { 
+      Alert.alert('خطأ', 'فشل رفع الصورة'); 
+    } finally { 
+      setUploadingImage(false); 
+    }
   };
 
   const handleLongPress = (msg: string) => {
@@ -87,23 +127,29 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-      <LinearGradient colors={['#0c6679', '#0a8a9f']} style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-forward" size={22} color="#fff" />
-        </TouchableOpacity>
-        <View style={s.headerInfo}>
+
+      {/* ── Header موحد RTL (زر رجوع يمين، عنوان وسط، حالة يسار) ── */}
+      <View style={s.header}>
+        <View style={s.headerContent}>
+          <View style={s.onlineIndicator}>
+            <View style={s.onlineDot} />
+            <Text style={s.onlineText}>متاح</Text>
+          </View>
           <Text style={s.headerTitle}>الدعم الفني</Text>
-          <Text style={s.headerSub}>نرد خلال ساعات العمل</Text>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color="#111827" />
+          </TouchableOpacity>
         </View>
-        <View style={s.onlineIndicator}>
-          <View style={s.onlineDot} />
-          <Text style={s.onlineText}>متاح</Text>
-        </View>
-      </LinearGradient>
+        <Text style={s.headerSub}>نرد خلال ساعات العمل</Text>
+      </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {isLoading ? (
-          <View style={s.center}><ActivityIndicator color={PRIMARY} /></View>
+        
+        {/* Skeleton Loading */}
+        {isLoading && msgList.length === 0 ? (
+          <View style={s.skeletonContainer}>
+            {[1, 2, 3].map((_, i) => <SkeletonMessage key={i} />)}
+          </View>
         ) : (
           <FlatList
             ref={flatListRef}
@@ -111,10 +157,13 @@ export default function SupportScreen() {
             keyExtractor={(item: any) => String(item.id)}
             contentContainerStyle={s.messagesList}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+            }
             ListEmptyComponent={
               <View style={s.empty}>
                 <View style={s.emptyIconBox}>
-                  <Ionicons name="chatbubbles-outline" size={40} color="#9ca3af" />
+                  <Ionicons name="chatbubbles-outline" size={42} color="#9ca3af" />
                 </View>
                 <Text style={s.emptyTitle}>ابدأ المحادثة</Text>
                 <Text style={s.emptyText}>أرسل رسالتك وسيرد عليك فريق الدعم</Text>
@@ -131,16 +180,22 @@ export default function SupportScreen() {
                       <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
                     </View>
                   )}
-                  <View style={[s.msgRow, isAdmin ? s.msgRowAdmin : s.msgRowUser]}>
+                  
+                  {/* RTL صحيح: رسائل المستخدم في اليمين، رسائل الأدمن في اليسار */}
+                  <View style={[s.messageRow, isAdmin ? s.messageRowAdmin : s.messageRowUser]}>
                     {isAdmin && (
                       <View style={s.adminAvatar}>
                         <Ionicons name="shield-checkmark" size={14} color="#fff" />
                       </View>
                     )}
-                    <TouchableOpacity style={{ maxWidth: '75%' }} onLongPress={() => item.message && handleLongPress(item.message)} activeOpacity={0.8}>
+                    
+                    <TouchableOpacity 
+                      style={[s.bubbleContainer, isAdmin ? s.bubbleContainerAdmin : s.bubbleContainerUser]}
+                      onLongPress={() => item.message && handleLongPress(item.message)} 
+                      activeOpacity={0.8}>
                       <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
                         {item.image_url && (
-                          <Image source={{ uri: item.image_url }} style={s.msgImage} resizeMode="cover" />
+                          <Image source={{ uri: item.image_url }} style={s.messageImage} resizeMode="cover" />
                         )}
                         {!!item.message && (
                           <Text style={[s.bubbleText, isAdmin ? s.bubbleTextAdmin : s.bubbleTextUser]}>
@@ -159,8 +214,9 @@ export default function SupportScreen() {
           />
         )}
 
+        {/* شريط الإدخال - RTL صحيح: زر صورة ← حقل ← زر إرسال */}
         <View style={s.inputRow}>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[s.sendBtn, (!message.trim() || sendMutation.isPending) && s.sendBtnOff]}
             onPress={handleSend}
             disabled={!message.trim() || sendMutation.isPending}>
@@ -168,11 +224,7 @@ export default function SupportScreen() {
               ? <ActivityIndicator color="#fff" size="small" />
               : <Ionicons name="send" size={18} color="#fff" />}
           </TouchableOpacity>
-          <TouchableOpacity style={s.imageBtn} onPress={handlePickImage} disabled={uploadingImage}>
-            {uploadingImage
-              ? <ActivityIndicator color={PRIMARY} size="small" />
-              : <Ionicons name="image-outline" size={22} color={PRIMARY} />}
-          </TouchableOpacity>
+          
           <TextInput
             style={s.input}
             value={message}
@@ -183,6 +235,15 @@ export default function SupportScreen() {
             multiline
             maxLength={500}
           />
+          
+          <TouchableOpacity 
+            style={s.imageBtn} 
+            onPress={handlePickImage} 
+            disabled={uploadingImage}>
+            {uploadingImage
+              ? <ActivityIndicator color={PRIMARY} size="small" />
+              : <Ionicons name="image-outline" size={22} color={PRIMARY} />}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -190,54 +251,274 @@ export default function SupportScreen() {
 }
 
 const s = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#f8fafc' },
-  header:          { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14,
-    paddingVertical: 12, paddingTop: 14, gap: 10 },
-  backBtn:         { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center' },
-  headerInfo:      { flex: 1 },
-  headerTitle:     { fontSize: 16, fontWeight: 'bold', color: '#fff', textAlign: 'right' },
-  headerSub:       { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginTop: 2 },
-  onlineIndicator: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(16,185,129,0.2)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  onlineDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-  onlineText:      { fontSize: 11, color: '#4ade80', fontWeight: '600' },
-  center:          { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  messagesList:    { padding: 14, paddingBottom: 8, flexGrow: 1 },
-  empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
-  emptyIconBox:    { width: 80, height: 80, borderRadius: 40, backgroundColor: PRIMARY + '15',
-    justifyContent: 'center', alignItems: 'center' },
-  emptyTitle:      { fontSize: 16, fontWeight: 'bold', color: '#374151' },
-  emptyText:       { fontSize: 13, color: '#9ca3af', textAlign: 'center' },
-  dateDivider:     { alignItems: 'center', marginVertical: 12 },
-  dateDividerText: { fontSize: 11, color: '#9ca3af', backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-  msgRow:          { marginBottom: 8, alignItems: 'flex-end' },
-  msgRowAdmin:     { alignItems: 'flex-end' },
-  msgRowUser:      { alignItems: 'flex-start' },
-  adminAvatar:     { width: 28, height: 28, borderRadius: 9, backgroundColor: PRIMARY,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  bubble:          { maxWidth: 280, borderRadius: 18, padding: 12, gap: 4 },
-  bubbleAdmin:     { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
-  bubbleUser:      { backgroundColor: '#fff', borderBottomLeftRadius: 4,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  msgImage:        { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  bubbleText:      { fontSize: 14, lineHeight: 20, flexWrap: 'wrap' },
-  bubbleTextAdmin: { color: '#fff', textAlign: 'right' },
-  bubbleTextUser:  { color: '#111827', textAlign: 'right' },
-  bubbleTime:      { fontSize: 10, textAlign: 'left' },
-  bubbleTimeAdmin: { color: 'rgba(255,255,255,0.7)' },
-  bubbleTimeUser:  { color: '#9ca3af' },
-  inputRow:        { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  input:           { flex: 1, backgroundColor: '#f8fafc', borderRadius: 22, paddingHorizontal: 16,
-    paddingVertical: 10, fontSize: 14, color: '#111827', maxHeight: 100,
-    borderWidth: 1.5, borderColor: '#e5e7eb' } as any,
-  imageBtn:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY + '15',
-    justifyContent: 'center', alignItems: 'center' },
-  sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 },
-  sendBtnOff:      { backgroundColor: '#d1d5db', shadowOpacity: 0 },
+  container: { flex: 1, backgroundColor: BG },
+
+  // ── Header موحد RTL ──
+  header: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+    paddingTop: 14,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  headerSub: {
+    fontSize: 11,
+    color: '#9ca3af',
+    textAlign: 'right',
+  },
+  onlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: PRIMARY + '12',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#4ade80',
+  },
+  onlineText: {
+    fontSize: 11,
+    color: PRIMARY,
+    fontWeight: '600',
+  },
+
+  // ── Skeleton ──
+  skeletonContainer: {
+    padding: 16,
+    gap: 16,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  skeletonAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e8edf2',
+  },
+  skeletonBubble: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  skeletonLine: {
+    height: 12,
+    backgroundColor: '#e8edf2',
+    borderRadius: 6,
+    width: '80%',
+  },
+
+  // ── قائمة الرسائل ──
+  messagesList: {
+    padding: 16,
+    paddingBottom: 8,
+    flexGrow: 1,
+  },
+
+  // ── Empty State ──
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+
+  // ── فاصل التاريخ ──
+  dateDivider: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dateDividerText: {
+    fontSize: 11,
+    color: '#9ca3af',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+
+  // ── رسائل المحادثة (RTL صحيح) ──
+  messageRow: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  // رسائل الأدمن (تظهر في اليسار)
+  messageRowAdmin: {
+    justifyContent: 'flex-start',
+  },
+  // رسائل المستخدم (تظهر في اليمين)
+  messageRowUser: {
+    justifyContent: 'flex-end',
+  },
+
+  adminAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+
+  bubbleContainer: {
+    maxWidth: '75%',
+  },
+  bubbleContainerAdmin: {
+    alignItems: 'flex-start',
+  },
+  bubbleContainerUser: {
+    alignItems: 'flex-end',
+  },
+
+  bubble: {
+    borderRadius: 18,
+    padding: 12,
+    gap: 4,
+  },
+  bubbleAdmin: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    borderBottomLeftRadius: 4,
+  },
+  bubbleUser: {
+    backgroundColor: PRIMARY,
+    borderBottomRightRadius: 4,
+  },
+
+  messageImage: {
+    width: 180,
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 20,
+    flexWrap: 'wrap',
+  },
+  bubbleTextAdmin: {
+    color: '#111827',
+    textAlign: 'right',
+  },
+  bubbleTextUser: {
+    color: '#fff',
+    textAlign: 'right',
+  },
+
+  bubbleTime: {
+    fontSize: 10,
+  },
+  bubbleTimeAdmin: {
+    color: '#9ca3af',
+    textAlign: 'left',
+  },
+  bubbleTimeUser: {
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'right',
+  },
+
+  // ── شريط الإدخال (RTL صحيح) ──
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e8edf2',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+    maxHeight: 100,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    textAlign: 'right',
+  },
+  imageBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sendBtnOff: {
+    backgroundColor: '#d1d5db',
+    shadowOpacity: 0,
+  },
 });
