@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Modal, RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
@@ -36,9 +36,7 @@ export default function CheckoutScreen() {
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [showProvinces, setShowProvinces] = useState(false);
 
-  useEffect(() => { loadCart(); }, []);
-
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     try {
       const data = await AsyncStorage.getItem('cart');
       const parsed = data ? JSON.parse(data) : [];
@@ -52,7 +50,15 @@ export default function CheckoutScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => { loadCart(); }, [loadCart]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCart();
+    }, [loadCart])
+  );
 
   const verifyPromo = useMutation({
     mutationFn: async (code: string) => {
@@ -163,7 +169,7 @@ export default function CheckoutScreen() {
       <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Ionicons name="chevron-forward" size={22} color="#111827" />
+            <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
           <Text style={s.headerTitle}>إتمام الطلب</Text>
           <View style={{ width: 40 }} />
@@ -179,10 +185,10 @@ export default function CheckoutScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header (بدون تدرج) ── */}
+      {/* ── Header RTL ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-forward" size={22} color="#111827" />
+          <Ionicons name="chevron-back" size={22} color="#111827" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>إتمام الطلب</Text>
         <View style={{ width: 40 }} />
@@ -411,7 +417,6 @@ export default function CheckoutScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header (موحد) ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -438,7 +443,6 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
-  // ── Loading ──
   centerLoading: {
     flex: 1,
     justifyContent: 'center',
@@ -450,13 +454,11 @@ const s = StyleSheet.create({
     color: '#9ca3af',
   },
 
-  // ── Scroll ──
   scrollContent: {
     padding: 16,
     paddingBottom: 100,
   },
 
-  // ── Cards ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -488,7 +490,6 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
-  // ── Form ──
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -530,7 +531,6 @@ const s = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // ── Promo ──
   promoRow: {
     flexDirection: 'row',
     gap: 10,
@@ -561,7 +561,6 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ── Summary ──
   summaryCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -614,7 +613,6 @@ const s = StyleSheet.create({
     color: PRIMARY,
   },
 
-  // ── Footer ──
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -644,7 +642,6 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // ── Modal ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

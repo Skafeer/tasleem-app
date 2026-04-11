@@ -7,7 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
@@ -47,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component (مع زر عرض التفاصيل بدلاً من الإضافة للسلة) ──
+// ── Product Card Component ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -132,7 +133,6 @@ const ProductCard = React.memo(({
           </Text>
         </View>
         
-        {/* زر عرض التفاصيل بدلاً من أضف للسلة */}
         <TouchableOpacity 
           style={s.detailsBtn}
           onPress={() => onViewDetails(product.id)}>
@@ -160,7 +160,7 @@ export default function HomeScreen() {
   const CARD_WIDTH = (width - 48) / 2;
 
   const [search, setSearch] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>(''); // البحث الفعلي بعد الضغط
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>('الكل');
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterModal, setFilterModal] = useState<boolean>(false);
@@ -173,8 +173,8 @@ export default function HomeScreen() {
     sortBy: 'newest',
   });
 
-  // Fetch unread notifications count
-  const { data: unreadCount = 0 } = useQuery({
+  // جلب عدد الإشعارات غير المقروءة
+  const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
       try {
@@ -186,6 +186,32 @@ export default function HomeScreen() {
     },
     refetchInterval: 30000,
   });
+
+  // تحديث عدد الإشعارات عند العودة للصفحة
+  useFocusEffect(
+    useCallback(() => {
+      refetchUnreadCount();
+    }, [refetchUnreadCount])
+  );
+
+  // جلب عدد السلة
+  const fetchCartCount = useCallback(async () => {
+    try {
+      const data = await AsyncStorage.getItem('cart');
+      const parsed = data ? JSON.parse(data) : [];
+      const count = parsed.reduce((sum: number, item: any) => sum + item.quantity, 0);
+      setCartCount(count);
+    } catch (error) {
+      console.error('Failed to fetch cart count:', error);
+    }
+  }, []);
+
+  // تحديث عدد السلة عند العودة للصفحة
+  useFocusEffect(
+    useCallback(() => {
+      fetchCartCount();
+    }, [fetchCartCount])
+  );
 
   const { data: favoriteIds = [] } = useQuery({
     queryKey: ['favorites'],
@@ -236,20 +262,6 @@ export default function HomeScreen() {
     },
   });
 
-  // Fetch cart count
-  useEffect(() => {
-    const fetchCartCount = async () => {
-      try {
-        const { data } = await api.get('/api/cart');
-        const count = data.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
-        setCartCount(count);
-      } catch (error) {
-        console.error('Failed to fetch cart count:', error);
-      }
-    };
-    fetchCartCount();
-  }, []);
-
   const banners = rawBanners as any[];
   const products = (allProducts as any[]).filter((p: any) => p.stock > 0);
 
@@ -260,7 +272,6 @@ export default function HomeScreen() {
     return ['الكل', ...Array.from(new Set(allCats))];
   }, [products]);
 
-  // Apply filters and sorting (باستخدام searchQuery وليس search)
   const filtered = useMemo(() => {
     let result = products.filter((p: any) => {
       const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
@@ -291,15 +302,15 @@ export default function HomeScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch();
+    await fetchCartCount();
+    await refetchUnreadCount();
     setRefreshing(false);
   };
 
-  // دالة البحث - تُسمى عند الضغط على زر البحث أو زر Enter
   const performSearch = () => {
     Keyboard.dismiss();
     if (search.trim()) {
       setSearchQuery(search);
-      // حفظ البحث في السجل إذا كان جديداً
       if (!recentSearches.includes(search) && search.length > 2) {
         setRecentSearches(prev => [search, ...prev].slice(0, 5));
       }
@@ -352,7 +363,7 @@ export default function HomeScreen() {
       {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="bag-outline" size={22} color={PRIMARY} />
+          <Ionicons name="cart-outline" size={22} color={PRIMARY} />
           {cartCount > 0 && (
             <View style={s.cartBadge}>
               <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
@@ -403,7 +414,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Recent Searches - تظهر فقط عندما لا يوجد بحث نشط */}
+      {/* Recent Searches */}
       {searchQuery === '' && recentSearches.length > 0 && (
         <View style={s.recentSearch}>
           <View style={s.recentHeader}>
@@ -569,7 +580,6 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -632,7 +642,6 @@ const s = StyleSheet.create({
   },
   notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
 
-  // ── FlatList Styles ──
   flatListContent: {
     paddingHorizontal: 12,
     paddingBottom: 32,
@@ -644,7 +653,6 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // ── Search Wrapper ──
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -676,7 +684,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Recent Searches ──
   recentSearch: {
     marginHorizontal: 12,
     marginBottom: 10,
@@ -706,7 +713,6 @@ const s = StyleSheet.create({
   },
   recentChipText: { fontSize: 12, color: '#374151' },
 
-  // ── Categories ──
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList: { maxHeight: 44 },
   catListContent: { gap: 8, paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row' },
@@ -725,7 +731,6 @@ const s = StyleSheet.create({
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
 
-  // ── Banner ──
   bannerWrapper: {
     marginHorizontal: 12,
     marginBottom: 16,
@@ -737,7 +742,6 @@ const s = StyleSheet.create({
     borderTopRightRadius: 0,
   },
 
-  // ── Results Header ──
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -748,7 +752,6 @@ const s = StyleSheet.create({
   resultCount: { fontSize: 13, color: '#64748b', fontWeight: '500' },
   resetFilterText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
 
-  // ── Cards ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -841,7 +844,6 @@ const s = StyleSheet.create({
   },
   detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 
-  // ── Empty State ──
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyIconBox: {
     width: 80,
@@ -865,7 +867,6 @@ const s = StyleSheet.create({
   },
   refreshText: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
 
-  // ── Filter Modal ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
