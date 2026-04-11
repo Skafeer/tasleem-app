@@ -70,22 +70,17 @@ export default function FavoritesScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header معكوس RTL بالكامل ── */}
+      {/* ── Header RTL (زر رجوع يمين، عنوان وسط، عداد يسار) ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          {/* عداد المفضلة في اليسار */}
-          <View style={s.favCountBox}>
-            <Text style={s.favCount}>{favorites.length}</Text>
-            <Ionicons name="heart" size={12} color={PRIMARY} />
-          </View>
-          
-          {/* العنوان في المنتصف */}
-          <Text style={s.headerTitle}>المنتجات المفضلة</Text>
-          
-          {/* زر الرجوع في اليمين */}
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
+          <Text style={s.headerTitle}>المنتجات المفضلة</Text>
+          <View style={s.favCountBox}>
+            <Ionicons name="heart" size={12} color={PRIMARY} />
+            <Text style={s.favCount}>{favorites.length}</Text>
+          </View>
         </View>
       </View>
 
@@ -101,8 +96,8 @@ export default function FavoritesScreen() {
           <Text style={s.emptyTitle}>لا توجد منتجات مفضلة</Text>
           <Text style={s.emptyText}>اضغط على أيقونة القلب على أي منتج لحفظه هنا</Text>
           <TouchableOpacity style={s.browseBtn} onPress={() => router.push('/')}>
-            <Text style={s.browseBtnText}>تصفح المنتجات</Text>
             <Ionicons name="cube-outline" size={16} color="#fff" />
+            <Text style={s.browseBtnText}>تصفح المنتجات</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -132,14 +127,12 @@ export default function FavoritesScreen() {
                     </View>
                   )}
                   
-                  {/* خصم */}
                   {hasDiscount && (
                     <View style={s.discountBadge}>
                       <Text style={s.discountText}>-{p.discount}%</Text>
                     </View>
                   )}
                   
-                  {/* زر إزالة المفضلة */}
                   <TouchableOpacity 
                     style={s.favBtn} 
                     onPress={() => removeFav.mutate(p.id)}
@@ -174,7 +167,7 @@ export default function FavoritesScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header معكوس RTL بالكامل ──
+  // ── Header RTL (زر رجوع يمين، عنوان وسط، عداد يسار) ──
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -217,7 +210,6 @@ const s = StyleSheet.create({
     color: PRIMARY,
   },
 
-  // ── Empty State ──
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 30 },
   emptyIconBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151', textAlign: 'center' },
@@ -225,11 +217,9 @@ const s = StyleSheet.create({
   browseBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PRIMARY, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 4 },
   browseBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  // ── القائمة ──
   list: { padding: 14, paddingBottom: 20, gap: 12 },
   row: { justifyContent: 'space-between', marginBottom: 12, gap: 12 },
 
-  // ── بطاقة المنتج ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,

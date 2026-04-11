@@ -42,22 +42,28 @@ export default function ProfileScreen() {
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
 
-        {/* ── Header معكوس RTL ── */}
+        {/* ── Header RTL ── */}
         <View style={s.header}>
-          <View style={{ width: 40 }} />
-          <Text style={s.headerTitle}>حسابي</Text>
           <TouchableOpacity style={s.headerIconBox}>
             <Ionicons name="person-circle-outline" size={22} color={PRIMARY} />
           </TouchableOpacity>
+          <Text style={s.headerTitle}>حسابي</Text>
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* ── بطاقة المستخدم الرئيسية ── */}
+        {/* ── بطاقة المستخدم ── */}
         <LinearGradient
           colors={[PRIMARY, '#0a8a9f', '#0c6679']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={s.heroCard}>
           <View style={s.heroContent}>
+            <View style={s.avatarContainer}>
+              <View style={s.avatarRing}>
+                <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
+              </View>
+              <View style={s.onlineDot} />
+            </View>
             <View style={s.userInfo}>
               <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
               <Text style={s.userId}>ID: {user?.merchantId || 'ADMIN-001'}</Text>
@@ -65,12 +71,6 @@ export default function ProfileScreen() {
                 <Ionicons name={user?.role === 'admin' ? 'shield-checkmark' : 'storefront'} size={12} color="#fff" />
                 <Text style={s.roleText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
               </View>
-            </View>
-            <View style={s.avatarContainer}>
-              <View style={s.avatarRing}>
-                <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
-              </View>
-              <View style={s.onlineDot} />
             </View>
           </View>
         </LinearGradient>
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── قائمة الخيارات (الترتيب الصحيح) ── */}
+        {/* ── قائمة الخيارات ── */}
         <View style={s.menuSection}>
           <Text style={s.menuSectionTitle}>القائمة</Text>
           {menuItems.map((item, idx) => (
@@ -105,10 +105,6 @@ export default function ProfileScreen() {
               style={[s.menuItem, idx === menuItems.length - 1 && { borderBottomWidth: 0 }]}
               onPress={() => router.push(item.route as any)}
               activeOpacity={0.7}>
-              {/* السهم على اليسار */}
-              <Ionicons name="chevron-back" size={16} color="#d1d5db" />
-              
-              {/* الأيقونة الملونة تسبق النص (على اليمين) */}
               <LinearGradient
                 colors={item.gradient as any}
                 start={{ x: 0, y: 0 }}
@@ -116,9 +112,8 @@ export default function ProfileScreen() {
                 style={s.menuIconGradient}>
                 <Ionicons name={item.icon as any} size={18} color="#fff" />
               </LinearGradient>
-              
-              {/* النص في المنتصف */}
               <Text style={s.menuLabel}>{item.label}</Text>
+              <Ionicons name="chevron-back" size={16} color="#d1d5db" />
             </TouchableOpacity>
           ))}
         </View>
@@ -130,8 +125,8 @@ export default function ProfileScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.logoutGradient}>
-            <Text style={s.logoutText}>تسجيل الخروج</Text>
             <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+            <Text style={s.logoutText}>تسجيل الخروج</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -145,7 +140,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 20 },
 
-  // ── Header ──
+  // ── Header RTL (أيقونة يمين، عنوان وسط) ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,7 +182,7 @@ const s = StyleSheet.create({
   heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 16,
   },
   avatarContainer: {
     position: 'relative',
@@ -219,6 +214,7 @@ const s = StyleSheet.create({
     borderColor: '#fff',
   },
   userInfo: {
+    flex: 1,
     alignItems: 'flex-start',
   },
   userName: {
@@ -306,7 +302,7 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // ── قائمة الخيارات (الترتيب الصحيح: سهم ← أيقونة ← نص) ──
+  // ── قائمة الخيارات (أيقونة يمين، نص، سهم يسار) ──
   menuSection: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -332,6 +328,7 @@ const s = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
@@ -374,7 +371,6 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // ── الإصدار ──
   version: {
     fontSize: 11,
     color: '#9ca3af',

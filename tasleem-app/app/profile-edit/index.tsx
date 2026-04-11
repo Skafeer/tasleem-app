@@ -62,32 +62,24 @@ export default function ProfileEditScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header معكوس RTL ── */}
+      {/* ── Header RTL ── */}
       <View style={s.header}>
         <View style={s.headerContent}>
-          <View style={{ width: 40 }} />
-          <Text style={s.headerTitle}>تعديل الملف الشخصي</Text>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
+          <Text style={s.headerTitle}>تعديل الملف الشخصي</Text>
+          <View style={{ width: 40 }} />
         </View>
       </View>
 
-      {/* ── بطاقة المستخدم المطورة ── */}
+      {/* ── بطاقة المستخدم ── */}
       <LinearGradient
         colors={[PRIMARY, '#0a8a9f', '#0c6679']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.heroCard}>
         <View style={s.heroContent}>
-          <View style={s.userInfo}>
-            <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
-            <Text style={s.userId}>ID: {user?.merchantId || '------'}</Text>
-            <View style={s.roleBadge}>
-              <Ionicons name={user?.role === 'admin' ? 'shield-checkmark' : 'storefront'} size={12} color="#fff" />
-              <Text style={s.roleText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
-            </View>
-          </View>
           <View style={s.avatarContainer}>
             <View style={s.avatarRing}>
               <Text style={s.avatarText}>{user?.storeName?.charAt(0) || 'ت'}</Text>
@@ -96,24 +88,31 @@ export default function ProfileEditScreen() {
               <Ionicons name="camera-outline" size={12} color="#fff" />
             </View>
           </View>
+          <View style={s.userInfo}>
+            <Text style={s.userName}>{user?.storeName || 'تاجر'}</Text>
+            <Text style={s.userId}>ID: {user?.merchantId || '------'}</Text>
+            <View style={s.roleBadge}>
+              <Ionicons name={user?.role === 'admin' ? 'shield-checkmark' : 'storefront'} size={12} color="#fff" />
+              <Text style={s.roleText}>{user?.role === 'admin' ? 'مدير' : 'تاجر'}</Text>
+            </View>
+          </View>
         </View>
       </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-        {/* ── معلومات المتجر (بطاقة مطورة) ── */}
+        {/* معلومات المتجر */}
         <View style={s.card}>
           <View style={s.cardHeader}>
-            <Text style={s.cardTitle}>معلومات المتجر</Text>
             <View style={s.cardIconBox}>
               <Ionicons name="storefront-outline" size={18} color={PRIMARY} />
             </View>
+            <Text style={s.cardTitle}>معلومات المتجر</Text>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>اسم المتجر <Text style={s.req}>*</Text></Text>
             <View style={s.inputWrap}>
-              <Ionicons name="storefront-outline" size={16} color="#9ca3af" />
               <TextInput
                 style={s.input}
                 value={storeName}
@@ -122,13 +121,13 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="اسم المتجر"
               />
+              <Ionicons name="storefront-outline" size={16} color="#9ca3af" />
             </View>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>رقم الهاتف <Text style={s.req}>*</Text></Text>
             <View style={s.inputWrap}>
-              <Ionicons name="call-outline" size={16} color="#9ca3af" />
               <TextInput
                 style={s.input}
                 value={phone}
@@ -138,13 +137,13 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="07XXXXXXXXX"
               />
+              <Ionicons name="call-outline" size={16} color="#9ca3af" />
             </View>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>العنوان</Text>
             <View style={[s.inputWrap, s.textareaWrap]}>
-              <Ionicons name="location-outline" size={16} color="#9ca3af" style={s.textareaIcon} />
               <TextInput
                 style={[s.input, s.textarea]}
                 value={address}
@@ -155,6 +154,7 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="العنوان التفصيلي"
               />
+              <Ionicons name="location-outline" size={16} color="#9ca3af" style={s.textareaIcon} />
             </View>
           </View>
 
@@ -166,26 +166,25 @@ export default function ProfileEditScreen() {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Text style={s.saveBtnText}>حفظ التغييرات</Text>
                 <Ionicons name="checkmark-outline" size={18} color="#fff" />
+                <Text style={s.saveBtnText}>حفظ التغييرات</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* ── تغيير كلمة المرور (بطاقة مطورة) ── */}
+        {/* تغيير كلمة المرور */}
         <View style={s.card}>
           <View style={s.cardHeader}>
-            <Text style={s.cardTitle}>تغيير كلمة المرور</Text>
             <View style={[s.cardIconBox, { backgroundColor: '#f5f3ff' }]}>
               <Ionicons name="lock-closed-outline" size={18} color="#8b5cf6" />
             </View>
+            <Text style={s.cardTitle}>تغيير كلمة المرور</Text>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>كلمة المرور الحالية</Text>
             <View style={s.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={16} color="#9ca3af" />
               <TextInput
                 style={s.input}
                 value={currentPass}
@@ -195,13 +194,13 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="••••••••"
               />
+              <Ionicons name="lock-closed-outline" size={16} color="#9ca3af" />
             </View>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>كلمة المرور الجديدة</Text>
             <View style={s.inputWrap}>
-              <Ionicons name="key-outline" size={16} color="#9ca3af" />
               <TextInput
                 style={s.input}
                 value={newPass}
@@ -211,13 +210,13 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="••••••••"
               />
+              <Ionicons name="key-outline" size={16} color="#9ca3af" />
             </View>
           </View>
 
           <View style={s.fieldGroup}>
             <Text style={s.label}>تأكيد كلمة المرور</Text>
             <View style={s.inputWrap}>
-              <Ionicons name="checkmark-circle-outline" size={16} color="#9ca3af" />
               <TextInput
                 style={s.input}
                 value={confirmPass}
@@ -227,6 +226,7 @@ export default function ProfileEditScreen() {
                 placeholderTextColor="#9ca3af"
                 placeholder="••••••••"
               />
+              <Ionicons name="checkmark-circle-outline" size={16} color="#9ca3af" />
             </View>
           </View>
 
@@ -238,8 +238,8 @@ export default function ProfileEditScreen() {
               <ActivityIndicator color={PRIMARY} size="small" />
             ) : (
               <>
-                <Text style={s.passBtnText}>تغيير كلمة المرور</Text>
                 <Ionicons name="refresh-outline" size={18} color={PRIMARY} />
+                <Text style={s.passBtnText}>تغيير كلمة المرور</Text>
               </>
             )}
           </TouchableOpacity>
@@ -254,7 +254,7 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  // ── Header معكوس RTL ──
+  // ── Header RTL (زر رجوع يمين، عنوان وسط) ──
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -283,7 +283,7 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
-  // ── Hero Card مطورة ──
+  // ── Hero Card ──
   heroCard: {
     marginHorizontal: 16,
     marginTop: 16,
@@ -298,7 +298,7 @@ const s = StyleSheet.create({
   heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 16,
   },
   avatarContainer: {
     position: 'relative',
@@ -332,6 +332,7 @@ const s = StyleSheet.create({
     borderColor: '#fff',
   },
   userInfo: {
+    flex: 1,
     alignItems: 'flex-start',
   },
   userName: {
@@ -362,7 +363,6 @@ const s = StyleSheet.create({
 
   scroll: { padding: 16, paddingBottom: 40 },
 
-  // ── البطاقات ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -378,7 +378,6 @@ const s = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 10,
     marginBottom: 16,
     paddingBottom: 14,
@@ -399,7 +398,6 @@ const s = StyleSheet.create({
     color: '#111827',
   },
 
-  // ── الحقول ──
   fieldGroup: {
     marginBottom: 14,
   },
@@ -416,6 +414,7 @@ const s = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10,
     borderWidth: 1.5,
     borderColor: '#e8edf2',
@@ -428,6 +427,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#111827',
+    textAlign: 'right',
   },
   textareaWrap: {
     height: 'auto',
@@ -443,7 +443,6 @@ const s = StyleSheet.create({
     textAlignVertical: 'top',
   },
 
-  // ── الأزرار ──
   saveBtn: {
     backgroundColor: PRIMARY,
     borderRadius: 14,
