@@ -6,13 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../src/lib/api';
+import { toast } from '../src/lib/toast';  // ✅ إضافة استيراد toast
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-// Types
 interface Notification {
   id: number;
   title: string;
@@ -59,27 +59,16 @@ export default function NotificationsScreen() {
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // ✅ استخدام الـ API الصحيح - نفس الـ endpoint الذي يعمل في admin
   const { data: notifications = [], isLoading, refetch, error } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: async () => {
       try {
-        // محاولة جلب الإشعارات من endpoint المستخدم
         const { data } = await api.get('/api/notifications');
-        
-        // فلترة الإشعارات لهذا المستخدم فقط
-        // إذا كان الـ API يعيد كل الإشعارات، نقوم بفلترتها
         let userNotifications = data;
-        
-        // إذا كانت البيانات تحتوي على خاصية user_id، فلترها للمستخدم الحالي
-        // وإلا اعتبر كل الإشعارات للمستخدم الحالي
         if (Array.isArray(data) && data.length > 0 && data[0]?.user_id) {
-          // جلب المستخدم الحالي
           const { data: user } = await api.get('/api/auth/me');
           userNotifications = data.filter((n: any) => n.user_id === user.id);
         }
-        
-        // ترتيب من الأحدث إلى الأقدم
         return userNotifications.sort((a: Notification, b: Notification) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -91,7 +80,12 @@ export default function NotificationsScreen() {
     refetchInterval: 30000,
   });
 
-  // Mark as read mutation
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
   const markAsRead = useMutation({
     mutationFn: async (id: number) => {
       await api.patch(`/api/notifications/${id}/read`);
@@ -100,27 +94,19 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
       qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
     },
-    onError: (err) => {
-      console.error('Error marking as read:', err);
-    },
   });
 
-  // Mark all as read mutation
   const markAllAsRead = useMutation({
     mutationFn: async () => {
-      // إرسال طلب لتحديد الكل كمقروء
       await api.post('/api/notifications/mark-all-read');
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
       qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
-    },
-    onError: (err) => {
-      console.error('Error marking all as read:', err);
+      toast.success('تم تحديد الكل كمقروء');
     },
   });
 
-  // Delete notification mutation
   const deleteNotification = useMutation({
     mutationFn: async (id: number) => {
       await api.delete(`/api/notifications/${id}`);
@@ -129,9 +115,7 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
       qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
       setModalVisible(false);
-    },
-    onError: (err) => {
-      console.error('Error deleting notification:', err);
+      toast.success('تم حذف الإشعار');
     },
   });
 
@@ -144,9 +128,7 @@ export default function NotificationsScreen() {
   const handleNotificationPress = (notification: Notification) => {
     if (!notification.is_read) {
       markAsRead.mutate(notification.id);
-      // تحديث الحالة محلياً
-      const updatedNotification = { ...notification, is_read: true };
-      setSelectedNotification(updatedNotification);
+      setSelectedNotification({ ...notification, is_read: true });
     } else {
       setSelectedNotification(notification);
     }
@@ -206,10 +188,11 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      {/* Header */}
+      
+      {/* Header RTL */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="arrow-forward" size={24} color="#111827" />
+          <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>الإشعارات</Text>
         {unreadCount > 0 && (
@@ -224,7 +207,6 @@ export default function NotificationsScreen() {
         )}
       </View>
 
-      {/* Stats Bar */}
       {notifications.length > 0 && (
         <View style={s.statsBar}>
           <View style={s.statItem}>
@@ -240,7 +222,6 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      {/* Error State */}
       {error ? (
         <View style={s.emptyContainer}>
           <View style={s.emptyIconBox}>
@@ -272,7 +253,6 @@ export default function NotificationsScreen() {
         />
       )}
 
-      {/* Notification Detail Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -309,10 +289,7 @@ export default function NotificationsScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+  container: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -327,23 +304,15 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  markAllBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  markAllText: {
-    fontSize: 12,
-    color: PRIMARY,
-    fontWeight: '600',
-  },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  markAllBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  markAllText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
   statsBar: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
@@ -354,26 +323,10 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: PRIMARY,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    paddingBottom: 20,
-  },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statText: { fontSize: 12, color: '#64748b' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PRIMARY },
+  listContent: { paddingHorizontal: 16, paddingVertical: 8, paddingBottom: 20 },
   notificationCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,154 +335,32 @@ const s = StyleSheet.create({
     padding: 14,
     gap: 12,
   },
-  unreadCard: {
-    backgroundColor: PRIMARY + '08',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contentContainer: {
-    flex: 1,
-    gap: 4,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    flex: 1,
-    marginRight: 8,
-  },
-  unreadTitle: {
-    color: '#111827',
-    fontWeight: '700',
-  },
-  time: {
-    fontSize: 10,
-    color: '#9ca3af',
-  },
-  body: {
-    fontSize: 12,
-    color: '#6b7280',
-    lineHeight: 18,
-  },
-  unreadBody: {
-    color: '#374151',
-  },
-  deleteBtn: {
-    padding: 4,
-  },
-  separator: {
-    height: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-    gap: 16,
-  },
-  emptyIconBox: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-  retryBtn: {
-    backgroundColor: PRIMARY,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  retryText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
-    width: '85%',
-    maxWidth: 400,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    flex: 1,
-    marginRight: 12,
-  },
-  modalTime: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginBottom: 16,
-  },
-  modalBody: {
-    fontSize: 15,
-    color: '#374151',
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#e8edf2',
-    paddingTop: 16,
-  },
-  deleteModalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#fee2e2',
-  },
-  deleteModalText: {
-    fontSize: 14,
-    color: '#ef4444',
-    fontWeight: '600',
-  },
+  unreadCard: { backgroundColor: PRIMARY + '08' },
+  iconContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  contentContainer: { flex: 1, gap: 4 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 14, fontWeight: '600', color: '#374151', flex: 1, marginRight: 8 },
+  unreadTitle: { color: '#111827', fontWeight: '700' },
+  time: { fontSize: 10, color: '#9ca3af' },
+  body: { fontSize: 12, color: '#6b7280', lineHeight: 18 },
+  unreadBody: { color: '#374151' },
+  deleteBtn: { padding: 4 },
+  separator: { height: 8 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14, color: '#9ca3af' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100, gap: 16 },
+  emptyIconBox: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151' },
+  emptyText: { fontSize: 14, color: '#9ca3af' },
+  retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  retryText: { color: '#fff', fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', borderRadius: 24, padding: 20, width: '85%', maxWidth: 400 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', flex: 1, marginRight: 12 },
+  modalTime: { fontSize: 11, color: '#9ca3af', marginBottom: 16 },
+  modalBody: { fontSize: 15, color: '#374151', lineHeight: 22, marginBottom: 20 },
+  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: 1, borderTopColor: '#e8edf2', paddingTop: 16 },
+  deleteModalBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#fee2e2' },
+  deleteModalText: { fontSize: 14, color: '#ef4444', fontWeight: '600' },
 });

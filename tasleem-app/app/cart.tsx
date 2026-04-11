@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { toast } from '../src/lib/toast';
 import api from '../src/lib/api';
@@ -15,14 +15,18 @@ export default function CartScreen() {
   const [cart, setCart] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => { loadCart(); }, []);
-
   const loadCart = async () => {
     try {
       const data = await AsyncStorage.getItem('cart');
       setCart(data ? JSON.parse(data) : []);
     } catch (e) { console.error(e); }
   };
+
+  useEffect(() => { loadCart(); }, []);
+
+  useFocusEffect(
+    useCallback(() => { loadCart(); }, [])
+  );
 
   const updateQty = async (productId: number, newQty: number) => {
     if (newQty < 1) return;
@@ -61,7 +65,7 @@ export default function CartScreen() {
         
         <View style={s.qtyBox}>
           <TouchableOpacity style={s.qtyBtn} onPress={() => updateQty(item.productId, item.quantity - 1)}>
-            <Ionicons name="remove" size={16} color="#6b7280" />
+            <Ionicons name="remove" size={14} color="#6b7280" />
           </TouchableOpacity>
           <Text style={s.qtyText}>{item.quantity}</Text>
           <TouchableOpacity style={s.qtyBtn} onPress={async () => {
@@ -74,7 +78,7 @@ export default function CartScreen() {
               }
             } catch (e) { toast.error('فشل التحقق'); }
           }}>
-            <Ionicons name="add" size={16} color="#6b7280" />
+            <Ionicons name="add" size={14} color="#6b7280" />
           </TouchableOpacity>
         </View>
         
@@ -82,7 +86,7 @@ export default function CartScreen() {
       </View>
       
       <TouchableOpacity onPress={() => removeItem(item.productId)} style={s.removeBtn}>
-        <Ionicons name="close-circle" size={24} color="#ef4444" />
+        <Ionicons name="close-circle" size={22} color="#ef4444" />
       </TouchableOpacity>
     </View>
   );
@@ -104,10 +108,10 @@ export default function CartScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header (بدون تدرج) ── */}
+      {/* ── Header RTL ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Ionicons name="chevron-forward" size={22} color="#111827" />
+          <Ionicons name="chevron-back" size={22} color="#111827" />
         </TouchableOpacity>
         
         <Text style={s.headerTitle}>السلة ({cart.length})</Text>
@@ -139,7 +143,6 @@ export default function CartScreen() {
             showsVerticalScrollIndicator={false}
           />
 
-          {/* ── Footer (بدون تدرج) ── */}
           <View style={s.footer}>
             <View style={s.totalRow}>
               <Text style={s.totalLabel}>المجموع</Text>
@@ -160,7 +163,6 @@ export default function CartScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header (موحد مع باقي الصفحات) ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -201,13 +203,8 @@ const s = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
 
-  // ── List ──
-  listContent: {
-    padding: 16,
-    paddingBottom: 140,
-  },
+  listContent: { padding: 16, paddingBottom: 140 },
 
-  // ── Cart Item Card ──
   cartItem: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -230,9 +227,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#f3f4f6',
   },
-  itemInfo: {
-    flex: 1,
-  },
+  itemInfo: { flex: 1 },
   itemName: {
     fontSize: 14,
     fontWeight: '600',
@@ -280,7 +275,6 @@ const s = StyleSheet.create({
     padding: 4,
   },
 
-  // ── Footer (بدون تدرج) ──
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -326,7 +320,6 @@ const s = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // ── Empty State ──
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
