@@ -13,11 +13,12 @@ interface Toast {
   type: ToastType;
 }
 
+// ✅ الألوان الجديدة - تصميم حديث
 const COLORS: any = {
-  success: { bg: '#f0fdf4', border: '#86efac', icon: '#16a34a', iconName: 'checkmark-circle' },
-  error:   { bg: '#fef2f2', border: '#fca5a5', icon: '#dc2626', iconName: 'close-circle' },
-  info:    { bg: '#eff6ff', border: '#93c5fd', icon: '#2563eb', iconName: 'information-circle' },
-  warning: { bg: '#fffbeb', border: '#fcd34d', icon: '#d97706', iconName: 'warning' },
+  success: { bg: '#10b981', border: '#10b981', icon: '#fff', iconName: 'checkmark-circle' },
+  error:   { bg: '#ef4444', border: '#ef4444', icon: '#fff', iconName: 'close-circle' },
+  info:    { bg: '#3b82f6', border: '#3b82f6', icon: '#fff', iconName: 'information-circle' },
+  warning: { bg: '#f59e0b', border: '#f59e0b', icon: '#fff', iconName: 'warning' },
 };
 
 let showToastFn: (msg: string, type?: ToastType, title?: string) => void = () => {};
@@ -40,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   showToastFn = useCallback((message: string, type: ToastType = 'info', title?: string) => {
     const id = ++counter.current;
     setToasts(prev => [...prev, { id, message, type, title }]);
-    setTimeout(() => removeToast(id), 3500);
+    setTimeout(() => removeToast(id), 3000); // 3 ثواني
   }, [removeToast]);
 
   return (
@@ -74,13 +75,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       opacity: anim,
     }]}>
       <TouchableOpacity onPress={onClose} style={s.closeBtn}>
-        <Ionicons name="close" size={16} color="#9ca3af" />
+        <Ionicons name="close" size={16} color="#fff" />
       </TouchableOpacity>
       <View style={s.toastContent}>
-        {toast.title && <Text style={[s.toastTitle, { color: c.icon }]}>{toast.title}</Text>}
+        {toast.title && <Text style={[s.toastTitle, { color: '#fff' }]}>{toast.title}</Text>}
         <Text style={s.toastMsg}>{toast.message}</Text>
       </View>
-      <View style={[s.toastIcon, { backgroundColor: c.icon + '20' }]}>
+      <View style={[s.toastIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
         <Ionicons name={c.iconName as any} size={22} color={c.icon} />
       </View>
     </Animated.View>
@@ -93,14 +94,14 @@ const s = StyleSheet.create({
     zIndex: 9999, gap: 8,
   },
   toast: {
-    borderRadius: 16, borderWidth: 1.5, padding: 14,
+    borderRadius: 16, borderWidth: 0, padding: 14,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12, elevation: 8,
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12, elevation: 8,
   },
   toastIcon: { width: 44, height: 44, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center' },
   toastContent: { flex: 1, alignItems: 'flex-end' },
   toastTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 2 },
-  toastMsg: { fontSize: 13, color: '#374151', textAlign: 'right', lineHeight: 18 },
+  toastMsg: { fontSize: 13, color: '#fff', textAlign: 'right', lineHeight: 18 },
   closeBtn: { padding: 4 },
 });
