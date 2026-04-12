@@ -48,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component (مع ارتفاع ثابت) ──
+// ── Product Card Component (مع ارتفاع ثابت وزر عرض التفاصيل) ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -66,8 +66,8 @@ const ProductCard = React.memo(({
   const hasDiscount = product.discount > 0;
   const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
   
-  // ارتفاع ثابت للبطاقة (عرض الصورة + 110 للجزء السفلي)
-  const CARD_HEIGHT = CARD_WIDTH + 110;
+  // ارتفاع ثابت للبطاقة (عرض الصورة + 120 للجزء السفلي)
+  const CARD_HEIGHT = CARD_WIDTH + 120;
   
   return (
     <TouchableOpacity
@@ -136,10 +136,11 @@ const ProductCard = React.memo(({
           </Text>
         </View>
         
+        {/* زر عرض التفاصيل */}
         <TouchableOpacity 
           style={s.detailsBtn}
           onPress={() => onViewDetails(product.id)}>
-          <Ionicons name="eye-outline" size={18} color={PRIMARY} />
+          <Ionicons name="eye-outline" size={16} color={PRIMARY} />
           <Text style={s.detailsBtnText}>عرض التفاصيل</Text>
         </TouchableOpacity>
       </View>
@@ -392,9 +393,7 @@ export default function HomeScreen() {
       {/* ── Search Box with Filter ── */}
       <View style={s.searchWrapper}>
         <View style={s.searchBox}>
-          <TouchableOpacity onPress={performSearch}>
-            <Ionicons name="search-outline" size={18} color="#9ca3af" />
-          </TouchableOpacity>
+          <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
             style={s.searchInput}
             placeholder="ابحث عن منتج..."
@@ -648,13 +647,13 @@ const s = StyleSheet.create({
   flatListContent: {
     paddingHorizontal: 12,
     paddingBottom: 32,
-    gap: 16,
+    gap: 8,  // تقليل المسافة بين الصفوف
   },
   columnWrapper: {
     gap: 12,
     justifyContent: 'space-between',
-    alignItems: 'stretch',  // ✅ يمد البطاقات لتكون متساوية
-    marginBottom: 16,
+    alignItems: 'stretch',
+    marginBottom: 8,  // تقليل المسافة بين الصفوف
   },
 
   searchWrapper: {
@@ -824,8 +823,8 @@ const s = StyleSheet.create({
   cardBody: { 
     padding: 10, 
     gap: 6,
-    flex: 1,  // ✅ يملأ المساحة المتبقية
-    justifyContent: 'space-between',  // ✅ يوزع المحتوى بالتساوي
+    flex: 1,
+    justifyContent: 'space-between',
   },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
   
@@ -836,7 +835,7 @@ const s = StyleSheet.create({
   oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through' },
   
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
-  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
+  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '80%' },
   catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
   stockText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
   stockLow: { color: '#ef4444' },
@@ -850,11 +849,11 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     marginTop: 6,
-    height: 36,  // ✅ ارتفاع ثابت للزر
+    height: 34,
   },
   detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  empty: { alignItems: 'center', paddingTop: 40, gap: 12 },
   emptyIconBox: {
     width: 80,
     height: 80,
