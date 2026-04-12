@@ -115,7 +115,7 @@ const ProductCard = React.memo(({
       </View>
 
       <View style={s.cardBody}>
-        <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
+        <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
 
         <View style={s.priceSection}>
           {hasDiscount && (
