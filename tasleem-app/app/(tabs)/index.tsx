@@ -48,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component ──
+// ── Product Card Component (مع ارتفاع ثابت) ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -66,9 +66,12 @@ const ProductCard = React.memo(({
   const hasDiscount = product.discount > 0;
   const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
   
+  // ارتفاع ثابت للبطاقة (عرض الصورة + 110 للجزء السفلي)
+  const CARD_HEIGHT = CARD_WIDTH + 110;
+  
   return (
     <TouchableOpacity
-      style={[s.card, { width: CARD_WIDTH }]}
+      style={[s.card, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
       onPress={() => onPress(product.id)}
       activeOpacity={0.92}>
       <View style={[s.imgBox, { height: CARD_WIDTH }]}>
@@ -650,6 +653,7 @@ const s = StyleSheet.create({
   columnWrapper: {
     gap: 12,
     justifyContent: 'space-between',
+    alignItems: 'stretch',  // ✅ يمد البطاقات لتكون متساوية
     marginBottom: 16,
   },
 
@@ -817,7 +821,12 @@ const s = StyleSheet.create({
   },
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
 
-  cardBody: { padding: 10, gap: 6 },
+  cardBody: { 
+    padding: 10, 
+    gap: 6,
+    flex: 1,  // ✅ يملأ المساحة المتبقية
+    justifyContent: 'space-between',  // ✅ يوزع المحتوى بالتساوي
+  },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
   
   priceSection: { marginVertical: 4 },
@@ -841,6 +850,7 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     marginTop: 6,
+    height: 36,  // ✅ ارتفاع ثابت للزر
   },
   detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 

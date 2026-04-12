@@ -6,7 +6,10 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
     },
     "development-simulator": {
       "developmentClient": true,
@@ -27,7 +30,7 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "aab"
       },
       "ios": {
         "simulator": false
@@ -37,6 +40,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "YOUR_APPLE_ID@example.com",
+        "ascAppId": "YOUR_APP_ID",
+        "sku": "com.tasleem.app"
+      }
+    }
   }
 }
