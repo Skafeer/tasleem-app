@@ -11,29 +11,30 @@ import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const SUCCESS = '#10b981';
-const DANGER  = '#ef4444';
+const DANGER = '#ef4444';
+const BG = '#f2f6f9';
 
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending:    { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
+  pending: { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
-  preparing:  { label: 'قيد التجهيز',  color: '#8b5cf6', bg: '#f5f3ff', icon: 'cube-outline' },
-  shipping:   { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
-  delivered:  { label: 'تم التوصيل',  color: '#10b981', bg: '#ecfdf5', icon: 'checkmark-circle-outline' },
-  cancelled:  { label: 'ملغي',         color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
-  returned:   { label: 'راجع',          color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
-  postponed:  { label: 'مؤجل',         color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
+  preparing: { label: 'قيد التجهيز', color: '#8b5cf6', bg: '#f5f3ff', icon: 'cube-outline' },
+  shipping: { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
+  delivered: { label: 'تم التوصيل', color: '#10b981', bg: '#ecfdf5', icon: 'checkmark-circle-outline' },
+  cancelled: { label: 'ملغي', color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
+  returned: { label: 'راجع', color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
+  postponed: { label: 'مؤجل', color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
 };
 
 const FILTERS = [
-  { key: 'all',        label: 'الكل' },
-  { key: 'pending',    label: 'انتظار' },
+  { key: 'all', label: 'الكل' },
+  { key: 'pending', label: 'انتظار' },
   { key: 'processing', label: 'معالجة' },
-  { key: 'preparing',  label: 'تجهيز' },
-  { key: 'shipping',   label: 'توصيل' },
-  { key: 'delivered',  label: 'مُسلَّم' },
-  { key: 'cancelled',  label: 'ملغي' },
-  { key: 'returned',   label: 'راجع' },
-  { key: 'postponed',  label: 'مؤجل' },
+  { key: 'preparing', label: 'تجهيز' },
+  { key: 'shipping', label: 'توصيل' },
+  { key: 'delivered', label: 'مُسلَّم' },
+  { key: 'cancelled', label: 'ملغي' },
+  { key: 'returned', label: 'راجع' },
+  { key: 'postponed', label: 'مؤجل' },
 ];
 
 const getFirstImage = (product: any) => {
@@ -44,12 +45,12 @@ const getFirstImage = (product: any) => {
 
 export default function OrdersTab() {
   const qc = useQueryClient();
-  const [search, setSearch]         = useState('');
-  const [filter, setFilter]         = useState('all');
-  const [expanded, setExpanded]     = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [expanded, setExpanded] = useState<number | null>(null);
   const [dropdownId, setDropdownId] = useState<number | null>(null);
-  const [editOrder, setEditOrder]   = useState<any>(null);
-  const [editForm, setEditForm]     = useState<any>({});
+  const [editOrder, setEditOrder] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({});
 
   const {
     data: ordersData,
@@ -75,11 +76,14 @@ export default function OrdersTab() {
   });
 
   const orders = ordersData?.pages.flatMap((p: any) => p.data) ?? [];
-  const total  = ordersData?.pages[0]?.total ?? 0;
+  const total = ordersData?.pages[0]?.total ?? 0;
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
-    queryFn: async () => { const { data } = await api.get('/api/admin/users'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/admin/users');
+      return data;
+    },
   });
 
   const updateStatus = useMutation({
@@ -109,7 +113,9 @@ export default function OrdersTab() {
   });
 
   const deleteOrder = useMutation({
-    mutationFn: async (id: number) => { await api.delete(`/api/orders/${id}`); },
+    mutationFn: async (id: number) => {
+      await api.delete(`/api/orders/${id}`);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
       toast.success('تم حذف الطلب');
@@ -135,16 +141,16 @@ export default function OrdersTab() {
 
   const openEdit = (o: any) => {
     setEditForm({
-      customerName:  o.customerName  || '',
+      customerName: o.customerName || '',
       customerPhone: o.customerPhone || '',
-      province:      o.province      || '',
-      address:       o.address       || '',
-      notes:         o.notes         || '',
+      province: o.province || '',
+      address: o.address || '',
+      notes: o.notes || '',
       items: (o.items || []).map((i: any) => ({
-        productId:   i.productId,
+        productId: i.productId,
         productName: i.product?.name || `منتج #${i.productId}`,
-        quantity:    String(i.quantity),
-        price:       String(i.price),
+        quantity: String(i.quantity),
+        price: String(i.price),
       })),
     });
     setEditOrder(o);
@@ -162,12 +168,18 @@ export default function OrdersTab() {
   };
 
   const handleSaveEdit = () => {
-    if (!editForm.customerName.trim()) { toast.warning('يرجى إدخال اسم الزبون'); return; }
-    if (!editForm.customerPhone.trim()) { toast.warning('يرجى إدخال رقم الهاتف'); return; }
+    if (!editForm.customerName.trim()) {
+      toast.warning('يرجى إدخال اسم الزبون');
+      return;
+    }
+    if (!editForm.customerPhone.trim()) {
+      toast.warning('يرجى إدخال رقم الهاتف');
+      return;
+    }
     const items = editForm.items.map((i: any) => ({
       productId: i.productId,
-      quantity:  Number(i.quantity),
-      price:     Number(i.price),
+      quantity: Number(i.quantity),
+      price: Number(i.price),
     }));
     updateOrder.mutate({ id: editOrder.id, data: { ...editForm, items } });
   };
@@ -179,15 +191,17 @@ export default function OrdersTab() {
     counts[k] = orders.filter((o: any) => o.status === k).length;
   });
 
-  if (isLoading) return (
-    <View style={s.center}>
-      <ActivityIndicator size="large" color={PRIMARY} />
-      <Text style={s.loadingTxt}>جاري تحميل الطلبات...</Text>
-    </View>
-  );
+  if (isLoading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={s.loadingTxt}>جاري تحميل الطلبات...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
 
       {/* شريط البحث والفلاتر */}
       <View style={s.topBar}>
@@ -196,8 +210,10 @@ export default function OrdersTab() {
           <TextInput
             style={s.searchInput}
             placeholder="ابحث برقم الطلب أو اسم الزبون..."
-            value={search} onChangeText={setSearch}
-            placeholderTextColor="#9ca3af" textAlign="right"
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor="#9ca3af"
+            textAlign="right"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
@@ -210,8 +226,7 @@ export default function OrdersTab() {
             <TouchableOpacity
               key={f.key}
               style={[s.chip, filter === f.key && s.chipActive]}
-              onPress={() => setFilter(f.key)}
-            >
+              onPress={() => setFilter(f.key)}>
               <Text style={[s.chipTxt, filter === f.key && s.chipTxtActive]}>{f.label}</Text>
               {f.key !== 'all' && counts[f.key] > 0 && (
                 <View style={[s.chipBadge, filter === f.key && s.chipBadgeActive]}>
@@ -229,7 +244,7 @@ export default function OrdersTab() {
       <FlatList
         data={filtered}
         keyExtractor={i => i.id.toString()}
-        contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+        contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={s.center}>
@@ -238,10 +253,10 @@ export default function OrdersTab() {
           </View>
         }
         renderItem={({ item: o }) => {
-          const st       = STATUS[o.status] || STATUS.pending;
+          const st = STATUS[o.status] || STATUS.pending;
           const merchant = getMerchant(o.merchantId);
-          const isOpen   = expanded === o.id;
-          const items    = o.items || [];
+          const isOpen = expanded === o.id;
+          const items = o.items || [];
 
           return (
             <View style={s.card}>
@@ -257,8 +272,7 @@ export default function OrdersTab() {
                 </View>
                 <TouchableOpacity
                   style={[s.statusPill, { backgroundColor: st.bg }]}
-                  onPress={() => setDropdownId(dropdownId === o.id ? null : o.id)}
-                >
+                  onPress={() => setDropdownId(dropdownId === o.id ? null : o.id)}>
                   <Ionicons name="chevron-down" size={11} color={st.color} />
                   <Ionicons name={st.icon} size={13} color={st.color} />
                   <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
@@ -285,11 +299,13 @@ export default function OrdersTab() {
                       key={key}
                       style={[s.dropdownItem, o.status === key && { backgroundColor: val.color + '15' }]}
                       onPress={() => {
-                        if (o.status === key) { setDropdownId(null); return; }
+                        if (o.status === key) {
+                          setDropdownId(null);
+                          return;
+                        }
                         updateStatus.mutate({ id: o.id, status: key });
                       }}
-                      disabled={updateStatus.isPending}
-                    >
+                      disabled={updateStatus.isPending}>
                       <Ionicons name={val.icon} size={14} color={val.color} />
                       <Text style={[s.dropdownTxt, { color: o.status === key ? val.color : '#374151' }]}>
                         {val.label}
@@ -323,7 +339,9 @@ export default function OrdersTab() {
                   </View>
                   {(o.province || o.address) && (
                     <View style={s.infoLine}>
-                      <TouchableOpacity style={s.copyBtn} onPress={() => copy(`${o.province} - ${o.address}`, 'العنوان')}>
+                      <TouchableOpacity
+                        style={s.copyBtn}
+                        onPress={() => copy(`${o.province} - ${o.address}`, 'العنوان')}>
                         <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                       </TouchableOpacity>
                       <Text style={s.infoSub}>{o.province}{o.address ? ` — ${o.address}` : ''}</Text>
@@ -386,8 +404,7 @@ export default function OrdersTab() {
               {/* زر التفاصيل */}
               <TouchableOpacity
                 style={s.expandBtn}
-                onPress={() => setExpanded(isOpen ? null : o.id)}
-              >
+                onPress={() => setExpanded(isOpen ? null : o.id)}>
                 <Ionicons name={isOpen ? 'chevron-up-outline' : 'chevron-down-outline'} size={15} color={PRIMARY} />
                 <Text style={s.expandTxt}>{isOpen ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}</Text>
               </TouchableOpacity>
@@ -498,34 +515,57 @@ export default function OrdersTab() {
                 <Text style={s.modalSection}>معلومات الزبون</Text>
 
                 <Text style={s.inputLabel}>الاسم</Text>
-                <TextInput style={s.input} value={editForm.customerName}
+                <TextInput
+                  style={s.input}
+                  value={editForm.customerName}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, customerName: v }))}
-                  placeholder="اسم الزبون" placeholderTextColor="#9ca3af" textAlign="right" />
+                  placeholder="اسم الزبون"
+                  placeholderTextColor="#9ca3af"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>رقم الهاتف</Text>
-                <TextInput style={s.input} value={editForm.customerPhone}
+                <TextInput
+                  style={s.input}
+                  value={editForm.customerPhone}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, customerPhone: v }))}
-                  placeholder="رقم الهاتف" placeholderTextColor="#9ca3af"
-                  keyboardType="phone-pad" textAlign="right" />
+                  placeholder="رقم الهاتف"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>المحافظة</Text>
-                <TextInput style={s.input} value={editForm.province}
+                <TextInput
+                  style={s.input}
+                  value={editForm.province}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, province: v }))}
-                  placeholder="المحافظة" placeholderTextColor="#9ca3af" textAlign="right" />
+                  placeholder="المحافظة"
+                  placeholderTextColor="#9ca3af"
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>العنوان</Text>
-                <TextInput style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]}
+                <TextInput
+                  style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]}
                   value={editForm.address}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, address: v }))}
-                  placeholder="العنوان التفصيلي" placeholderTextColor="#9ca3af"
-                  multiline textAlign="right" />
+                  placeholder="العنوان التفصيلي"
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  textAlign="right"
+                />
 
                 <Text style={s.inputLabel}>ملاحظات</Text>
-                <TextInput style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]}
+                <TextInput
+                  style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]}
                   value={editForm.notes}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, notes: v }))}
-                  placeholder="ملاحظات (اختياري)" placeholderTextColor="#9ca3af"
-                  multiline textAlign="right" />
+                  placeholder="ملاحظات (اختياري)"
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  textAlign="right"
+                />
 
                 <Text style={s.modalSection}>المنتجات</Text>
 
@@ -536,8 +576,7 @@ export default function OrdersTab() {
                       onPress={() => {
                         const newItems = editForm.items.filter((_: any, i: number) => i !== idx);
                         setEditForm((p: any) => ({ ...p, items: newItems }));
-                      }}
-                    >
+                      }}>
                       <Ionicons name="close-circle" size={20} color={DANGER} />
                     </TouchableOpacity>
                     <View style={s.editItemInfo}>
@@ -545,23 +584,33 @@ export default function OrdersTab() {
                       <View style={s.editItemFields}>
                         <View style={{ flex: 1 }}>
                           <Text style={s.inputLabel}>سعر البيع</Text>
-                          <TextInput style={s.inputSm} value={item.price}
+                          <TextInput
+                            style={s.inputSm}
+                            value={item.price}
                             onChangeText={v => {
                               const newItems = [...editForm.items];
                               newItems[idx] = { ...newItems[idx], price: v };
                               setEditForm((p: any) => ({ ...p, items: newItems }));
                             }}
-                            keyboardType="numeric" textAlign="right" placeholderTextColor="#9ca3af" />
+                            keyboardType="numeric"
+                            textAlign="right"
+                            placeholderTextColor="#9ca3af"
+                          />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={s.inputLabel}>الكمية</Text>
-                          <TextInput style={s.inputSm} value={item.quantity}
+                          <TextInput
+                            style={s.inputSm}
+                            value={item.quantity}
                             onChangeText={v => {
                               const newItems = [...editForm.items];
                               newItems[idx] = { ...newItems[idx], quantity: v };
                               setEditForm((p: any) => ({ ...p, items: newItems }));
                             }}
-                            keyboardType="numeric" textAlign="right" placeholderTextColor="#9ca3af" />
+                            keyboardType="numeric"
+                            textAlign="right"
+                            placeholderTextColor="#9ca3af"
+                          />
                         </View>
                       </View>
                     </View>
@@ -571,12 +620,18 @@ export default function OrdersTab() {
               </ScrollView>
 
               <View style={s.modalFooter}>
-                <TouchableOpacity style={s.saveBtn} onPress={handleSaveEdit} disabled={updateOrder.isPending}>
-                  {updateOrder.isPending
-                    ? <ActivityIndicator color="#fff" />
-                    : <><Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                        <Text style={s.saveBtnTxt}>حفظ التعديلات</Text></>
-                  }
+                <TouchableOpacity
+                  style={s.saveBtn}
+                  onPress={handleSaveEdit}
+                  disabled={updateOrder.isPending}>
+                  {updateOrder.isPending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                      <Text style={s.saveBtnTxt}>حفظ التعديلات</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -590,94 +645,268 @@ export default function OrdersTab() {
 }
 
 const s = StyleSheet.create({
-  totalTxt:    { fontSize: 12, color: '#9ca3af', textAlign: 'right', paddingHorizontal: 14, paddingVertical: 8 },
-  loadMoreBtn: { margin: 14, padding: 14, backgroundColor: '#fff', borderRadius: 14,
-    alignItems: 'center', borderWidth: 1.5, borderColor: PRIMARY + '40' },
-  loadMoreTxt: { color: PRIMARY, fontWeight: 'bold', fontSize: 14 },
-  noMoreTxt:   { textAlign: 'center', color: '#9ca3af', fontSize: 12, padding: 16 },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
+  listContent: { padding: 12, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
-  emptyTxt:   { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
-  topBar:     { backgroundColor: '#fff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  searchRow:  { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f9fafb', borderRadius: 12, paddingHorizontal: 12, gap: 8, borderWidth: 1.5, borderColor: '#e5e7eb' },
-  searchInput:{ flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827' },
-  chip:           { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: '#f3f4f6', marginRight: 7, borderWidth: 1.5, borderColor: '#e5e7eb' },
-  chipActive:     { backgroundColor: PRIMARY + '18', borderColor: PRIMARY },
-  chipTxt:        { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  chipTxtActive:  { color: PRIMARY },
-  chipBadge:      { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
-  chipBadgeActive:{ backgroundColor: PRIMARY },
-  chipBadgeTxt:   { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
+  emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+
+  topBar: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+  },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
+
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    marginRight: 7,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  chipActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  chipTxt: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  chipTxtActive: { color: PRIMARY },
+  chipBadge: { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  chipBadgeActive: { backgroundColor: PRIMARY },
+  chipBadgeTxt: { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
   chipBadgeTxtActive: { color: '#fff' },
-  card:       { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, paddingBottom: 10 },
+
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 14,
+    paddingBottom: 10,
+  },
   orderIdRow: { alignItems: 'flex-end', gap: 4 },
-  orderId:    { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  dateRow:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  dateTxt:    { fontSize: 11, color: '#9ca3af' },
-  statusPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20 },
-  statusTxt:  { fontSize: 12, fontWeight: 'bold' },
-  actionRow:    { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
-  editBtn:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: PRIMARY + '12', borderWidth: 1, borderColor: PRIMARY + '30' },
-  deleteBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: DANGER + '10', borderWidth: 1, borderColor: DANGER + '30' },
+  orderId: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateTxt: { fontSize: 11, color: '#9ca3af' },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20 },
+  statusTxt: { fontSize: 12, fontWeight: 'bold' },
+
+  actionRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: PRIMARY + '12',
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: DANGER + '10',
+    borderWidth: 1,
+    borderColor: DANGER + '30',
+  },
   actionBtnTxt: { fontSize: 12, fontWeight: '700' },
-  dropdown:     { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
-  dropdownItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  dropdownTxt:  { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
-  divider:      { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
-  section:         { paddingHorizontal: 14, paddingVertical: 12 },
-  sectionLabelRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 8 },
-  sectionLabel:    { fontSize: 12, fontWeight: '700', color: PRIMARY },
+
+  dropdown: {
+    marginHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  dropdownTxt: { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+
+  divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
+
+  section: { paddingHorizontal: 14, paddingVertical: 12 },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: PRIMARY },
   infoBlock: { gap: 6 },
-  infoLine:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  infoVal:   { fontSize: 14, fontWeight: '700', color: '#111827' },
-  infoSub:   { fontSize: 13, color: '#6b7280', flex: 1, textAlign: 'right' },
-  copyBtn:   { width: 28, height: 28, borderRadius: 8, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-  priceRow:     { flexDirection: 'row-reverse', backgroundColor: '#f8fafc', paddingVertical: 12, paddingHorizontal: 14, gap: 4 },
-  priceBox:     { flex: 1, alignItems: 'center', gap: 3 },
+  infoLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoVal: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  infoSub: { fontSize: 13, color: '#6b7280', flex: 1, textAlign: 'right' },
+  copyBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  priceRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 4,
+  },
+  priceBox: { flex: 1, alignItems: 'center', gap: 3 },
   priceDivider: { width: 1, backgroundColor: '#e5e7eb' },
-  priceLabel:   { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
-  priceVal:     { fontSize: 13, fontWeight: 'bold' },
-  expandBtn: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 11, borderTopWidth: 1, borderTopColor: '#f3f4f6', backgroundColor: PRIMARY + '06' },
+  priceLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  priceVal: { fontSize: 13, fontWeight: 'bold' },
+
+  expandBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    backgroundColor: PRIMARY + '06',
+  },
   expandTxt: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
-  details:   { padding: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  itemsBox:  { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 2 },
-  productRow:            { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 12, paddingVertical: 10 },
-  productBorder:         { borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  productImg:            { width: 64, height: 64, borderRadius: 12, backgroundColor: '#f3f4f6' },
+
+  details: { padding: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  itemsBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 2 },
+  productRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 10 },
+  productBorder: { borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  productImg: { width: 64, height: 64, borderRadius: 12, backgroundColor: '#f3f4f6' },
   productImgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  productInfo:           { flex: 1, gap: 6 },
-  productName:           { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 19 },
-  productPriceRow:       { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  qtyBadge:        { backgroundColor: PRIMARY + '15', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  qtyTxt:          { fontSize: 12, color: PRIMARY, fontWeight: 'bold' },
-  priceBadge:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, backgroundColor: '#fef2f2', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  productInfo: { flex: 1, gap: 6 },
+  productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 19 },
+  productPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  qtyBadge: { backgroundColor: PRIMARY + '15', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  qtyTxt: { fontSize: 12, color: PRIMARY, fontWeight: 'bold' },
+  priceBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#fef2f2', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   priceBadgeLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
-  priceBadgeVal:   { fontSize: 12, fontWeight: 'bold' },
-  itemTotal:       { fontSize: 11, color: '#6b7280', textAlign: 'right' },
-  finBox:   { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 8 },
-  finRow:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  priceBadgeVal: { fontSize: 12, fontWeight: 'bold' },
+  itemTotal: { fontSize: 11, color: '#6b7280', textAlign: 'right' },
+
+  finBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, gap: 8 },
+  finRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   finTotal: { borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8, marginTop: 2 },
   finLabel: { flex: 1, fontSize: 13, color: '#6b7280', textAlign: 'right' },
-  finVal:   { fontSize: 13, fontWeight: '600', color: '#374151' },
-  notesBox: { flexDirection: 'row-reverse', gap: 8, backgroundColor: '#fffbeb', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#fde68a' },
+  finVal: { fontSize: 13, fontWeight: '600', color: '#374151' },
+
+  notesBox: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
   notesTxt: { flex: 1, fontSize: 13, color: '#92400e', textAlign: 'right', lineHeight: 20 },
-  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  modalCard:     { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
-  modalHeader:   { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  modalTitle:    { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   modalCloseBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  modalBody:     { padding: 20, paddingBottom: 10 },
-  modalSection:  { fontSize: 14, fontWeight: 'bold', color: PRIMARY, textAlign: 'right', marginTop: 16, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 6 },
-  modalFooter:   { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  modalBody: { padding: 20, paddingBottom: 10 },
+  modalSection: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: PRIMARY,
+    textAlign: 'right',
+    marginTop: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    paddingBottom: 6,
+  },
+  modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+
   inputLabel: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 4, fontWeight: '600' },
-  input:      { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 11, fontSize: 14, color: '#111827', backgroundColor: '#f9fafb', marginBottom: 10 },
-  inputSm:    { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 10, padding: 9, fontSize: 13, color: '#111827', backgroundColor: '#f9fafb' },
-  editItemRow:    { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginBottom: 10, flexDirection: 'row-reverse', gap: 10, alignItems: 'flex-start' },
-  removeItemBtn:  { paddingTop: 2 },
-  editItemInfo:   { flex: 1 },
-  editItemName:   { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', marginBottom: 8 },
-  editItemFields: { flexDirection: 'row-reverse', gap: 10 },
-  saveBtn:    { backgroundColor: PRIMARY, borderRadius: 14, height: 50, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    padding: 11,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    marginBottom: 10,
+  },
+  inputSm: {
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    padding: 9,
+    fontSize: 13,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+  },
+
+  editItemRow: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  removeItemBtn: { paddingTop: 2 },
+  editItemInfo: { flex: 1 },
+  editItemName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', marginBottom: 8 },
+  editItemFields: { flexDirection: 'row', gap: 10 },
+
+  saveBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    height: 50,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
   saveBtnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });

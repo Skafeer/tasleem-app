@@ -44,18 +44,25 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
-      <Tabs.Screen name="profile" options={{
-        title: 'حسابي',
+      {/* الترتيب الجديد: من اليمين إلى اليسار */}
+      
+      {/* 1. الرئيسية (كانت آخر واحدة) */}
+      <Tabs.Screen name="index" options={{
+        title: 'الرئيسية',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
         ),
       }} />
-      <Tabs.Screen name="wallet" options={{
-        title: 'المحفظة',
+      
+      {/* 2. طلباتي (كانت الرابعة) */}
+      <Tabs.Screen name="orders" options={{
+        title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
         ),
       }} />
+      
+      {/* 3. الإدارة (كانت الثالثة) */}
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
         tabBarIcon: ({ color, focused }) => (
@@ -63,16 +70,20 @@ export default function TabsLayout() {
         ),
         href: isAdmin ? '/(tabs)/admin' : null,
       }} />
-      <Tabs.Screen name="orders" options={{
-        title: 'طلباتي',
+      
+      {/* 4. المحفظة (كانت الثانية) */}
+      <Tabs.Screen name="wallet" options={{
+        title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
         ),
       }} />
-      <Tabs.Screen name="index" options={{
-        title: 'الرئيسية',
+      
+      {/* 5. حسابي (كان الأول) */}
+      <Tabs.Screen name="profile" options={{
+        title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
-          <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
         ),
       }} />
     </Tabs>

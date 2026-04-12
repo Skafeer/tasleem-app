@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  FlatList, TextInput, ActivityIndicator, Alert, Animated
+  FlatList, TextInput, ActivityIndicator, Alert, Animated,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
+const BG = '#f2f6f9';
 
+// ── حالات الطلب ──
 const STATUS: any = {
   pending:    { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
@@ -42,9 +44,8 @@ const TAB_COLORS: any = {
 
 const CANCELLABLE = ['pending', 'processing'];
 
-
-// ── Skeleton Row ──
-function SkeletonOrder() {
+// ── Skeleton Order Card ──
+function SkeletonOrderCard() {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
     Animated.loop(
@@ -55,25 +56,41 @@ function SkeletonOrder() {
     ).start();
   }, []);
   return (
-    <Animated.View style={[sko.card, { opacity: anim }]}>
-      <View style={sko.icon} />
-      <View style={{ flex: 1, gap: 8 }}>
-        <View style={sko.line} />
-        <View style={[sko.line, { width: '50%' }]} />
+    <Animated.View style={[sk.card, { opacity: anim }]}>
+      <View style={sk.row}>
+        <View style={sk.icon} />
+        <View style={sk.content}>
+          <View style={sk.line} />
+          <View style={[sk.line, { width: '60%' }]} />
+          <View style={[sk.line, { width: '40%' }]} />
+        </View>
       </View>
-      <View style={sko.badge} />
+      <View style={sk.footer}>
+        <View style={sk.btn} />
+        <View style={[sk.btn, { width: 80 }]} />
+      </View>
     </Animated.View>
   );
 }
 
-const sko = StyleSheet.create({
-  card:  { backgroundColor: '#fff', borderRadius: 18, padding: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 16, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  icon:  { width: 46, height: 46, borderRadius: 14, backgroundColor: '#e5e7eb' },
-  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '75%' },
-  badge: { width: 60, height: 26, borderRadius: 8, backgroundColor: '#e5e7eb' },
+const sk = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  row: { flexDirection: 'row', gap: 12 },
+  icon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#e8edf2' },
+  content: { flex: 1, gap: 8 },
+  line: { height: 12, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
+  footer: { flexDirection: 'row', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  btn: { flex: 1, height: 36, backgroundColor: '#e8edf2', borderRadius: 10 },
 });
 
 export default function OrdersScreen() {
@@ -81,14 +98,14 @@ export default function OrdersScreen() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState('active');
   const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading, refetch } = useQuery({
     queryKey: ['orders'],
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data } = await api.get('/api/orders?limit=9999&page=1');
-      // يتعامل مع pagination response و array عادي
       const result = data?.data || data;
       return Array.isArray(result) ? result : [];
     },
@@ -101,6 +118,7 @@ export default function OrdersScreen() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['wallet'] });
       toast.success('تم إلغاء الطلب');
     },
     onError: () => toast.error('فشل إلغاء الطلب'),
@@ -117,22 +135,32 @@ export default function OrdersScreen() {
     );
   };
 
-  const getFiltered = (tab: string) => {
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
+  const getFiltered = useCallback((tab: string) => {
     const sorted = [...(orders as any[])].sort((a, b) => {
       const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tB - tA;
     });
     return sorted.filter((o: any) => {
-      const matchSearch =
+      const matchSearch = !search || 
         o.id.toString().includes(search) ||
         o.customerName?.toLowerCase().includes(search.toLowerCase()) ||
         o.customerPhone?.includes(search);
-      if (tab === 'active')
+      if (tab === 'active') {
         return matchSearch && ['pending', 'processing', 'preparing', 'shipping'].includes(o.status);
+      }
       return matchSearch && o.status === tab;
     });
-  };
+  }, [orders, search]);
+
+  const filtered = useMemo(() => getFiltered(activeTab), [getFiltered, activeTab]);
+  const activeCount = useMemo(() => getFiltered('active').length, [getFiltered]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -140,120 +168,125 @@ export default function OrdersScreen() {
     return dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const filtered = getFiltered(activeTab);
-  const activeCount = getFiltered('active').length;
-
   const renderOrder = ({ item: o }: any) => {
     const status = STATUS[o.status] || STATUS.pending;
     const canCancel = CANCELLABLE.includes(o.status);
 
     return (
-      <View style={s.orderCard}>
-        <TouchableOpacity style={s.cardPressable} onPress={() => router.push(`/order-details/${o.id}`)} activeOpacity={0.7}>
-          <View style={s.cardTop}>
-            <View style={[s.orderIcon, { backgroundColor: status.bg }]}>
-              <Ionicons name={status.icon} size={22} color={status.color} />
-            </View>
-            <View style={s.orderInfo}>
-              <View style={s.orderTopRow}>
-                <View style={[s.badge, { backgroundColor: status.bg }]}>
-                  <Text style={[s.badgeText, { color: status.color }]}>{status.label}</Text>
-                </View>
-                <Text style={s.orderId}>طلب #{o.id}</Text>
-              </View>
-              {(o.customerName || o.province) && (
-                <View style={s.customerRow}>
-                  {o.province ? (
-                    <View style={s.provinceTag}>
-                      <Ionicons name="location-outline" size={10} color="#6b7280" />
-                      <Text style={s.provinceText}>{o.province}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={s.customerName} numberOfLines={1}>{o.customerName}</Text>
-                </View>
-              )}
-              <View style={s.dateRow}>
-                <Ionicons name="calendar-outline" size={11} color="#9ca3af" />
-                <Text style={s.dateText}>{formatDate(o.createdAt)}</Text>
-              </View>
-              <View style={s.amountRow}>
-                {o.totalProfit != null && (
-                  <View style={s.profitTag}>
-                    <Ionicons name="trending-up-outline" size={11} color="#10b981" />
-                    <Text style={s.profitText}>ربح: {o.totalProfit?.toLocaleString()} د.ع</Text>
-                  </View>
-                )}
-                <Text style={s.orderAmount}>{o.totalAmount?.toLocaleString()} <Text style={{ fontSize: 11, color: '#9ca3af' }}>د.ع</Text></Text>
-              </View>
-            </View>
+      <TouchableOpacity
+        style={s.orderCard}
+        onPress={() => router.push(`/order-details/${o.id}`)}
+        activeOpacity={0.92}>
+        
+        {/* رأس البطاقة */}
+        <View style={s.cardHeader}>
+          <View style={[s.statusBadge, { backgroundColor: status.bg }]}>
+            <Ionicons name={status.icon} size={14} color={status.color} />
+            <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
           </View>
-        </TouchableOpacity>
+          <Text style={s.orderId}>طلب #{o.id}</Text>
+        </View>
 
+        {/* معلومات الزبون */}
+        <View style={s.customerInfo}>
+          <Ionicons name="person-outline" size={14} color="#9ca3af" />
+          <Text style={s.customerName}>{o.customerName || 'بدون اسم'}</Text>
+          {o.province && (
+            <View style={s.locationTag}>
+              <Ionicons name="location-outline" size={10} color="#6b7280" />
+              <Text style={s.locationText}>{o.province}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* التاريخ */}
+        <View style={s.dateRow}>
+          <Ionicons name="calendar-outline" size={12} color="#9ca3af" />
+          <Text style={s.dateText}>{formatDate(o.createdAt)}</Text>
+        </View>
+
+        {/* السعر والربح */}
+        <View style={s.amountRow}>
+          {o.totalProfit != null && (
+            <View style={s.profitTag}>
+              <Ionicons name="trending-up-outline" size={12} color="#10b981" />
+              <Text style={s.profitText}>ربح: {o.totalProfit?.toLocaleString()} د.ع</Text>
+            </View>
+          )}
+          <Text style={s.orderAmount}>
+            {o.totalAmount?.toLocaleString()} <Text style={s.currency}>د.ع</Text>
+          </Text>
+        </View>
+
+        {/* أزرار الإجراءات */}
         <View style={s.cardFooter}>
           <TouchableOpacity
             style={[s.cancelBtn, !canCancel && s.cancelBtnDisabled]}
             onPress={() => canCancel && confirmCancel(o)}
-            disabled={!canCancel || cancelOrder.isPending}
-            activeOpacity={canCancel ? 0.7 : 1}>
-            <Ionicons name="close-circle-outline" size={15} color={canCancel ? '#ef4444' : '#d1d5db'} />
+            disabled={!canCancel || cancelOrder.isPending}>
+            <Ionicons name="close-circle-outline" size={16} color={canCancel ? '#ef4444' : '#d1d5db'} />
             <Text style={[s.cancelBtnText, !canCancel && s.cancelBtnTextDisabled]}>
               {canCancel ? 'إلغاء الطلب' : 'لا يمكن الإلغاء'}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.detailsBtn} onPress={() => router.push(`/order-details/${o.id}`)}>
-            <Ionicons name="eye-outline" size={15} color={PRIMARY} />
+          
+          <TouchableOpacity 
+            style={s.detailsBtn}
+            onPress={() => router.push(`/order-details/${o.id}`)}>
+            <Ionicons name="eye-outline" size={16} color={PRIMARY} />
             <Text style={s.detailsBtnText}>التفاصيل</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header أبيض ── */}
+      {/* ── Header ── */}
       <View style={s.header}>
-        <View style={s.headerContent}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.headerSub}>تتبع حالة طلباتك وأرباحك</Text>
+        <View style={s.headerTop}>
+          <View>
             <Text style={s.headerTitle}>طلباتي</Text>
+            <Text style={s.headerSub}>تتبع حالة طلباتك</Text>
           </View>
           {activeCount > 0 && (
-            <View style={s.activeCountBadge}>
-              <Text style={s.activeCountText}>{activeCount}</Text>
-              <Text style={s.activeCountLabel}>نشط</Text>
+            <View style={s.activeBadge}>
+              <Text style={s.activeBadgeText}>{activeCount}</Text>
+              <Text style={s.activeBadgeLabel}>طلب نشط</Text>
             </View>
           )}
         </View>
 
-        {/* Search */}
+        {/* شريط البحث */}
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
             style={s.searchInput}
             placeholder="ابحث برقم الطلب أو اسم الزبون..."
+            placeholderTextColor="#9ca3af"
             value={search}
             onChangeText={setSearch}
             textAlign="right"
-            placeholderTextColor="#9ca3af"
+            returnKeyType="search"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={17} color="#9ca3af" />
+              <Ionicons name="close-circle" size={18} color="#9ca3af" />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
-      {/* Tabs */}
-      <View style={s.tabsWrap}>
+      {/* ── التبويبات ── */}
+      <View style={s.tabsWrapper}>
         <FlatList
           horizontal
           data={TABS}
           keyExtractor={t => t.key}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          contentContainerStyle={s.tabsContent}
           renderItem={({ item: tab }) => {
             const isActive = activeTab === tab.key;
             const colors = TAB_COLORS[tab.key];
@@ -262,7 +295,7 @@ export default function OrdersScreen() {
               <TouchableOpacity
                 style={[s.tabBtn, isActive && { backgroundColor: colors.bg, borderColor: colors.border }]}
                 onPress={() => setActiveTab(tab.key)}>
-                <Ionicons name={tab.icon as any} size={13} color={isActive ? colors.text : '#9ca3af'} />
+                <Ionicons name={tab.icon as any} size={14} color={isActive ? colors.text : '#9ca3af'} />
                 <Text style={[s.tabText, isActive && { color: colors.text }]}>{tab.label}</Text>
                 {count > 0 && (
                   <View style={[s.tabBadge, isActive && { backgroundColor: colors.border }]}>
@@ -275,27 +308,32 @@ export default function OrdersScreen() {
         />
       </View>
 
-      {/* List */}
+      {/* ── قائمة الطلبات ── */}
       {isLoading ? (
         <View style={{ paddingTop: 8 }}>
-          {[...Array(5)].map((_, i) => <SkeletonOrder key={i} />)}
+          {[...Array(4)].map((_, i) => <SkeletonOrderCard key={i} />)}
         </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item: any) => item.id.toString()}
           renderItem={renderOrder}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          contentContainerStyle={s.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+          }
           ListEmptyComponent={
-            <View style={s.emptyBox}>
-              <View style={s.emptyIcon}>
-                <Ionicons name="cube-outline" size={40} color={PRIMARY} />
+            <View style={s.emptyContainer}>
+              <View style={s.emptyIconBox}>
+                <Ionicons name="cube-outline" size={40} color="#9ca3af" />
               </View>
               <Text style={s.emptyTitle}>لا توجد طلبات</Text>
-              <Text style={s.emptyText}>لا توجد طلبات في هذه القائمة</Text>
+              <Text style={s.emptyText}>
+                {search ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد طلبات في هذه القائمة'}
+              </Text>
             </View>
           }
-          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -303,76 +341,286 @@ export default function OrdersScreen() {
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#f8fafc' },
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+  container: { flex: 1, backgroundColor: BG },
 
-  header:        { paddingHorizontal: 16, paddingBottom: 12, paddingTop: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  headerContent: { flexDirection: 'row-reverse', justifyContent: 'space-between',
-    alignItems: 'flex-start', paddingTop: 12, marginBottom: 14 },
-  headerTitle:   { fontSize: 24, fontWeight: '900', color: '#111827', textAlign: 'right' },
-  headerSub:     { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
-  activeCountBadge: { backgroundColor: 'rgba(12,102,121,0.1)', borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
-  activeCountText:  { fontSize: 22, fontWeight: 'bold', color: '#fff' },
-  activeCountLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },
+  // ── Header ──
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'right',
+  },
+  headerSub: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  activeBadge: {
+    backgroundColor: PRIMARY + '15',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  activeBadgeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
+  activeBadgeLabel: {
+    fontSize: 10,
+    color: PRIMARY,
+  },
 
-  searchBox:   { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, paddingHorizontal: 12, height: 44, gap: 8 },
-  searchInput: { flex: 1, fontSize: 13, color: '#111827' },
+  // ── Search ──
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  tabsWrap: { paddingVertical: 10, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  tabBtn: { flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  tabText:      { fontSize: 12, fontWeight: '700', color: '#9ca3af' },
-  tabBadge:     { backgroundColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-  tabBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#6b7280' },
+  // ── Tabs ──
+  tabsWrapper: {
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  tabsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  tabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  tabBadge: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#6b7280',
+  },
 
-  orderCard: { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' },
-  cardPressable: { padding: 14 },
-  cardTop:       { flexDirection: 'row-reverse', gap: 12, alignItems: 'flex-start' },
+  // ── List ──
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
 
-  orderIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  orderInfo:   { flex: 1, gap: 6 },
-  orderTopRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  orderId:     { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  badge:       { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  badgeText:   { fontSize: 11, fontWeight: 'bold' },
+  // ── Order Card ──
+  orderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  orderId: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
 
-  customerRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  customerName: { fontSize: 13, color: '#374151', fontWeight: '600', textAlign: 'right', flex: 1 },
-  provinceTag:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 3,
-    backgroundColor: '#f3f4f6', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  provinceText: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+  customerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  customerName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+    textAlign: 'right',
+  },
+  locationTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  locationText: {
+    fontSize: 10,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
 
-  dateRow:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  dateText: { fontSize: 11, color: '#9ca3af' },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 10,
+  },
+  dateText: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
 
-  amountRow:   { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  orderAmount: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  profitTag:   { flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
-    backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  profitText:  { fontSize: 11, color: '#10b981', fontWeight: '700' },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  orderAmount: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  currency: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+  profitTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  profitText: {
+    fontSize: 11,
+    color: '#10b981',
+    fontWeight: '700',
+  },
 
-  cardFooter: { flexDirection: 'row-reverse', borderTopWidth: 1,
-    borderTopColor: '#f3f4f6', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  cancelBtn:            { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
-    justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
-    backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
-  cancelBtnDisabled:    { backgroundColor: '#f9fafb', borderColor: '#e5e7eb' },
-  cancelBtnText:        { fontSize: 12, fontWeight: '700', color: '#ef4444' },
-  cancelBtnTextDisabled:{ color: '#d1d5db' },
-  detailsBtn:     { flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
-    justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: 12,
-    backgroundColor: PRIMARY + '10', borderWidth: 1, borderColor: PRIMARY + '30' },
-  detailsBtnText: { fontSize: 12, fontWeight: '700', color: PRIMARY },
+  cardFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  cancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  cancelBtnDisabled: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ef4444',
+  },
+  cancelBtnTextDisabled: {
+    color: '#d1d5db',
+  },
+  detailsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: PRIMARY + '10',
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
+  },
+  detailsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
 
-  emptyBox:   { alignItems: 'center', paddingVertical: 60, gap: 12 },
-  emptyIcon:  { width: 80, height: 80, borderRadius: 24, backgroundColor: `${PRIMARY}15`,
-    justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: '#374151' },
-  emptyText:  { fontSize: 13, color: '#9ca3af' },
+  // ── Empty State ──
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: PRIMARY + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#9ca3af',
+  },
 });

@@ -1,18 +1,19 @@
-import { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Image, RefreshControl, useWindowDimensions, Animated
+  TextInput, Image, RefreshControl, useWindowDimensions, Animated,
+  Modal, ScrollView, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
 const PRIMARY = '#0c6679';
-
+const BG = '#f2f6f9';
 
 // ── Skeleton Card ──
 function SkeletonCard({ width }: { width: number }) {
@@ -38,12 +39,122 @@ function SkeletonCard({ width }: { width: number }) {
 }
 
 const sk = StyleSheet.create({
-  card:  { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  img:   { backgroundColor: '#e5e7eb', width: '100%' },
-  body:  { padding: 10, gap: 8 },
-  line:  { height: 12, backgroundColor: '#e5e7eb', borderRadius: 6, width: '80%' },
+  card: {
+    backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
+  },
+  img: { backgroundColor: '#e8edf2', width: '100%' },
+  body: { padding: 12, gap: 8 },
+  line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
+
+// ── Product Card Component (مع ارتفاع ثابت) ──
+const ProductCard = React.memo(({ 
+  product, 
+  isFav, 
+  CARD_WIDTH, 
+  onPress, 
+  onToggleFav,
+  onViewDetails 
+}: any) => {
+  const getImages = (p: any) => {
+    const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
+    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
+  };
+  
+  const imgs = getImages(product);
+  const hasDiscount = product.discount > 0;
+  const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
+  
+  // ارتفاع ثابت للبطاقة (عرض الصورة + 110 للجزء السفلي)
+  const CARD_HEIGHT = CARD_WIDTH + 110;
+  
+  return (
+    <TouchableOpacity
+      style={[s.card, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
+      onPress={() => onPress(product.id)}
+      activeOpacity={0.92}>
+      <View style={[s.imgBox, { height: CARD_WIDTH }]}>
+        {imgs[0] ? (
+          <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
+        ) : (
+          <View style={[s.img, s.imgPlaceholder]}>
+            <Ionicons name="image-outline" size={28} color="#d1d5db" />
+          </View>
+        )}
+        
+        {product.isRenewable && (
+          <View style={s.renewBadge}>
+            <Text style={s.renewText}>قابل للتجديد</Text>
+          </View>
+        )}
+        
+        {hasDiscount && (
+          <View style={s.discountBadge}>
+            <Text style={s.discountText}>-{product.discount}%</Text>
+          </View>
+        )}
+        
+        {imgs.length > 1 && (
+          <View style={s.imgCount}>
+            <Ionicons name="images-outline" size={10} color="#fff" />
+            <Text style={s.imgCountText}>{imgs.length}</Text>
+          </View>
+        )}
+        
+        <TouchableOpacity
+          style={[s.favBtn, isFav && s.favBtnActive]}
+          onPress={() => onToggleFav(product.id, isFav)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons
+            name={isFav ? 'heart' : 'heart-outline'}
+            size={18}
+            color={isFav ? '#ef4444' : '#fff'}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={s.cardBody}>
+        <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
+
+        <View style={s.priceSection}>
+          {hasDiscount && (
+            <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
+          )}
+          <View style={s.priceRow}>
+            <Text style={s.price}>{Math.round(discounted).toLocaleString()}</Text>
+            <Text style={s.currency}>د.ع</Text>
+          </View>
+        </View>
+
+        <View style={s.bottomRow}>
+          <View style={s.catPill}>
+            <Text style={s.catPillText} numberOfLines={1}>{product.category}</Text>
+          </View>
+          <Text style={[s.stockText, product.stock < 5 && s.stockLow]}>
+            {product.stock < 5 ? '⚠ ' : ''}{product.stock}
+          </Text>
+        </View>
+        
+        <TouchableOpacity 
+          style={s.detailsBtn}
+          onPress={() => onViewDetails(product.id)}>
+          <Ionicons name="eye-outline" size={18} color={PRIMARY} />
+          <Text style={s.detailsBtnText}>عرض التفاصيل</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const categoryIcons: Record<string, string> = {
+  'الكل': 'grid-outline',
+  'الكترونيات': 'phone-portrait-outline',
+  'ملابس': 'shirt-outline',
+  'منزل': 'home-outline',
+  'عطور': 'flower-outline',
+  'مكتبة': 'book-outline',
+};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -51,19 +162,72 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const CARD_WIDTH = (width - 48) / 2;
 
-  const [search, setSearch]                 = useState('');
-  const [activeCategory, setActiveCategory] = useState('الكل');
-  const [refreshing, setRefreshing]         = useState(false);
+  const [search, setSearch] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activeCategory, setActiveCategory] = useState<string>('الكل');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [filterModal, setFilterModal] = useState<boolean>(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [cartCount, setCartCount] = useState<number>(0);
+  
+  const [filters, setFilters] = useState({
+    minPrice: '',
+    maxPrice: '',
+    sortBy: 'newest',
+  });
+
+  // جلب عدد الإشعارات غير المقروءة
+  const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
+    queryKey: ['unread-notifications-count'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/api/notifications/unread-count');
+        return data.count || 0;
+      } catch {
+        return 0;
+      }
+    },
+    refetchInterval: 30000,
+  });
+
+  // تحديث عدد الإشعارات عند العودة للصفحة
+  useFocusEffect(
+    useCallback(() => {
+      refetchUnreadCount();
+    }, [refetchUnreadCount])
+  );
+
+  // جلب عدد السلة
+  const fetchCartCount = useCallback(async () => {
+    try {
+      const data = await AsyncStorage.getItem('cart');
+      const parsed = data ? JSON.parse(data) : [];
+      const count = parsed.reduce((sum: number, item: any) => sum + item.quantity, 0);
+      setCartCount(count);
+    } catch (error) {
+      console.error('Failed to fetch cart count:', error);
+    }
+  }, []);
+
+  // تحديث عدد السلة عند العودة للصفحة
+  useFocusEffect(
+    useCallback(() => {
+      fetchCartCount();
+    }, [fetchCartCount])
+  );
 
   const { data: favoriteIds = [] } = useQuery({
     queryKey: ['favorites'],
-    queryFn: async () => { const { data } = await api.get('/api/favorites'); return data as number[]; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/favorites');
+      return data as number[];
+    },
   });
 
   const toggleFav = useMutation({
     mutationFn: async ({ id, isFav }: { id: number; isFav: boolean }) => {
       if (isFav) await api.delete(`/api/favorites/${id}`);
-      else       await api.post(`/api/favorites/${id}`);
+      else await api.post(`/api/favorites/${id}`);
     },
     onMutate: async ({ id, isFav }) => {
       await qc.cancelQueries({ queryKey: ['favorites'] });
@@ -87,7 +251,10 @@ export default function HomeScreen() {
 
   const { data: user } = useQuery({
     queryKey: ['user'],
-    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/auth/me');
+      return data;
+    },
   });
 
   const { data: rawBanners = [] } = useQuery({
@@ -98,207 +265,698 @@ export default function HomeScreen() {
     },
   });
 
-  const banners  = rawBanners as any[];
+  const banners = rawBanners as any[];
   const products = (allProducts as any[]).filter((p: any) => p.stock > 0);
-  const allCats  = products.flatMap((p: any) => p.category ? p.category.split(',').map((c: string) => c.trim()) : []);
-  const categories = ['الكل', ...Array.from(new Set(allCats))];
-  const filtered = products.filter((p: any) => {
-    const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
-    return (activeCategory === 'الكل' || cats.includes(activeCategory)) && (!search || p.name.includes(search));
-  });
 
-  const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
-  const getImages = (p: any) => {
-    const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
-    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
+  const categories = useMemo(() => {
+    const allCats = products.flatMap((p: any) =>
+      p.category ? p.category.split(',').map((c: string) => c.trim()) : []
+    );
+    return ['الكل', ...Array.from(new Set(allCats))];
+  }, [products]);
+
+  const filtered = useMemo(() => {
+    let result = products.filter((p: any) => {
+      const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+      const matchesCategory = activeCategory === 'الكل' || cats.includes(activeCategory);
+      const matchesSearch = !searchQuery || p.name.includes(searchQuery);
+      const matchesMinPrice = !filters.minPrice || p.wholesalePrice >= Number(filters.minPrice);
+      const matchesMaxPrice = !filters.maxPrice || p.wholesalePrice <= Number(filters.maxPrice);
+      return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice;
+    });
+    
+    switch (filters.sortBy) {
+      case 'price_asc':
+        result.sort((a, b) => a.wholesalePrice - b.wholesalePrice);
+        break;
+      case 'price_desc':
+        result.sort((a, b) => b.wholesalePrice - a.wholesalePrice);
+        break;
+      case 'popular':
+        result.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
+        break;
+      default:
+        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    
+    return result;
+  }, [products, activeCategory, searchQuery, filters]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    await fetchCartCount();
+    await refetchUnreadCount();
+    setRefreshing(false);
+  };
+
+  const performSearch = () => {
+    Keyboard.dismiss();
+    if (search.trim()) {
+      setSearchQuery(search);
+      if (!recentSearches.includes(search) && search.length > 2) {
+        setRecentSearches(prev => [search, ...prev].slice(0, 5));
+      }
+    } else {
+      setSearchQuery('');
+    }
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    setSearchQuery('');
+  };
+
+  const handleRecentSearchPress = (term: string) => {
+    setSearch(term);
+    setSearchQuery(term);
+  };
+
+  const clearRecentSearch = (term: string) => {
+    setRecentSearches(prev => prev.filter(t => t !== term));
+  };
+
+  const handleProductPress = useCallback((id: number) => {
+    router.push(`/products/${id}`);
+  }, [router]);
+
+  const handleViewDetails = useCallback((id: number) => {
+    router.push(`/products/${id}`);
+  }, [router]);
+
+  const handleToggleFav = useCallback((id: number, isFav: boolean) => {
+    toggleFav.mutate({ id, isFav });
+  }, [toggleFav]);
+
+  const applyFilters = () => {
+    setFilterModal(false);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      minPrice: '',
+      maxPrice: '',
+      sortBy: 'newest',
+    });
   };
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header أبيض نظيف ── */}
+      {/* ── Header ── */}
       <View style={s.header}>
-        {/* زر الكارت يسار */}
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="bag-outline" size={22} color={PRIMARY} />
+          <Ionicons name="cart-outline" size={22} color={PRIMARY} />
+          {cartCount > 0 && (
+            <View style={s.cartBadge}>
+              <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
-        {/* الشعار وسط */}
         <View style={s.headerCenter}>
           <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
+          <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
         </View>
 
-        {/* أيقونة الإشعارات يمين */}
-        <TouchableOpacity onPress={() => router.push('/notifications')} style={s.notifBtn}>
+        <TouchableOpacity onPress={() => router.push('/notification')} style={s.notifBtn}>
           <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
+          {unreadCount > 0 && (
+            <View style={s.notifBadge}>
+              <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* ── Search ── */}
-      <View style={s.searchBox}>
-        <Ionicons name="search-outline" size={18} color="#9ca3af" />
-        <TextInput style={s.searchInput} placeholder="ابحث عن منتج..."
-          value={search} onChangeText={setSearch}
-          placeholderTextColor="#9ca3af" textAlign="right" />
-        {search ? (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color="#9ca3af" />
+      {/* ── Search Box with Filter ── */}
+      <View style={s.searchWrapper}>
+        <View style={s.searchBox}>
+          <TouchableOpacity onPress={performSearch}>
+            <Ionicons name="search-outline" size={18} color="#9ca3af" />
           </TouchableOpacity>
-        ) : null}
+          <TextInput
+            style={s.searchInput}
+            placeholder="ابحث عن منتج..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor="#9ca3af"
+            textAlign="right"
+            returnKeyType="search"
+            onSubmitEditing={performSearch}
+          />
+          {search ? (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        
+        <TouchableOpacity style={s.filterBtn} onPress={() => setFilterModal(true)}>
+          <Ionicons name="options-outline" size={20} color={PRIMARY} />
+        </TouchableOpacity>
       </View>
+
+      {/* Recent Searches */}
+      {searchQuery === '' && recentSearches.length > 0 && (
+        <View style={s.recentSearch}>
+          <View style={s.recentHeader}>
+            <Text style={s.recentTitle}>عمليات البحث الأخيرة</Text>
+            <TouchableOpacity onPress={() => setRecentSearches([])}>
+              <Text style={s.clearRecentText}>مسح الكل</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.recentList}>
+            {recentSearches.map(term => (
+              <TouchableOpacity key={term} style={s.recentChip} onPress={() => handleRecentSearchPress(term)}>
+                <Text style={s.recentChipText}>{term}</Text>
+                <TouchableOpacity onPress={() => clearRecentSearch(term)}>
+                  <Ionicons name="close-circle" size={14} color="#9ca3af" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 12, paddingTop: 12 }}>
           {[...Array(6)].map((_, i) => <SkeletonCard key={i} width={CARD_WIDTH} />)}
         </View>
       ) : (
-      <FlatList
-        data={filtered}
-        numColumns={2}
-        keyExtractor={i => String((i as any).id)}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24, gap: 12 }}
-        columnWrapperStyle={{ gap: 12, flexDirection: 'row-reverse' }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
-        ListHeaderComponent={
-          <>
-            <View style={s.categoriesWrapper}>
-              <FlatList
-                horizontal data={categories as string[]}
-                showsHorizontalScrollIndicator={false}
-                style={s.catList} contentContainerStyle={s.catListContent}
-                keyExtractor={i => i}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[s.catBtn, activeCategory === item && s.catBtnActive]}
-                    onPress={() => setActiveCategory(item)}>
-                    <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-            <BannerSlider banners={banners} containerWidth={width} />
-          </>
-        }
-        ListEmptyComponent={
-          <View style={s.empty}>
-            <Ionicons name="cube-outline" size={56} color="#d1d5db" />
-            <Text style={s.emptyText}>لا توجد منتجات</Text>
-          </View>
-        }
-        renderItem={({ item: p }: any) => {
-          const imgs = getImages(p);
-          const hasDiscount = p.discount > 0;
-          const discounted  = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
-          return (
-            <TouchableOpacity style={[s.card, { width: CARD_WIDTH }]} onPress={() => router.push(`/products/${p.id}`)}>
-              <View style={[s.imgBox, { height: CARD_WIDTH }]}>
-                {imgs[0]
-                  ? <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
-                  : <View style={[s.img, s.imgPlaceholder]}><Ionicons name="image-outline" size={28} color="#d1d5db" /></View>
-                }
-                {p.isRenewable && <View style={s.renewBadge}><Text style={s.renewText}>قابل للتجديد</Text></View>}
-                {hasDiscount   && <View style={s.discountBadge}><Text style={s.discountText}>خصم {p.discount}%</Text></View>}
-                {imgs.length > 1 && (
-                  <View style={s.imgCount}>
-                    <Ionicons name="images-outline" size={11} color="#fff" />
-                    <Text style={s.imgCountText}>{imgs.length}</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={s.favBtn}
-                  onPress={() => toggleFav.mutate({ id: p.id, isFav: (favoriteIds as number[]).includes(p.id) })}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons
-                    name={(favoriteIds as number[]).includes(p.id) ? 'heart' : 'heart-outline'}
-                    size={18}
-                    color={(favoriteIds as number[]).includes(p.id) ? '#ef4444' : '#fff'} />
+        <FlatList
+          data={filtered}
+          numColumns={2}
+          keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
+          contentContainerStyle={s.flatListContent}
+          columnWrapperStyle={s.columnWrapper}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
+          ListHeaderComponent={
+            <>
+              <View style={s.categoriesWrapper}>
+                <FlatList
+                  horizontal
+                  data={categories}
+                  showsHorizontalScrollIndicator={false}
+                  style={s.catList}
+                  contentContainerStyle={s.catListContent}
+                  keyExtractor={item => item}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[s.catBtn, activeCategory === item && s.catBtnActive]}
+                      onPress={() => setActiveCategory(item)}>
+                      <Ionicons
+                        name={(categoryIcons[item] || 'pricetag-outline') as any}
+                        size={16}
+                        color={activeCategory === item ? '#fff' : PRIMARY}
+                      />
+                      <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+              
+              <View style={s.bannerWrapper}>
+                <BannerSlider banners={banners} containerWidth={width} />
+              </View>
+              
+              <View style={s.resultHeader}>
+                <Text style={s.resultCount}>{filtered.length} منتج</Text>
+                <TouchableOpacity onPress={resetFilters}>
+                  <Text style={s.resetFilterText}>إعادة تعيين</Text>
                 </TouchableOpacity>
               </View>
-              <View style={s.cardBody}>
-                <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
-                <View style={s.priceRow}>
-                  {hasDiscount && <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>}
-                  <Text style={s.price}>{Math.round(discounted).toLocaleString()} د.ع</Text>
-                </View>
-                <View style={s.bottomRow}>
-                  <View style={s.catPill}><Text style={s.catPillText} numberOfLines={1}>{p.category}</Text></View>
-                  <Text style={[s.stockText, p.stock < 5 && { color: '#ef4444' }]}>
-                    {p.stock < 5 ? '⚠️' : ''} {p.stock}
-                  </Text>
-                </View>
+            </>
+          }
+          ListEmptyComponent={
+            <View style={s.empty}>
+              <View style={s.emptyIconBox}>
+                <Ionicons name="cube-outline" size={40} color="#9ca3af" />
               </View>
-            </TouchableOpacity>
-          );
-        }}
-      />
+              <Text style={s.emptyTitle}>لا توجد منتجات</Text>
+              <Text style={s.emptyText}>سيتم إضافة منتجات جديدة قريباً</Text>
+              <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
+                <Ionicons name="refresh-outline" size={18} color={PRIMARY} />
+                <Text style={s.refreshText}>تحديث</Text>
+              </TouchableOpacity>
+            </View>
+          }
+          renderItem={({ item: p }) => (
+            <ProductCard
+              product={p}
+              isFav={(favoriteIds as number[]).includes(p.id)}
+              CARD_WIDTH={CARD_WIDTH}
+              onPress={handleProductPress}
+              onToggleFav={handleToggleFav}
+              onViewDetails={handleViewDetails}
+            />
+          )}
+        />
       )}
+
+      {/* ── Filter Modal ── */}
+      <Modal visible={filterModal} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>فلترة المنتجات</Text>
+              <TouchableOpacity onPress={() => setFilterModal(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.filterLabel}>نطاق السعر (د.ع)</Text>
+              <View style={s.priceRange}>
+                <TextInput
+                  style={s.priceInput}
+                  placeholder="من"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                  value={filters.minPrice}
+                  onChangeText={(text) => setFilters(prev => ({ ...prev, minPrice: text }))}
+                />
+                <Text style={s.priceDash}>-</Text>
+                <TextInput
+                  style={s.priceInput}
+                  placeholder="إلى"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                  value={filters.maxPrice}
+                  onChangeText={(text) => setFilters(prev => ({ ...prev, maxPrice: text }))}
+                />
+              </View>
+
+              <Text style={s.filterLabel}>ترتيب حسب</Text>
+              {[
+                { id: 'newest', label: 'الأحدث' },
+                { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
+                { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
+                { id: 'popular', label: 'الأكثر شهرة' },
+              ].map(option => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={s.sortOption}
+                  onPress={() => setFilters(prev => ({ ...prev, sortBy: option.id }))}>
+                  <View style={[s.radioCircle, filters.sortBy === option.id && s.radioSelected]} />
+                  <Text style={s.sortText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={s.modalFooter}>
+              <TouchableOpacity style={s.resetFilterBtn} onPress={resetFilters}>
+                <Text style={s.resetFilterBtnText}>إعادة تعيين</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.applyFilterBtn} onPress={applyFilters}>
+                <Text style={s.applyFilterText}>تطبيق الفلتر</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: BG },
 
-  // ── Header ──
-  header:       { flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 10, gap: 10,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerLogo:   { width: 100, height: 36 },
-  cartBtn:      { width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7',
-    justifyContent: 'center', alignItems: 'center' },
-  notifBtn:     { width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#e0f2f7',
-    justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  headerCenter: { alignItems: 'center' },
+  headerLogo: { width: 90, height: 32 },
+  welcomeText: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  
+  cartBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
+  
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
 
-  // ── Search ──
-  searchBox:    { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    marginHorizontal: 12, marginVertical: 10, borderRadius: 14, paddingHorizontal: 14,
-    height: 46, borderWidth: 1.5, borderColor: '#e5e7eb', gap: 8 },
-  searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
+  flatListContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 32,
+    gap: 16,
+  },
+  columnWrapper: {
+    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'stretch',  // ✅ يمد البطاقات لتكون متساوية
+    marginBottom: 16,
+  },
 
-  // ── Categories ──
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 12,
+    marginVertical: 10,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  recentSearch: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  recentTitle: { fontSize: 12, fontWeight: '600', color: '#374151' },
+  clearRecentText: { fontSize: 11, color: '#9ca3af' },
+  recentList: { gap: 8, flexDirection: 'row' },
+  recentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  recentChipText: { fontSize: 12, color: '#374151' },
+
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
-  catList:           { maxHeight: 44 },
-  catListContent:    { gap: 8, paddingHorizontal: 4, alignItems: 'center' },
-  catBtn:            { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  catBtnActive:      { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  catText:           { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  catTextActive:     { color: '#fff' },
+  catList: { maxHeight: 44 },
+  catListContent: { gap: 8, paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row' },
+  catBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+  },
+  catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
+  catTextActive: { color: '#fff' },
 
-  // ── Cards ──
-  card:          { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  imgBox:        { position: 'relative', overflow: 'hidden' },
-  img:           { width: '100%', height: '100%' },
-  imgPlaceholder:{ backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  renewBadge:    { position: 'absolute', top: 8, right: 8, backgroundColor: PRIMARY,
-    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  renewText:     { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#ef4444',
-    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  discountText:  { fontSize: 9, color: '#fff', fontWeight: 'bold' },
-  favBtn:        { position: 'absolute', top: 8, left: 8, width: 32, height: 32,
-    borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center', alignItems: 'center' },
-  imgCount:      { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2,
-    flexDirection: 'row', alignItems: 'center', gap: 3 },
-  imgCountText:  { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-  cardBody:      { padding: 10, gap: 6 },
-  productName:   { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  priceRow:      { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  price:         { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
-  oldPrice:      { fontSize: 11, color: '#9ca3af', textDecorationLine: 'line-through' },
-  bottomRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  catPill:       { backgroundColor: PRIMARY + '12', borderRadius: 6,
-    paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
-  catPillText:   { fontSize: 10, color: PRIMARY, fontWeight: '600' },
-  stockText:     { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
-  empty:         { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText:     { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+  bannerWrapper: {
+    marginHorizontal: 12,
+    marginBottom: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+
+  resultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  resultCount: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  resetFilterText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
+
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#0d1b2a',
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  imgBox: { position: 'relative', overflow: 'hidden' },
+  img: { width: '100%', height: '100%' },
+  imgPlaceholder: { backgroundColor: '#f2f6f9', justifyContent: 'center', alignItems: 'center' },
+
+  renewBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: PRIMARY,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  renewText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+
+  discountBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  discountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+
+  favBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favBtnActive: { backgroundColor: 'rgba(255,255,255,0.9)' },
+
+  imgCount: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+
+  cardBody: { 
+    padding: 10, 
+    gap: 6,
+    flex: 1,  // ✅ يملأ المساحة المتبقية
+    justifyContent: 'space-between',  // ✅ يوزع المحتوى بالتساوي
+  },
+  productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
+  
+  priceSection: { marginVertical: 4 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
+  price: { fontSize: 14, fontWeight: '900', color: PRIMARY },
+  currency: { fontSize: 10, color: PRIMARY, fontWeight: '500' },
+  oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through' },
+  
+  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '70%' },
+  catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
+  stockText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+  stockLow: { color: '#ef4444' },
+  
+  detailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY + '10',
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 6,
+    height: 36,  // ✅ ارتفاع ثابت للزر
+  },
+  detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
+
+  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: PRIMARY + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151' },
+  emptyText: { fontSize: 13, color: '#94a3b8' },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY + '10',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  refreshText: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  filterLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 10 },
+  priceRange: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  priceInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  priceDash: { fontSize: 16, color: '#9ca3af' },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+  },
+  radioSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: PRIMARY,
+  },
+  sortText: { fontSize: 14, color: '#374151' },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e8edf2',
+  },
+  resetFilterBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resetFilterBtnText: { fontSize: 14, color: '#64748b', fontWeight: '600' },
+  applyFilterBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyFilterText: { fontSize: 14, color: '#fff', fontWeight: 'bold' },
 });

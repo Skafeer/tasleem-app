@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, TextInput, Modal, Alert
+  ActivityIndicator, TextInput, Modal, Alert, Animated,
+  Dimensions, ScrollView, RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +10,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
+const { width } = Dimensions.get('window');
 const PRIMARY = '#0c6679';
+const GOLD = '#f59e0b';
+const SUCCESS = '#10b981';
+const DANGER = '#ef4444';
+const BG = '#f2f6f9';
 
 const STATUS: any = {
   pending:  { label: 'قيد المعالجة', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
@@ -21,6 +27,20 @@ const STATUS: any = {
 const PAYMENT_METHOD = 'mastercard';
 const PAYMENT_METHOD_ARABIC = 'ماستر كارد';
 
+// Live dot animation
+function LiveDot() {
+  const anim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 0.3, duration: 750, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return <Animated.View style={[s.liveDot, { opacity: anim }]} />;
+}
+
 export default function WalletScreen() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
@@ -28,14 +48,18 @@ export default function WalletScreen() {
   const [cardNumber, setCardNumber] = useState('');
   const [amountError, setAmountError] = useState('');
   const [cardError, setCardError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: user } = useQuery({
+  const { data: user, refetch: refetchUser } = useQuery({
     queryKey: ['user'],
     refetchInterval: 15000,
-    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/auth/me');
+      return data;
+    },
   });
 
-  const { data: withdrawals = [], isLoading } = useQuery({
+  const { data: withdrawals = [], isLoading, refetch: refetchWithdrawals } = useQuery({
     queryKey: ['withdrawals'],
     refetchInterval: 15000,
     queryFn: async () => {
@@ -46,6 +70,12 @@ export default function WalletScreen() {
     },
   });
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([refetchUser(), refetchWithdrawals()]);
+    setRefreshing(false);
+  };
+
   const createWithdrawal = useMutation({
     mutationFn: async (body: any) => {
       const { data } = await api.post('/api/withdrawals', body);
@@ -54,8 +84,11 @@ export default function WalletScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      setIsOpen(false); setAmount(''); setCardNumber('');
-      setAmountError(''); setCardError('');
+      setIsOpen(false);
+      setAmount('');
+      setCardNumber('');
+      setAmountError('');
+      setCardError('');
       Alert.alert('تم إرسال الطلب', 'سيتم مراجعة طلب السحب قريباً');
     },
     onError: (e: any) => {
@@ -67,19 +100,28 @@ export default function WalletScreen() {
     let isValid = true;
     const val = Number(amount);
     if (!amount || amount.trim() === '') {
-      setAmountError('يرجى إدخال المبلغ'); isValid = false;
+      setAmountError('يرجى إدخال المبلغ');
+      isValid = false;
     } else if (isNaN(val) || val <= 0) {
-      setAmountError('يرجى إدخال مبلغ صحيح'); isValid = false;
+      setAmountError('يرجى إدخال مبلغ صحيح');
+      isValid = false;
     } else if (val > (user?.balance || 0)) {
-      setAmountError('المبلغ المطلوب أكبر من رصيدك المتاح'); isValid = false;
-    } else { setAmountError(''); }
+      setAmountError('المبلغ المطلوب أكبر من رصيدك المتاح');
+      isValid = false;
+    } else {
+      setAmountError('');
+    }
 
     const trimmedCard = cardNumber.replace(/\s/g, '');
     if (!cardNumber || cardNumber.trim() === '') {
-      setCardError('يرجى إدخال رقم البطاقة'); isValid = false;
+      setCardError('يرجى إدخال رقم البطاقة');
+      isValid = false;
     } else if (!/^\d{10}$/.test(trimmedCard)) {
-      setCardError('رقم البطاقة يجب أن يحتوي على 10 أرقام بالضبط'); isValid = false;
-    } else { setCardError(''); }
+      setCardError('رقم البطاقة يجب أن يحتوي على 10 أرقام بالضبط');
+      isValid = false;
+    } else {
+      setCardError('');
+    }
 
     return isValid;
   };
@@ -96,252 +138,697 @@ export default function WalletScreen() {
   const formatDate = (d: string) => {
     if (!d) return '';
     const dt = new Date(d);
-    const date = dt.toLocaleDateString('ar-IQ', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = dt.toLocaleDateString('ar-IQ', { month: 'short', day: 'numeric' });
     const time = dt.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-    return `${date} — ${time}`;
+    return `${date} · ${time}`;
   };
 
+  const totalWithdrawn = withdrawals.reduce((sum: number, w: any) => sum + (w.status === 'paid' ? w.amount : 0), 0);
+  const totalBalance = (user?.balance || 0) + (user?.pendingBalance || 0);
+  const progress = totalBalance > 0 ? (user?.balance || 0) / totalBalance : 0;
+
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <View style={s.container}>
+      <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
 
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <View>
-          <Text style={s.headerSub}>إدارة أرباحك</Text>
+        {/* ── Header معكوس RTL ── */}
+        <View style={s.header}>
+          <TouchableOpacity style={s.headerIconBtn}>
+            <Ionicons name="card-outline" size={22} color={PRIMARY} />
+          </TouchableOpacity>
           <Text style={s.headerTitle}>المحفظة</Text>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={s.headerIcon}>
-          <Ionicons name="card-outline" size={22} color={PRIMARY} />
-        </View>
-      </View>
 
-      <FlatList
-        data={withdrawals as any[]}
-        keyExtractor={(item: any) => item.id.toString()}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        ListHeaderComponent={
-          <>
-            {/* ── بطاقة الرصيد ── */}
-            <LinearGradient colors={[PRIMARY, '#0a8a9f']} style={s.balanceWrap}>
-              <View style={s.balanceTop}>
-                <View style={s.balanceIconBox}>
-                  <Ionicons name="wallet" size={20} color="#fff" />
-                </View>
-                <View style={{ alignItems: 'flex-end', flex: 1 }}>
-                  <Text style={s.balanceLabel}>الرصيد المتاح للسحب</Text>
-                  <Text style={s.balanceVal}>
-                    {(user?.balance || 0).toLocaleString()}
-                    <Text style={s.balanceUnit}> د.ع</Text>
-                  </Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+          }>
+
+          {/* بطاقة الرصيد */}
+          <LinearGradient
+            colors={[PRIMARY, '#0a8a9f', '#0c6679']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.mainCard}>
+            <View style={s.cardTop}>
+              <View style={s.liveIndicator}>
+                <LiveDot />
+                <Text style={s.liveText}>مباشر</Text>
+              </View>
+              <View style={s.cardChip}>
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" />
+                <Ionicons name="ellipse-outline" size={24} color="rgba(255,255,255,0.3)" style={{ marginLeft: -16 }} />
+              </View>
+            </View>
+            
+            <View style={s.cardBalance}>
+              <Text style={s.cardLabel}>الرصيد المتاح</Text>
+              <Text style={s.cardAmount}>{(user?.balance || 0).toLocaleString()}</Text>
+              <Text style={s.cardCurrency}>دينار عراقي</Text>
+            </View>
+
+            <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
+              <Ionicons name="arrow-up-circle-outline" size={18} color={PRIMARY} />
+              <Text style={s.withdrawBtnText}>سحب رصيد</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* إحصائيات متقدمة */}
+          <View style={s.statsContainer}>
+            <View style={s.progressSection}>
+              <View style={s.progressCircle}>
+                <View style={s.progressRing}>
+                  <Text style={s.progressPercent}>{Math.round(progress * 100)}%</Text>
                 </View>
               </View>
-              <TouchableOpacity style={s.withdrawBtn} onPress={() => setIsOpen(true)}>
-                <Ionicons name="arrow-up-circle-outline" size={20} color={PRIMARY} />
-                <Text style={s.withdrawBtnText}>سحب رصيد</Text>
-              </TouchableOpacity>
-            </LinearGradient>
+              <View style={s.progressLabels}>
+                <Text style={s.progressTitle}>تقدم الأرباح</Text>
+                <Text style={s.progressSub}>
+                  {(user?.balance || 0).toLocaleString()} محققة
+                </Text>
+                <Text style={s.progressSub2}>
+                  {(user?.pendingBalance || 0).toLocaleString()} منتظرة
+                </Text>
+              </View>
+            </View>
 
-            {/* ── بطاقتا الأرباح ── */}
             <View style={s.statsRow}>
-              <View style={[s.statCard, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}>
-                <View style={s.statTop}>
-                  <View style={[s.statIconBox, { backgroundColor: '#dcfce7' }]}>
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#16a34a" />
-                  </View>
-                  <Text style={[s.statLabel, { color: '#15803d' }]}>المحققة</Text>
+              <View style={s.statItem}>
+                <View style={[s.statIcon, { backgroundColor: '#ecfdf5' }]}>
+                  <Ionicons name="checkmark-circle" size={20} color={SUCCESS} />
                 </View>
-                <Text style={[s.statVal, { color: '#16a34a' }]}>
-                  {(user?.balance || 0).toLocaleString()}
-                </Text>
-                <Text style={[s.statCur, { color: '#22c55e' }]}>د.ع</Text>
+                <Text style={s.statValue}>{(user?.balance || 0).toLocaleString()}</Text>
+                <Text style={s.statLabel}>الأرباح المحققة</Text>
               </View>
-              <View style={[s.statCard, { backgroundColor: '#fff7ed', borderColor: '#fed7aa' }]}>
-                <View style={s.statTop}>
-                  <View style={[s.statIconBox, { backgroundColor: '#ffedd5' }]}>
-                    <Ionicons name="time-outline" size={18} color="#f97316" />
-                  </View>
-                  <Text style={[s.statLabel, { color: '#c2410c' }]}>المنتظرة</Text>
+              <View style={s.statDivider} />
+              <View style={s.statItem}>
+                <View style={[s.statIcon, { backgroundColor: '#fffbeb' }]}>
+                  <Ionicons name="time" size={20} color={GOLD} />
                 </View>
-                <Text style={[s.statVal, { color: '#ea580c' }]}>
-                  {(user?.pendingBalance || 0).toLocaleString()}
-                </Text>
-                <Text style={[s.statCur, { color: '#fb923c' }]}>د.ع</Text>
+                <Text style={s.statValue}>{(user?.pendingBalance || 0).toLocaleString()}</Text>
+                <Text style={s.statLabel}>الأرباح المنتظرة</Text>
               </View>
             </View>
+          </View>
 
-            {/* ── عنوان السجل ── */}
-            <View style={s.secHead}>
-              <Ionicons name="time-outline" size={17} color={PRIMARY} />
-              <Text style={s.secTitle}>سجل السحوبات</Text>
+          {/* إجمالي السحوبات */}
+          {totalWithdrawn > 0 && (
+            <View style={s.totalWithdrawnCard}>
+              <Text style={s.totalWithdrawnLabel}>إجمالي السحوبات</Text>
+              <Text style={s.totalWithdrawnValue}>{totalWithdrawn.toLocaleString()} د.ع</Text>
             </View>
-          </>
-        }
-        ListEmptyComponent={
-          !isLoading ? (
-            <View style={s.emptyBox}>
-              <View style={s.emptyCircle}>
-                <Ionicons name="wallet-outline" size={34} color="#9ca3af" />
+          )}
+
+          {/* عنوان سجل السحوبات */}
+          <View style={s.historyHeader}>
+            <View style={s.historyBadge}>
+              <Text style={s.historyBadgeText}>{withdrawals.length}</Text>
+            </View>
+            <View style={s.historyTitleContainer}>
+              <Ionicons name="list-outline" size={20} color={PRIMARY} />
+              <Text style={s.historyTitle}>سجل السحوبات</Text>
+            </View>
+          </View>
+
+          {/* سجل السحوبات */}
+          {isLoading && withdrawals.length === 0 ? (
+            <View style={s.loadingContainer}>
+              <ActivityIndicator size="large" color={PRIMARY} />
+              <Text style={s.loadingText}>جاري تحميل السحوبات...</Text>
+            </View>
+          ) : withdrawals.length === 0 ? (
+            <View style={s.emptyContainer}>
+              <View style={s.emptyIconBox}>
+                <Ionicons name="wallet-outline" size={40} color="#9ca3af" />
               </View>
               <Text style={s.emptyTitle}>لا توجد سحوبات بعد</Text>
-              <Text style={s.emptyText}>اضغط "سحب رصيد" لتقديم طلبك</Text>
+              <Text style={s.emptyText}>اضغط "سحب رصيد" لتقديم طلبك الأول</Text>
             </View>
-          ) : null
-        }
-        renderItem={({ item }: any) => {
-          const st = STATUS[item.status] || STATUS.pending;
-          return (
-            <View style={s.wCard}>
-              <View style={[s.wBadge, { backgroundColor: st.bg }]}>
-                <Text style={[s.wBadgeText, { color: st.color }]}>{st.label}</Text>
-              </View>
-              <View style={s.wInfo}>
-                <Text style={s.wAmount}>{item.amount?.toLocaleString()} د.ع</Text>
-                <Text style={s.wMeta}>
-                  {item.method === 'mastercard' ? PAYMENT_METHOD_ARABIC : item.method}
-                </Text>
-                <Text style={s.wDate}>{formatDate(item.createdAt)}</Text>
-              </View>
-              <View style={[s.wIcon, { backgroundColor: st.bg }]}>
-                <Ionicons name={st.icon} size={20} color={st.color} />
-              </View>
+          ) : (
+            <View style={s.timeline}>
+              {withdrawals.map((item: any, index: number) => {
+                const st = STATUS[item.status] || STATUS.pending;
+                const isLast = index === withdrawals.length - 1;
+                return (
+                  <View key={item.id} style={s.timelineItem}>
+                    {!isLast && <View style={s.timelineLine} />}
+                    <View style={[s.timelineDot, { backgroundColor: st.color }]}>
+                      <Ionicons name={st.icon} size={12} color="#fff" />
+                    </View>
+                    <View style={s.timelineContent}>
+                      <View style={s.timelineHeader}>
+                        <View style={[s.timelineBadge, { backgroundColor: st.bg }]}>
+                          <Text style={[s.timelineBadgeText, { color: st.color }]}>{st.label}</Text>
+                        </View>
+                        <Text style={s.timelineAmount}>{item.amount?.toLocaleString()} د.ع</Text>
+                      </View>
+                      <Text style={s.timelineMeta}>
+                        {item.method === 'mastercard' ? PAYMENT_METHOD_ARABIC : item.method}
+                      </Text>
+                      <Text style={s.timelineDate}>{formatDate(item.createdAt)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-          );
-        }}
-      />
+          )}
+        </ScrollView>
 
-      {isLoading && <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />}
+        {/* Modal السحب */}
+        <Modal visible={isOpen} transparent animationType="slide">
+          <View style={s.modalOverlay}>
+            <View style={s.modalCard}>
+              <View style={s.modalHandle} />
+              <View style={s.modalIcon}>
+                <Ionicons name="wallet-outline" size={32} color={PRIMARY} />
+              </View>
+              <Text style={s.modalTitle}>طلب سحب جديد</Text>
 
-      {/* ── Modal السحب ── */}
-      <Modal visible={isOpen} transparent animationType="slide">
-        <View style={s.overlay}>
-          <View style={s.modalCard}>
-            <View style={s.handle} />
-            <Text style={s.modalTitle}>طلب سحب جديد</Text>
+              <View style={s.availBox}>
+                <Text style={s.availLabel}>الرصيد المتاح</Text>
+                <Text style={s.availVal}>{(user?.balance || 0).toLocaleString()} د.ع</Text>
+              </View>
 
-            <View style={s.availBox}>
-              <Text style={s.availVal}>{(user?.balance || 0).toLocaleString()} د.ع</Text>
-              <Text style={s.availLabel}>الرصيد المتاح</Text>
+              <Text style={s.label}>المبلغ المراد سحبه</Text>
+              <TextInput
+                style={[s.input, amountError && s.inputErr]}
+                placeholder="أدخل المبلغ"
+                placeholderTextColor="#9ca3af"
+                value={amount}
+                onChangeText={(t) => {
+                  setAmount(t);
+                  if (amountError) setAmountError('');
+                }}
+                keyboardType="numeric"
+                textAlign="right"
+              />
+              {amountError && <Text style={s.errText}>{amountError}</Text>}
+
+              <Text style={s.label}>رقم بطاقة الدفع</Text>
+              <TextInput
+                style={[s.input, cardError && s.inputErr]}
+                placeholder="10 أرقام"
+                placeholderTextColor="#9ca3af"
+                value={cardNumber}
+                onChangeText={(t) => {
+                  setCardNumber(t.replace(/[^0-9]/g, '').slice(0, 10));
+                  if (cardError) setCardError('');
+                }}
+                keyboardType="numeric"
+                maxLength={10}
+                textAlign="right"
+              />
+              {cardError && <Text style={s.errText}>{cardError}</Text>}
+
+              <TouchableOpacity
+                style={[s.confirmBtn, createWithdrawal.isPending && s.confirmBtnDisabled]}
+                onPress={handleWithdraw}
+                disabled={createWithdrawal.isPending}>
+                {createWithdrawal.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={s.confirmText}>تأكيد السحب</Text>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={s.cancelBtn} onPress={() => {
+                setIsOpen(false);
+                setAmountError('');
+                setCardError('');
+              }}>
+                <Text style={s.cancelText}>إلغاء</Text>
+              </TouchableOpacity>
             </View>
-
-            <Text style={s.label}>المبلغ</Text>
-            <TextInput
-              style={[s.input, amountError ? s.inputErr : null]}
-              placeholder="0" value={amount}
-              onChangeText={(t) => { setAmount(t); if (amountError) setAmountError(''); }}
-              keyboardType="numeric" textAlign="right" placeholderTextColor="#9ca3af"
-            />
-            {amountError ? <Text style={s.errText}>{amountError}</Text> : null}
-
-            <Text style={s.label}>رقم البطاقة (10 أرقام)</Text>
-            <TextInput
-              style={[s.input, cardError ? s.inputErr : null]}
-              placeholder="أدخل رقم البطاقة" value={cardNumber}
-              onChangeText={(t) => { setCardNumber(t.replace(/[^0-9]/g, '')); if (cardError) setCardError(''); }}
-              keyboardType="numeric" maxLength={10} textAlign="right" placeholderTextColor="#9ca3af"
-            />
-            {cardError ? <Text style={s.errText}>{cardError}</Text> : null}
-
-            <TouchableOpacity
-              style={[s.confirmBtn, createWithdrawal.isPending && { opacity: 0.7 }]}
-              onPress={handleWithdraw} disabled={createWithdrawal.isPending}>
-              {createWithdrawal.isPending
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.confirmText}>تأكيد السحب</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => {
-              setIsOpen(false); setAmountError(''); setCardError('');
-            }}>
-              <Text style={s.cancelText}>إلغاء</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
-
-    </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: BG },
+  safeArea: { flex: 1 },
 
-  // ── Header ──
-  header:      { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  headerTitle: { fontSize: 22, fontWeight: '900', color: '#111827', textAlign: 'right' },
-  headerSub:   { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 2 },
-  headerIcon:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#f0f9fa',
-    borderWidth: 1.5, borderColor: '#e0f2f7', justifyContent: 'center', alignItems: 'center' },
+  // Header معكوس
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-  // ── بطاقة الرصيد ──
-  balanceWrap:    { marginHorizontal: 16, marginTop: 16, marginBottom: 12,
-    borderRadius: 20, padding: 18, gap: 14 },
-  balanceTop:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
-  balanceIconBox: { width: 44, height: 44, borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  balanceLabel:   { fontSize: 12, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginBottom: 4 },
-  balanceVal:     { fontSize: 32, fontWeight: '900', color: '#fff', textAlign: 'right' },
-  balanceUnit:    { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
-  withdrawBtn:    { backgroundColor: '#fff', borderRadius: 13, height: 46,
-    flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  withdrawBtnText: { color: PRIMARY, fontWeight: '800', fontSize: 14 },
+  scrollContent: { paddingBottom: 40 },
 
-  // ── بطاقتا الأرباح ──
-  statsRow:    { flexDirection: 'row-reverse', gap: 10, marginHorizontal: 16, marginBottom: 16 },
-  statCard:    { flex: 1, borderRadius: 16, padding: 12,
-    borderWidth: 1.5, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
-  statTop:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-  statIconBox: { width: 30, height: 30, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  statLabel:   { fontSize: 11, fontWeight: '700' },
-  statVal:     { fontSize: 20, fontWeight: '900', textAlign: 'right' },
-  statCur:     { fontSize: 10, fontWeight: '600', textAlign: 'right', marginTop: 2 },
+  mainCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: 24,
+    padding: 18,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  cardChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardBalance: {
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  cardLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 4,
+  },
+  cardAmount: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  cardCurrency: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 2,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ade80',
+  },
+  liveText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  withdrawBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    paddingVertical: 10,
+  },
+  withdrawBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
 
-  // ── عنوان السجل ──
-  secHead:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingBottom: 10 },
-  secTitle: { fontSize: 15, fontWeight: '800', color: '#111827' },
+  statsContainer: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  progressSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+    marginBottom: 14,
+  },
+  progressCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: SUCCESS + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressPercent: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: SUCCESS,
+  },
+  progressLabels: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  progressTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  progressSub: {
+    fontSize: 11,
+    color: SUCCESS,
+    fontWeight: '600',
+  },
+  progressSub2: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 5,
+  },
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+  statDivider: {
+    width: 1,
+    height: 35,
+    backgroundColor: '#e8edf2',
+  },
 
-  // ── بطاقة سحب ──
-  wCard:      { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff',
-    marginHorizontal: 16, marginBottom: 10, borderRadius: 16, padding: 14, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  wIcon:      { width: 44, height: 44, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
-  wInfo:      { flex: 1, alignItems: 'flex-end', gap: 2 },
-  wAmount:    { fontSize: 15, fontWeight: '800', color: '#111827' },
-  wMeta:      { fontSize: 12, color: '#6b7280' },
-  wDate:      { fontSize: 11, color: '#9ca3af' },
-  wBadge:     { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9 },
-  wBadgeText: { fontSize: 10, fontWeight: '700' },
+  totalWithdrawnCard: {
+    backgroundColor: '#fef3c7',
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalWithdrawnLabel: {
+    fontSize: 12,
+    color: '#92400e',
+    fontWeight: '600',
+  },
+  totalWithdrawnValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#d97706',
+  },
 
-  // ── Empty ──
-  emptyBox:    { alignItems: 'center', paddingVertical: 48, gap: 10 },
-  emptyCircle: { width: 72, height: 72, borderRadius: 36,
-    backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-  emptyTitle:  { fontSize: 15, fontWeight: '700', color: '#374151' },
-  emptyText:   { fontSize: 13, color: '#9ca3af' },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  historyTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  historyTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  historyBadge: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  historyBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
 
-  // ── Modal ──
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard:   { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, paddingBottom: 40 },
-  handle:      { width: 40, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb',
-    alignSelf: 'center', marginBottom: 16 },
-  modalTitle:  { fontSize: 18, fontWeight: '800', color: '#111827', textAlign: 'right', marginBottom: 16 },
-  availBox:    { backgroundColor: PRIMARY + '10', borderRadius: 14, padding: 14,
-    flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 16, borderWidth: 1, borderColor: PRIMARY + '25' },
-  availLabel:  { fontSize: 13, color: PRIMARY },
-  availVal:    { fontSize: 16, fontWeight: '800', color: PRIMARY },
-  label:       { fontSize: 13, fontWeight: '500', color: '#374151', textAlign: 'right',
-    marginBottom: 8, marginTop: 12 },
-  input:       { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 14,
-    fontSize: 15, color: '#111827', backgroundColor: '#f9fafb' },
-  inputErr:    { borderColor: '#dc2626' },
-  errText:     { color: '#dc2626', fontSize: 12, marginTop: 4, textAlign: 'right' },
-  confirmBtn:  { backgroundColor: PRIMARY, borderRadius: 14, height: 50,
-    justifyContent: 'center', alignItems: 'center', marginTop: 20 },
-  confirmText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  cancelBtn:   { height: 44, justifyContent: 'center', alignItems: 'center' },
-  cancelText:  { color: '#9ca3af', fontSize: 14 },
+  timeline: {
+    paddingHorizontal: 16,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    position: 'relative',
+    marginBottom: 16,
+  },
+  timelineLine: {
+    position: 'absolute',
+    right: 13,
+    top: 26,
+    bottom: -16,
+    width: 2,
+    backgroundColor: '#e2e8f0',
+  },
+  timelineDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    marginRight: 0,
+    zIndex: 2,
+  },
+  timelineContent: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  timelineAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  timelineBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+  },
+  timelineBadgeText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  timelineMeta: {
+    fontSize: 10,
+    color: '#6b7280',
+    textAlign: 'left',
+    marginBottom: 3,
+  },
+  timelineDate: {
+    fontSize: 9,
+    color: '#9ca3af',
+    textAlign: 'left',
+  },
+
+  loadingContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#9ca3af',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+    gap: 12,
+  },
+  emptyIconBox: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: PRIMARY + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e2e8f0',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: PRIMARY + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  availBox: {
+    backgroundColor: PRIMARY + '10',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  availLabel: {
+    fontSize: 12,
+    color: PRIMARY,
+    fontWeight: '600',
+  },
+  availVal: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'left',
+    marginBottom: 5,
+    marginTop: 10,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#111827',
+    backgroundColor: '#f8fafc',
+    textAlign: 'left',
+  },
+  inputErr: {
+    borderColor: DANGER,
+  },
+  errText: {
+    color: DANGER,
+    fontSize: 11,
+    marginTop: 3,
+    textAlign: 'left',
+  },
+  confirmBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  confirmBtnDisabled: {
+    opacity: 0.7,
+  },
+  confirmText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  cancelBtn: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  cancelText: {
+    color: '#64748b',
+    fontSize: 13,
+  },
 });

@@ -8,30 +8,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
-const PRIMARY  = '#0c6679';
-const SUCCESS  = '#10b981';
-const DANGER   = '#ef4444';
-const WARNING  = '#f59e0b';
-const INFO     = '#3b82f6';
+const PRIMARY = '#0c6679';
+const SUCCESS = '#10b981';
+const DANGER = '#ef4444';
+const WARNING = '#f59e0b';
+const INFO = '#3b82f6';
+const BG = '#f2f6f9';
 
 const W_STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending:  { label: 'قيد المعالجة', color: WARNING, bg: '#fffbeb', icon: 'time-outline' },
-  approved: { label: 'تم القبول',    color: INFO,    bg: '#eff6ff', icon: 'checkmark-outline' },
-  paid:     { label: 'تم الدفع',     color: SUCCESS, bg: '#ecfdf5', icon: 'cash-outline' },
-  rejected: { label: 'مرفوض',        color: DANGER,  bg: '#fef2f2', icon: 'close-circle-outline' },
+  pending: { label: 'قيد المعالجة', color: WARNING, bg: '#fffbeb', icon: 'time-outline' },
+  approved: { label: 'تم القبول', color: INFO, bg: '#eff6ff', icon: 'checkmark-outline' },
+  paid: { label: 'تم الدفع', color: SUCCESS, bg: '#ecfdf5', icon: 'cash-outline' },
+  rejected: { label: 'مرفوض', color: DANGER, bg: '#fef2f2', icon: 'close-circle-outline' },
 };
 
 const FILTERS = [
-  { key: 'all',      label: 'الكل' },
-  { key: 'pending',  label: 'معالجة' },
+  { key: 'all', label: 'الكل' },
+  { key: 'pending', label: 'معالجة' },
   { key: 'approved', label: 'مقبول' },
-  { key: 'paid',     label: 'مدفوع' },
+  { key: 'paid', label: 'مدفوع' },
   { key: 'rejected', label: 'مرفوض' },
 ];
 
 export default function WithdrawalsTab() {
   const qc = useQueryClient();
-  const [filter, setFilter]       = useState('all');
+  const [filter, setFilter] = useState('all');
   const [dropdownId, setDropdownId] = useState<number | null>(null);
 
   const { data: withdrawals = [], isLoading } = useQuery({
@@ -47,7 +48,10 @@ export default function WithdrawalsTab() {
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users'],
-    queryFn: async () => { const { data } = await api.get('/api/admin/users'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/admin/users');
+      return data;
+    },
   });
 
   const updateStatus = useMutation({
@@ -82,10 +86,10 @@ export default function WithdrawalsTab() {
 
   const confirmAction = (w: any, newStatus: string) => {
     const labels: any = {
-      pending:  { title: 'إعادة للمعالجة', msg: `إعادة الطلب لحالة قيد المعالجة؟`, btn: 'تأكيد', style: 'default' },
-      approved: { title: 'قبول الطلب',     msg: `هل تريد قبول طلب السحب بمبلغ ${w.amount?.toLocaleString()} د.ع؟`, btn: 'قبول', style: 'default' },
-      paid:     { title: 'تأكيد الدفع',    msg: `هل تأكدت من دفع مبلغ ${w.amount?.toLocaleString()} د.ع للتاجر؟`, btn: 'تأكيد', style: 'default' },
-      rejected: { title: 'رفض الطلب',      msg: `هل تريد رفض الطلب؟\nسيُعاد المبلغ ${w.amount?.toLocaleString()} د.ع لحساب التاجر.`, btn: 'رفض', style: 'destructive' },
+      pending: { title: 'إعادة للمعالجة', msg: `إعادة الطلب لحالة قيد المعالجة؟`, btn: 'تأكيد', style: 'default' },
+      approved: { title: 'قبول الطلب', msg: `هل تريد قبول طلب السحب بمبلغ ${w.amount?.toLocaleString()} د.ع؟`, btn: 'قبول', style: 'default' },
+      paid: { title: 'تأكيد الدفع', msg: `هل تأكدت من دفع مبلغ ${w.amount?.toLocaleString()} د.ع للتاجر؟`, btn: 'تأكيد', style: 'default' },
+      rejected: { title: 'رفض الطلب', msg: `هل تريد رفض الطلب؟\nسيُعاد المبلغ ${w.amount?.toLocaleString()} د.ع لحساب التاجر.`, btn: 'رفض', style: 'destructive' },
     };
     const l = labels[newStatus];
     if (!l) return;
@@ -106,21 +110,27 @@ export default function WithdrawalsTab() {
       : (withdrawals as any[]).filter((w: any) => w.status === f.key).length;
   });
 
-  if (isLoading) return (
-    <View style={s.center}>
-      <ActivityIndicator size="large" color={PRIMARY} />
-      <Text style={s.loadingTxt}>جاري تحميل السحوبات...</Text>
-    </View>
-  );
+  if (isLoading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={s.loadingTxt}>جاري تحميل السحوبات...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
 
       {/* فلاتر الحالة */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        style={s.filtersScroll} contentContainerStyle={s.filtersContent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.filtersScroll}
+        contentContainerStyle={s.filtersContent}>
         {FILTERS.map(f => (
-          <TouchableOpacity key={f.key}
+          <TouchableOpacity
+            key={f.key}
             style={[s.chip, filter === f.key && s.chipActive]}
             onPress={() => setFilter(f.key)}>
             <Text style={[s.chipTxt, filter === f.key && s.chipTxtActive]}>{f.label}</Text>
@@ -135,11 +145,11 @@ export default function WithdrawalsTab() {
         ))}
       </ScrollView>
 
-      {/* القائمة */}
+      {/* قائمة السحوبات */}
       <FlatList
         data={filtered}
         keyExtractor={(item: any) => item.id.toString()}
-        contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
+        contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={s.center}>
@@ -148,21 +158,18 @@ export default function WithdrawalsTab() {
           </View>
         }
         renderItem={({ item: w }: any) => {
-          const st         = W_STATUS[w.status] || W_STATUS.pending;
-          const merchant   = getMerchant(w.merchantId);
+          const st = W_STATUS[w.status] || W_STATUS.pending;
+          const merchant = getMerchant(w.merchantId);
           const isDropOpen = dropdownId === w.id;
 
           return (
             <View style={s.card}>
 
-              {/* رأس الكارد: المبلغ + زر الحالة المنسدل */}
+              {/* رأس الكارد: المبلغ + زر الحالة */}
               <View style={s.cardHeader}>
-
-                {/* زر الحالة — يفتح القائمة المنسدلة */}
                 <TouchableOpacity
                   style={[s.statusPill, { backgroundColor: st.bg }]}
-                  onPress={() => setDropdownId(isDropOpen ? null : w.id)}
-                >
+                  onPress={() => setDropdownId(isDropOpen ? null : w.id)}>
                   <Ionicons name="chevron-down" size={11} color={st.color} />
                   <Ionicons name={st.icon} size={13} color={st.color} />
                   <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
@@ -185,11 +192,13 @@ export default function WithdrawalsTab() {
                       key={key}
                       style={[s.dropdownItem, w.status === key && { backgroundColor: val.color + '12' }]}
                       onPress={() => {
-                        if (w.status === key) { setDropdownId(null); return; }
+                        if (w.status === key) {
+                          setDropdownId(null);
+                          return;
+                        }
                         confirmAction(w, key);
                       }}
-                      disabled={updateStatus.isPending}
-                    >
+                      disabled={updateStatus.isPending}>
                       <Ionicons name={val.icon} size={14} color={val.color} />
                       <Text style={[s.dropdownTxt, { color: w.status === key ? val.color : '#374151' }]}>
                         {val.label}
@@ -212,7 +221,8 @@ export default function WithdrawalsTab() {
                 </View>
                 <View style={s.infoBlock}>
                   <View style={s.infoLine}>
-                    <TouchableOpacity style={[s.copyBtn, { backgroundColor: '#8b5cf615' }]}
+                    <TouchableOpacity
+                      style={[s.copyBtn, { backgroundColor: '#8b5cf615' }]}
                       onPress={() => copy(merchant?.storeName || merchant?.name || '', 'اسم التاجر')}>
                       <Ionicons name="copy-outline" size={13} color="#8b5cf6" />
                     </TouchableOpacity>
@@ -220,7 +230,8 @@ export default function WithdrawalsTab() {
                   </View>
                   {merchant?.phone && (
                     <View style={s.infoLine}>
-                      <TouchableOpacity style={[s.copyBtn, { backgroundColor: '#8b5cf615' }]}
+                      <TouchableOpacity
+                        style={[s.copyBtn, { backgroundColor: '#8b5cf615' }]}
                         onPress={() => copy(merchant.phone, 'رقم الهاتف')}>
                         <Ionicons name="copy-outline" size={13} color="#8b5cf6" />
                       </TouchableOpacity>
@@ -240,21 +251,23 @@ export default function WithdrawalsTab() {
                 </View>
                 <View style={s.infoBlock}>
                   <View style={s.infoLine}>
-                    <TouchableOpacity style={s.copyBtn}
+                    <TouchableOpacity
+                      style={s.copyBtn}
                       onPress={() => copy(w.accountDetails || '', 'رقم البطاقة')}>
                       <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                     </TouchableOpacity>
-                    <View style={{ alignItems: 'flex-end' }}>
+                    <View style={s.infoRight}>
                       <Text style={s.infoLabel}>رقم البطاقة</Text>
                       <Text style={s.infoVal}>{w.accountDetails || '—'}</Text>
                     </View>
                   </View>
                   <View style={s.infoLine}>
-                    <TouchableOpacity style={s.copyBtn}
+                    <TouchableOpacity
+                      style={s.copyBtn}
                       onPress={() => copy(String(w.amount), 'المبلغ')}>
                       <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                     </TouchableOpacity>
-                    <View style={{ alignItems: 'flex-end' }}>
+                    <View style={s.infoRight}>
                       <Text style={s.infoLabel}>المبلغ</Text>
                       <Text style={[s.infoVal, { color: PRIMARY }]}>{w.amount?.toLocaleString()} د.ع</Text>
                     </View>
@@ -275,14 +288,15 @@ export default function WithdrawalsTab() {
                   <View style={s.finalRow}>
                     <Ionicons
                       name={w.status === 'paid' ? 'checkmark-circle' : 'close-circle'}
-                      size={15} color={w.status === 'paid' ? SUCCESS : DANGER} />
+                      size={15}
+                      color={w.status === 'paid' ? SUCCESS : DANGER}
+                    />
                     <Text style={[s.finalTxt, { color: w.status === 'paid' ? SUCCESS : DANGER }]}>
                       {w.status === 'paid' ? 'تم الدفع بنجاح' : 'تم الرفض وإعادة المبلغ للتاجر'}
                     </Text>
                   </View>
                 </>
               )}
-
             </View>
           );
         }}
@@ -292,42 +306,119 @@ export default function WithdrawalsTab() {
 }
 
 const s = StyleSheet.create({
-  center:     { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
+  listContent: { padding: 12, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
-  emptyTxt:   { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
-  filtersScroll:  { maxHeight: 52 },
+  emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+
+  filtersScroll: { maxHeight: 52 },
   filtersContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
-  chip:            { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: '#f3f4f6', borderWidth: 1.5, borderColor: '#e5e7eb' },
-  chipActive:      { backgroundColor: PRIMARY + '18', borderColor: PRIMARY },
-  chipTxt:         { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  chipTxtActive:   { color: PRIMARY },
-  chipBadge:       { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+  },
+  chipActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  chipTxt: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  chipTxtActive: { color: PRIMARY },
+  chipBadge: { backgroundColor: '#e5e7eb', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   chipBadgeActive: { backgroundColor: PRIMARY },
-  chipBadgeTxt:    { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
+  chipBadgeTxt: { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
   chipBadgeTxtActive: { color: '#fff' },
-  card:       { backgroundColor: '#fff', borderRadius: 18, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14 },
-  amountBox:  { alignItems: 'flex-end', gap: 4 },
-  amount:     { fontSize: 22, fontWeight: 'bold', color: PRIMARY },
-  dateRow:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  dateTxt:    { fontSize: 11, color: '#9ca3af' },
-  statusPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20 },
-  statusTxt:  { fontSize: 12, fontWeight: 'bold' },
-  dropdown:     { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: '#e5e7eb', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 5 },
-  dropdownItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-  dropdownTxt:  { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
-  divider:    { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
-  section:         { paddingHorizontal: 14, paddingVertical: 12 },
-  sectionLabelRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sectionLabel:    { fontSize: 12, fontWeight: '700', color: PRIMARY },
+
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 14,
+  },
+  amountBox: { alignItems: 'flex-end', gap: 4 },
+  amount: { fontSize: 20, fontWeight: 'bold', color: PRIMARY },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateTxt: { fontSize: 11, color: '#9ca3af' },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20 },
+  statusTxt: { fontSize: 12, fontWeight: 'bold' },
+
+  dropdown: {
+    marginHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  dropdownTxt: { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'right' },
+
+  divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
+
+  section: { paddingHorizontal: 14, paddingVertical: 12 },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: PRIMARY },
   infoBlock: { gap: 10 },
-  infoLine:  { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  infoLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  infoRight: { alignItems: 'flex-end' },
   infoLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600', textAlign: 'right' },
-  infoVal:   { fontSize: 14, fontWeight: '700', color: '#111827', textAlign: 'right' },
-  infoSub:   { fontSize: 13, color: '#6b7280' },
-  copyBtn:   { width: 30, height: 30, borderRadius: 9, backgroundColor: PRIMARY + '12', justifyContent: 'center', alignItems: 'center' },
-  methodRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#f8fafc', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
+  infoVal: { fontSize: 14, fontWeight: '700', color: '#111827', textAlign: 'right' },
+  infoSub: { fontSize: 13, color: '#6b7280' },
+  copyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  methodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
   methodTxt: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  finalRow:  { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 12 },
-  finalTxt:  { fontSize: 13, fontWeight: '600' },
+
+  finalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
+  },
+  finalTxt: { fontSize: 13, fontWeight: '600' },
 });
