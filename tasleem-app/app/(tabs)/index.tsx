@@ -67,7 +67,7 @@ const ProductCard = React.memo(({
   const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
   
   // ارتفاع ثابت للبطاقة (عرض الصورة + 120 للجزء السفلي)
-  const CARD_HEIGHT = CARD_WIDTH + 120;
+  const CARD_HEIGHT = CARD_WIDTH + 150;
   
   return (
     <TouchableOpacity
