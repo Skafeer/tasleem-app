@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
@@ -20,9 +20,21 @@ const PROVINCES = [
   'صلاح الدين', 'المثنى', 'كركوك', 'دهوك', 'أربيل', 'السليمانية'
 ];
 
+// دالة مفتاح السلة - نفس الموجودة في cart.tsx
+const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
+
 export default function CheckoutScreen() {
   const router = useRouter();
   const qc = useQueryClient();
+  
+  // جلب بيانات المستخدم لتحديد مفتاح السلة الصحيح
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+  });
+
+  const CART_KEY = getCartKey(user?.id);
+  
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState('');
@@ -37,27 +49,45 @@ export default function CheckoutScreen() {
   const [showProvinces, setShowProvinces] = useState(false);
 
   const loadCart = useCallback(async () => {
+    // انتظر حتى يتم تحميل بيانات المستخدم
+    if (userLoading) return;
+    
+    // إذا لم يكن هناك مفتاح (مستخدم غير مسجل) ارجع للخلف
+    if (!CART_KEY) {
+      toast.warning('الرجاء تسجيل الدخول أولاً');
+      router.back();
+      return;
+    }
+    
     try {
-      const data = await AsyncStorage.getItem('cart');
+      const data = await AsyncStorage.getItem(CART_KEY);
       const parsed = data ? JSON.parse(data) : [];
       if (parsed.length === 0) {
         toast.warning('السلة فارغة');
         router.back();
+        return;
       }
       setCart(parsed);
     } catch (e) {
+      console.error(e);
       router.back();
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [CART_KEY, router, userLoading]);
 
-  useEffect(() => { loadCart(); }, [loadCart]);
+  useEffect(() => {
+    if (!userLoading && CART_KEY !== undefined) {
+      loadCart();
+    }
+  }, [CART_KEY, loadCart, userLoading]);
 
   useFocusEffect(
     useCallback(() => {
-      loadCart();
-    }, [loadCart])
+      if (!userLoading && CART_KEY !== undefined) {
+        loadCart();
+      }
+    }, [CART_KEY, loadCart, userLoading])
   );
 
   const verifyPromo = useMutation({
@@ -102,7 +132,10 @@ export default function CheckoutScreen() {
     },
     onSuccess: async () => {
       toast.success('تم إرسال الطلب بنجاح! 🎉');
-      await AsyncStorage.removeItem('cart');
+      // حذف السلة باستخدام المفتاح الصحيح
+      if (CART_KEY) {
+        await AsyncStorage.removeItem(CART_KEY);
+      }
       qc.invalidateQueries({ queryKey: ['user'] });
       qc.invalidateQueries({ queryKey: ['orders'] });
       router.replace('/(tabs)/orders');
@@ -164,7 +197,7 @@ export default function CheckoutScreen() {
   const total = sellingTotal - discount + shipping;
   const profit = sellingTotal - costTotal - discount;
 
-  if (loading) {
+  if (loading || userLoading) {
     return (
       <SafeAreaView style={s.container} edges={['top', 'bottom']}>
         <View style={s.header}>
