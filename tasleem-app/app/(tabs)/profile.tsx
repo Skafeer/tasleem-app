@@ -76,25 +76,25 @@ export default function ProfileScreen() {
         </LinearGradient>
 
         {/* ── بطاقات الأرباح ── */}
-        <View style={s.statsGrid}>
-          <View style={[s.statCard, s.statCardPending]}>
-            <View style={s.statIconWrapper}>
-              <Ionicons name="time-outline" size={24} color="#f97316" />
-            </View>
-            <Text style={s.statLabel}>الأرباح المنتظرة</Text>
-            <Text style={s.statValue}>{(user?.pendingBalance || 100000).toLocaleString('ar-IQ')}</Text>
-            <Text style={s.statCurrency}>دينار عراقي</Text>
-          </View>
+<View style={s.statsGrid}>
+  <View style={[s.statCard, s.statCardPending]}>
+    <View style={s.statIconWrapper}>
+      <Ionicons name="time-outline" size={24} color="#f97316" />
+    </View>
+    <Text style={s.statLabel}>الأرباح المنتظرة</Text>
+    <Text style={s.statValue}>{(user?.pendingBalance ?? 0).toLocaleString('ar-IQ')}</Text>
+    <Text style={s.statCurrency}>دينار عراقي</Text>
+  </View>
 
-          <View style={[s.statCard, s.statCardEarned]}>
-            <View style={s.statIconWrapper}>
-              <Ionicons name="checkmark-circle-outline" size={24} color="#16a34a" />
-            </View>
-            <Text style={s.statLabel}>الأرباح المحققة</Text>
-            <Text style={s.statValue}>{(user?.balance || 5000).toLocaleString('ar-IQ')}</Text>
-            <Text style={s.statCurrency}>دينار عراقي</Text>
-          </View>
-        </View>
+  <View style={[s.statCard, s.statCardEarned]}>
+    <View style={s.statIconWrapper}>
+      <Ionicons name="checkmark-circle-outline" size={24} color="#16a34a" />
+    </View>
+    <Text style={s.statLabel}>الأرباح المحققة</Text>
+    <Text style={s.statValue}>{(user?.balance ?? 0).toLocaleString('ar-IQ')}</Text>
+    <Text style={s.statCurrency}>دينار عراقي</Text>
+  </View>
+</View>
 
         {/* ── قائمة الخيارات ── */}
         <View style={s.menuSection}>
