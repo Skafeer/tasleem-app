@@ -48,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component (مع ارتفاع ثابت وزر عرض التفاصيل) ──
+// ── Product Card Component ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -65,8 +65,6 @@ const ProductCard = React.memo(({
   const imgs = getImages(product);
   const hasDiscount = product.discount > 0;
   const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
-  
-  // ارتفاع ثابت للبطاقة (عرض الصورة + 120 للجزء السفلي)
   const CARD_HEIGHT = CARD_WIDTH + 150;
   
   return (
@@ -136,7 +134,6 @@ const ProductCard = React.memo(({
           </Text>
         </View>
         
-        {/* زر عرض التفاصيل */}
         <TouchableOpacity 
           style={s.detailsBtn}
           onPress={() => onViewDetails(product.id)}>
@@ -170,14 +167,12 @@ export default function HomeScreen() {
   const [filterModal, setFilterModal] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState<number>(0);
-  
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
     sortBy: 'newest',
   });
 
-  // جلب عدد الإشعارات غير المقروءة
   const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
@@ -191,17 +186,20 @@ export default function HomeScreen() {
     refetchInterval: 30000,
   });
 
-  // تحديث عدد الإشعارات عند العودة للصفحة
   useFocusEffect(
     useCallback(() => {
       refetchUnreadCount();
     }, [refetchUnreadCount])
   );
 
-  // جلب عدد السلة
+  // ✅ جلب عدد السلة - مرتبط بـ userId
   const fetchCartCount = useCallback(async () => {
     try {
-      const data = await AsyncStorage.getItem('cart');
+      const { data: user } = await api.get('/api/auth/me');
+      if (!user?.id) return;
+      
+      const cartKey = `cart_${user.id}`;
+      const data = await AsyncStorage.getItem(cartKey);
       const parsed = data ? JSON.parse(data) : [];
       const count = parsed.reduce((sum: number, item: any) => sum + item.quantity, 0);
       setCartCount(count);
@@ -210,7 +208,6 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // تحديث عدد السلة عند العودة للصفحة
   useFocusEffect(
     useCallback(() => {
       fetchCartCount();
@@ -364,7 +361,6 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
           <Ionicons name="cart-outline" size={22} color={PRIMARY} />
@@ -390,7 +386,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Search Box with Filter ── */}
       <View style={s.searchWrapper}>
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
@@ -416,7 +411,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Recent Searches */}
       {searchQuery === '' && recentSearches.length > 0 && (
         <View style={s.recentSearch}>
           <View style={s.recentHeader}>
@@ -514,7 +508,6 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* ── Filter Modal ── */}
       <Modal visible={filterModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
@@ -647,13 +640,13 @@ const s = StyleSheet.create({
   flatListContent: {
     paddingHorizontal: 12,
     paddingBottom: 32,
-    gap: 8,  // تقليل المسافة بين الصفوف
+    gap: 8,
   },
   columnWrapper: {
     gap: 12,
     justifyContent: 'space-between',
     alignItems: 'stretch',
-    marginBottom: 8,  // تقليل المسافة بين الصفوف
+    marginBottom: 8,
   },
 
   searchWrapper: {
