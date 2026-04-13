@@ -9,6 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ✅ مفتاح السلة مرتبط بالـ userId
+const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -38,6 +41,13 @@ export default function ProductDetailScreen() {
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const flatRef = useRef<FlatList>(null);
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+  });
+
+  const CART_KEY = getCartKey(user?.id);
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
@@ -69,8 +79,13 @@ export default function ProductDetailScreen() {
       toast.warning('السعر يجب أن يكون أكبر من سعر الجملة');
       return;
     }
+    // ✅ تحقق من توفر مفتاح السلة الخاص بالمستخدم
+    if (!CART_KEY) {
+      toast.error('يجب تسجيل الدخول أولاً');
+      return;
+    }
     try {
-      const cartRaw = await AsyncStorage.getItem('cart');
+      const cartRaw = await AsyncStorage.getItem(CART_KEY);
       const cart = cartRaw ? JSON.parse(cartRaw) : [];
       const existing = cart.findIndex((i: any) => i.productId === product.id);
       if (existing >= 0) {
@@ -86,7 +101,7 @@ export default function ProductDetailScreen() {
           quantity: Number(quantity),
         });
       }
-      await AsyncStorage.setItem('cart', JSON.stringify(cart));
+      await AsyncStorage.setItem(CART_KEY, JSON.stringify(cart));
       toast.success('تمت الإضافة إلى السلة ✅');
       setTimeout(() => router.push('/cart'), 100);
       setShowCart(false);
