@@ -20,7 +20,7 @@ export default function SaqrScreen() {
     setLoading(true);
 
     try {
-      const response = await api.post('/saqr/analyze', { identifier: userMsg });
+      const response = await api.post('/api/saqr/analyze', { identifier: userMsg });
       setMessages(prev => [...prev, { id: Date.now() + 1, text: response.data.analysis, sender: 'saqr' }]);
     } catch (error) {
       setMessages(prev => [...prev, { id: Date.now() + 1, text: 'عذراً عيني، صار عندي خلل بسيط. تأكد من الكود؟', sender: 'saqr' }]);
