@@ -35,6 +35,7 @@ export default function ProfileScreen() {
     { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', gradient: ['#10b981', '#059669'], route: '/stats' },
     { key: 'privacy', label: 'سياسة الخصوصية', icon: 'shield-checkmark-outline', gradient: ['#f59e0b', '#d97706'], route: '/privacy' },
     { key: 'support', label: 'الدعم الفني', icon: 'headset-outline', gradient: ['#8b5cf6', '#7c3aed'], route: '/support' },
+    { key: 'saqr', label: 'المساعد صقر', icon: 'bonfire-outline', gradient: ['#f97316', '#ea580c'], route: '/saqr' },
     { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', gradient: ['#06b6d4', '#0891b2'], route: '/contact' },
   ];
 
