@@ -49,7 +49,7 @@ export default function SaqrScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="اكتب كود المنتج هنا..."
+          placeholder="اكتب اسم المنتج هنا..."
           placeholderTextColor="#999"
         />
         <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
