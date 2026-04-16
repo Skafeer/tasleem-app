@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
-import { api } from '../src/lib/api';
+import api from '../src/lib/api';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SaqrScreen() {
