@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function SaqrScreen() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { id: 1, text: 'هلا بيك عيني! أنا صقر مساعدك الذكي في تسليم. انطيني كود أي منتج وأحلله الك فوراً 🦅', sender: 'saqr' }
+    { id: 1, text: 'هلا بيك عيني! أنا صقر مساعدك الذكي في تسليم. انطيني اسم المنتج وأحلله الك فوراً 🦅', sender: 'saqr' }
   ]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -23,7 +23,7 @@ export default function SaqrScreen() {
       const response = await api.post('/api/saqr/analyze', { identifier: userMsg });
       setMessages(prev => [...prev, { id: Date.now() + 1, text: response.data.analysis, sender: 'saqr' }]);
     } catch (error) {
-      setMessages(prev => [...prev, { id: Date.now() + 1, text: 'عذراً عيني، صار عندي خلل بسيط. تأكد من الكود؟', sender: 'saqr' }]);
+      setMessages(prev => [...prev, { id: Date.now() + 1, text: 'عذراً عيني، صار عندي خلل بسيط. تأكد من اسم المنتج؟', sender: 'saqr' }]);
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export default function SaqrScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="اكتب كود المنتج هنا..."
+          placeholder="اكتب اسم المنتج هنا..."
           placeholderTextColor="#999"
         />
         <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
