@@ -100,12 +100,21 @@ export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ جلب بيانات المستخدم الحالي لمعرفة دوره
+  const { data: currentUser } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
+  });
+
   const { data: orders = [], isLoading, refetch } = useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', currentUser?.id],
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
+    enabled: !!currentUser,
     queryFn: async () => {
-      const { data } = await api.get('/api/orders?limit=9999&page=1');
+      // ✅ إذا كان أدمن، أرسل merchantId الخاص به فقط — ليس كل الطلبات
+      const merchantId = currentUser?.id;
+      const { data } = await api.get(`/api/orders?limit=100&page=1&merchantId=${merchantId}`);
       const result = data?.data || data;
       return Array.isArray(result) ? result : [];
     },
