@@ -35,6 +35,7 @@ export default function ProfileScreen() {
     { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline', gradient: ['#10b981', '#059669'], route: '/stats' },
     { key: 'privacy', label: 'سياسة الخصوصية', icon: 'shield-checkmark-outline', gradient: ['#f59e0b', '#d97706'], route: '/privacy' },
     { key: 'support', label: 'الدعم الفني', icon: 'headset-outline', gradient: ['#8b5cf6', '#7c3aed'], route: '/support' },
+    { key: 'saqr', label: 'المساعد صقر', icon: 'flash-outline', gradient: ['#FF9800', '#F57C00'], route: '/saqr', isBeta: true },
     { key: 'contact', label: 'تواصل معنا', icon: 'chatbubble-outline', gradient: ['#06b6d4', '#0891b2'], route: '/contact' },
   ];
 
@@ -112,7 +113,14 @@ export default function ProfileScreen() {
                 style={s.menuIconGradient}>
                 <Ionicons name={item.icon as any} size={18} color="#fff" />
               </LinearGradient>
-              <Text style={s.menuLabel}>{item.label}</Text>
+              <View style={s.menuLabelContainer}>
+                <Text style={s.menuLabel}>{item.label}</Text>
+                {item.isBeta && (
+                  <View style={s.betaBadge}>
+                    <Text style={s.betaText}>Beta</Text>
+                  </View>
+                )}
+              </View>
               <Ionicons name="chevron-back" size={16} color="#d1d5db" />
             </TouchableOpacity>
           ))}
@@ -342,12 +350,28 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  menuLabel: {
+  menuLabelContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#374151',
     textAlign: 'right',
+  },
+  betaBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  betaText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 
   // ── زر تسجيل الخروج ──
