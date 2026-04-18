@@ -25,6 +25,29 @@ type Message = {
   timestamp: Date;
 };
 
+// معالجة أخطاء API بشكل احترافي
+const handleApiError = (err: any): string => {
+  const errorMsg = err?.message || err?.response?.data?.message || '';
+  
+  if (errorMsg.includes('503') || errorMsg.includes('high demand') || errorMsg.includes('Service Unavailable')) {
+    return '🦅 عذراً، صقر يستقبل طلبات كثيرة الآن!\n⏳ انتظر 30 ثانية ثم حاول مرة أخرى.\nشكراً لصبرك ❤️';
+  }
+  
+  if (errorMsg.includes('429') || errorMsg.includes('Too Many Requests')) {
+    return '🦅 لقد تجاوزت عدد المحاولات المسموح بها.\n⏱️ انتظر دقيقة ثم حاول مجدداً.';
+  }
+  
+  if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+    return '🦅 يبدو أن جلسة الدخول انتهت.\n🔄 الرجاء تسجيل الدخول مرة أخرى.';
+  }
+  
+  if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+    return '🦅 عفواً، خدمة صقر غير متاحة حالياً.\n🔄 الرجاء المحاولة لاحقاً.';
+  }
+  
+  return '🦅 عذراً، حدث خطأ تقني.\n🔄 الرجاء المحاولة مرة أخرى بعد قليل.';
+};
+
 export default function SaqrScreen() {
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
@@ -40,16 +63,25 @@ export default function SaqrScreen() {
     },
   ]);
 
+  // التمرير للأسفل عند إضافة رسائل جديدة
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
     }
   }, [messages]);
 
+  // نسخ الرد
+  const handleCopyMessage = (text: string) => {
+    Clipboard.setString(text);
+    Alert.alert('', '✅ تم نسخ الرد بنجاح');
+  };
+
+  // إرسال الطلب إلى صقر
   const sendToSaqr = async () => {
     const text = input.trim();
     if (!text || loading) return;
 
+    // إضافة رسالة المستخدم
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -73,8 +105,12 @@ export default function SaqrScreen() {
         reply = data.message;
       } else if (data?.text) {
         reply = data.text;
+      } else if (data?.reply) {
+        reply = data.reply;
+      } else if (data?.response) {
+        reply = data.response;
       } else {
-        reply = 'تم استلام طلبك بنجاح';
+        reply = '✅ تم استلام طلبك بنجاح.\nسأقوم بتحليل المنتج لك حالياً.';
       }
       
       const saqrMessage: Message = {
@@ -86,10 +122,14 @@ export default function SaqrScreen() {
       
       setMessages(prev => [...prev, saqrMessage]);
     } catch (err: any) {
+      console.log('Saqr error:', err);
+      
+      const errorMessageText = handleApiError(err);
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'saqr',
-        text: 'عذراً، حدث خطأ. حاول مرة أخرى.',
+        text: errorMessageText,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -98,15 +138,11 @@ export default function SaqrScreen() {
     }
   };
 
-  const handleCopyMessage = (text: string) => {
-    Clipboard.setString(text);
-    Alert.alert('', '✅ تم نسخ الرد');
-  };
-
+  // مسح المحادثة
   const handleClearChat = () => {
     Alert.alert(
       'مسح المحادثة',
-      'هل أنت متأكد؟',
+      'هل أنت متأكد من مسح جميع الرسائل؟',
       [
         { text: 'إلغاء', style: 'cancel' },
         { 
@@ -117,7 +153,7 @@ export default function SaqrScreen() {
               { 
                 id: Date.now().toString(),
                 role: 'saqr', 
-                text: 'مرحباً بك مجدداً! 🦅\nأنا صقر جاهز لمساعدتك.',
+                text: 'مرحباً بك مجدداً! 🦅\nأنا صقر جاهز لمساعدتك. أرسل لي أي منتج لتحليله.',
                 timestamp: new Date()
               }
             ]);
@@ -127,6 +163,7 @@ export default function SaqrScreen() {
     );
   };
 
+  // تحديث الصفحة (سحب للأسفل)
   const onRefresh = async () => {
     setRefreshing(true);
     setTimeout(() => {
@@ -137,7 +174,7 @@ export default function SaqrScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
+      {/* Header - نفس تصميم صفحة الدعم */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.onlineIndicator}>
@@ -149,11 +186,12 @@ export default function SaqrScreen() {
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerSub}>محلل المنتجات الذكي</Text>
+        <Text style={styles.headerSub}>محلل المنتجات الذكي | رد خلال ثوان</Text>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         
+        {/* قائمة الرسائل */}
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -174,21 +212,30 @@ export default function SaqrScreen() {
                   </View>
                 )}
                 
-                <TouchableOpacity 
-                  style={[styles.bubbleContainer, isSaqr ? styles.bubbleContainerSaqr : styles.bubbleContainerUser]}
-                  onLongPress={() => isSaqr && handleCopyMessage(item.text)}
-                  activeOpacity={0.8}
-                  disabled={!isSaqr}
-                >
+                <View style={[styles.bubbleContainer, isSaqr ? styles.bubbleContainerSaqr : styles.bubbleContainerUser]}>
                   <View style={[styles.bubble, isSaqr ? styles.bubbleSaqr : styles.bubbleUser]}>
                     <Text style={[styles.bubbleText, isSaqr ? styles.bubbleTextSaqr : styles.bubbleTextUser]}>
                       {item.text}
                     </Text>
-                    <Text style={[styles.bubbleTime, isSaqr ? styles.bubbleTimeSaqr : styles.bubbleTimeUser]}>
-                      {formatTime(item.timestamp)}
-                    </Text>
+                    
+                    <View style={styles.bubbleFooter}>
+                      <Text style={[styles.bubbleTime, isSaqr ? styles.bubbleTimeSaqr : styles.bubbleTimeUser]}>
+                        {formatTime(item.timestamp)}
+                      </Text>
+                      
+                      {/* أيقونة النسخ - تظهر فقط لرسائل صقر */}
+                      {isSaqr && (
+                        <TouchableOpacity 
+                          onPress={() => handleCopyMessage(item.text)}
+                          style={styles.copyButton}
+                          activeOpacity={0.7}>
+                          <Ionicons name="copy-outline" size={14} color={PRIMARY} />
+                          <Text style={styles.copyButtonText}>نسخ</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                </TouchableOpacity>
+                </View>
               </View>
             );
           }}
@@ -205,9 +252,18 @@ export default function SaqrScreen() {
               </View>
             ) : null
           }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <View style={styles.emptyIconBox}>
+                <Text style={styles.emptyEmoji}>🦅</Text>
+              </View>
+              <Text style={styles.emptyTitle}>مرحباً بك في صقر</Text>
+              <Text style={styles.emptyText}>أرسل كود منتج أو اسمه وسأقوم بتحليله لك</Text>
+            </View>
+          }
         />
 
-        {/* Input Row */}
+        {/* شريط الإدخال - نفس تصميم صفحة الدعم */}
         <View style={styles.inputRow}>
           <TouchableOpacity 
             style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnOff]}
@@ -226,11 +282,14 @@ export default function SaqrScreen() {
             placeholderTextColor="#9ca3af"
             textAlign="right"
             multiline
+            maxLength={500}
+            onSubmitEditing={sendToSaqr}
           />
           
           <TouchableOpacity 
             style={styles.clearBtn} 
-            onPress={handleClearChat}>
+            onPress={handleClearChat}
+            disabled={loading}>
             <Ionicons name="trash-outline" size={20} color={PRIMARY} />
           </TouchableOpacity>
         </View>
@@ -242,6 +301,7 @@ export default function SaqrScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
+  // ── Header ──
   header: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -297,12 +357,44 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // ── قائمة الرسائل ──
   messagesList: {
     padding: 16,
     paddingBottom: 8,
     flexGrow: 1,
   },
 
+  // ── Empty State ──
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyEmoji: {
+    fontSize: 40,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+
+  // ── رسائل المحادثة ──
   messageRow: {
     marginBottom: 12,
     flexDirection: 'row',
@@ -323,13 +415,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
   },
   saqrEmoji: {
     fontSize: 18,
   },
 
   bubbleContainer: {
-    maxWidth: '75%',
+    maxWidth: '78%',
   },
   bubbleContainerSaqr: {
     alignItems: 'flex-start',
@@ -341,6 +435,7 @@ const styles = StyleSheet.create({
   bubble: {
     borderRadius: 18,
     padding: 12,
+    gap: 4,
   },
   bubbleSaqr: {
     backgroundColor: '#fff',
@@ -356,6 +451,7 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 14,
     lineHeight: 20,
+    flexWrap: 'wrap',
   },
   bubbleTextSaqr: {
     color: '#111827',
@@ -366,9 +462,16 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
+  bubbleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 8,
+  },
+
   bubbleTime: {
     fontSize: 10,
-    marginTop: 4,
   },
   bubbleTimeSaqr: {
     color: '#9ca3af',
@@ -379,6 +482,23 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
+  // زر النسخ الجديد
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: PRIMARY + '10',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  copyButtonText: {
+    fontSize: 10,
+    color: PRIMARY,
+    fontWeight: '500',
+  },
+
+  // ── مؤشر الكتابة ──
   typingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,6 +522,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
 
+  // ── شريط الإدخال ──
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -440,8 +561,13 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sendBtnOff: {
     backgroundColor: '#d1d5db',
+    shadowOpacity: 0,
   },
 });
