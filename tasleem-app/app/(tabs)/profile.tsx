@@ -52,7 +52,11 @@ export default function ProfileScreen() {
     setLoading(true);
     try {
       const { data } = await api.post('/api/saqr/analyze', { identifier: text });
-      setMessages(prev => [...prev, { role: 'saqr', text: data.analysis }]);
+      // data.analysis أو data مباشرة أو أي field يرجع من الـ API
+      const reply = data?.analysis || data?.message || data?.text || JSON.stringify(data);
+      if (reply) {
+        setMessages(prev => [...prev, { role: 'saqr', text: reply }]);
+      }
     } catch {
       setMessages(prev => [...prev, { role: 'saqr', text: 'صار عندي خلل فني بسيط، حاول مرة ثانية عيوني.' }]);
     } finally {
