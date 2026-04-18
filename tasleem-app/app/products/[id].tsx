@@ -1,3 +1,4 @@
+// /workspaces/tasleem-app/tasleem-app/app/products/[id].tsx
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -19,18 +20,6 @@ const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
 const SUCCESS = '#10b981';
 const BG = '#f2f6f9';
-
-const generateProductCode = (id: number) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const seed = id * 12345 + 67890;
-  let code = '';
-  let tempSeed = seed;
-  for (let i = 0; i < 5; i++) {
-    code += chars[tempSeed % chars.length];
-    tempSeed = Math.floor(tempSeed / chars.length) + (i * 17);
-  }
-  return code;
-};
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -117,10 +106,10 @@ export default function ProductDetailScreen() {
     toast.success('تم النسخ ✅');
   };
 
-  const copyProductCode = () => {
-    const code = generateProductCode(product.id);
-    Clipboard.setString(code);
-    toast.success('تم نسخ الكود ✅');
+  // ✅ دالة نسخ ID المنتج (بدلاً من الكود المتولد)
+  const copyProductId = () => {
+    Clipboard.setString(String(product.id));
+    toast.success('تم نسخ ID المنتج ✅');
   };
 
   if (isLoading) {
@@ -226,11 +215,11 @@ export default function ProductDetailScreen() {
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
 
-          {/* كود المنتج */}
+          {/* ✅ عرض ID المنتج من قاعدة البيانات بدلاً من الكود المتولد */}
           <View style={s.codeChip}>
             <Ionicons name="barcode-outline" size={16} color={PRIMARY} />
-            <Text style={s.productCode}>#{generateProductCode(product.id)}</Text>
-            <TouchableOpacity onPress={copyProductCode} style={s.copyCodeBtn}>
+            <Text style={s.productCode}>ID: {product.id}</Text>
+            <TouchableOpacity onPress={copyProductId} style={s.copyCodeBtn}>
               <Ionicons name="copy-outline" size={16} color={PRIMARY} />
             </TouchableOpacity>
           </View>
