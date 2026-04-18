@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+// /workspaces/tasleem-app/tasleem-app/app/(tabs)/profile.tsx
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, KeyboardAvoidingView, Platform,
-  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,20 +14,8 @@ import api from '../../src/lib/api';
 const PRIMARY = '#0c6679';
 const BG      = '#f2f6f9';
 
-type Message = { role: 'user' | 'saqr'; text: string };
-
 export default function ProfileScreen() {
   const router      = useRouter();
-  // ✅ FIX: استخدم ScrollView ref بدل FlatList ref
-  const chatScrollRef = useRef<ScrollView>(null);
-
-  // ── Saqr state ──
-  const [showSaqr, setShowSaqr] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'saqr', text: 'أهلاً وسهلاً! أنا صقر 🦅\nمساعدك الذكي في منصة تسليم.\nأرسل لي كود منتج أو اسمه وأحلله لك فوراً.' },
-  ]);
-  const [input, setInput]   = useState('');
-  const [loading, setLoading] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -38,40 +25,10 @@ export default function ProfileScreen() {
     },
   });
 
-  // ✅ FIX: scroll للأسفل عند كل رسالة جديدة
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 150);
-    }
-  }, [messages, loading]);
-
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
     router.replace('/auth');
-  };
-
-  const sendToSaqr = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-
-    setInput('');
-    // ✅ FIX: أضف رسالة المستخدم أولاً بشكل مضمون
-    setMessages(prev => [...prev, { role: 'user', text }]);
-    setLoading(true);
-
-    try {
-      const { data } = await api.post('/api/saqr/analyze', { identifier: text });
-      const reply = data?.analysis || data?.message || data?.text || JSON.stringify(data);
-      if (reply) {
-        setMessages(prev => [...prev, { role: 'saqr', text: reply }]);
-      }
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || 'صار عندي خلل فني بسيط، حاول مرة ثانية عيوني.';
-      setMessages(prev => [...prev, { role: 'saqr', text: errMsg }]);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const menuItems = [
@@ -86,11 +43,9 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-      {/* ✅ FIX: الـ ScrollView الرئيسي يوقف عند صقر مفتوح */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
-        scrollEnabled={!showSaqr}
       >
 
         {/* ── Header ── */}
@@ -147,109 +102,33 @@ export default function ProfileScreen() {
 
         {/* ── صقر AI ── فقط للتجار ── */}
         {user?.role !== 'admin' && (
-          <View style={s.saqrSection}>
-
-            {/* زر فتح/إغلاق صقر */}
-            <TouchableOpacity
-              style={s.saqrToggle}
-              onPress={() => setShowSaqr(v => !v)}
-              activeOpacity={0.85}>
-              <LinearGradient
-                colors={['#1e3a5f', '#0c6679']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={s.saqrToggleGradient}>
-                <View style={s.saqrToggleLeft}>
-                  <View style={s.saqrIconBox}>
-                    <Text style={s.saqrEmoji}>🦅</Text>
-                  </View>
-                  <View>
-                    <Text style={s.saqrToggleTitle}>صقر AI</Text>
-                    <Text style={s.saqrToggleSub}>محلل المنتجات الذكي</Text>
-                  </View>
+          <TouchableOpacity
+            style={s.saqrSection}
+            onPress={() => router.push('/saqr')}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#1e3a5f', '#0c6679']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.saqrToggleGradient}
+            >
+              <View style={s.saqrToggleLeft}>
+                <View style={s.saqrIconBox}>
+                  <Text style={s.saqrEmoji}>🦅</Text>
                 </View>
-                <Ionicons
-                  name={showSaqr ? 'chevron-up' : 'chevron-down'}
-                  size={20} color="rgba(255,255,255,0.7)" />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* ✅ FIX: منطقة الشات — ScrollView بدل FlatList، ارتفاع ثابت */}
-            {showSaqr && (
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={s.saqrChat}>
-
-                {/* الرسائل */}
-                <ScrollView
-                  ref={chatScrollRef}
-                  style={s.msgList}
-                  contentContainerStyle={s.msgListContent}
-                  showsVerticalScrollIndicator={false}
-                  onContentSizeChange={() =>
-                    chatScrollRef.current?.scrollToEnd({ animated: true })
-                  }
-                >
-                  {messages.map((item, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        s.msgRow,
-                        item.role === 'user' ? s.msgRowUser : s.msgRowSaqr,
-                      ]}>
-                      {item.role === 'saqr' && (
-                        <View style={s.saqrAvatar}>
-                          <Text style={{ fontSize: 14 }}>🦅</Text>
-                        </View>
-                      )}
-                      <View style={[
-                        s.msgBubble,
-                        item.role === 'user' ? s.bubbleUser : s.bubbleSaqr,
-                      ]}>
-                        <Text style={[
-                          s.msgText,
-                          item.role === 'user' ? s.msgTextUser : s.msgTextSaqr,
-                        ]}>{item.text}</Text>
-                      </View>
-                    </View>
-                  ))}
-
-                  {/* مؤشر الكتابة */}
-                  {loading && (
-                    <View style={s.typingRow}>
-                      <View style={s.saqrAvatar}>
-                        <Text style={{ fontSize: 14 }}>🦅</Text>
-                      </View>
-                      <View style={s.typingBubble}>
-                        <ActivityIndicator size="small" color={PRIMARY} />
-                        <Text style={s.typingText}>صقر يحلل...</Text>
-                      </View>
-                    </View>
-                  )}
-                </ScrollView>
-
-                {/* Input */}
-                <View style={s.inputRow}>
-                  <TouchableOpacity
-                    style={[s.sendBtn, (!input.trim() || loading) && s.sendBtnDisabled]}
-                    onPress={sendToSaqr}
-                    disabled={!input.trim() || loading}>
-                    <Ionicons name="send" size={18} color="#fff" />
-                  </TouchableOpacity>
-                  <TextInput
-                    style={s.inputBox}
-                    placeholder="أرسل كود منتج أو اسمه..."
-                    placeholderTextColor="#9ca3af"
-                    value={input}
-                    onChangeText={setInput}
-                    onSubmitEditing={sendToSaqr}
-                    returnKeyType="send"
-                    textAlign="right"
-                    multiline={false}
-                  />
+                <View>
+                  <Text style={s.saqrToggleTitle}>صقر AI</Text>
+                  <Text style={s.saqrToggleSub}>محلل المنتجات الذكي</Text>
                 </View>
-              </KeyboardAvoidingView>
-            )}
-          </View>
+              </View>
+              <Ionicons
+                name="arrow-back"
+                size={20}
+                color="rgba(255,255,255,0.7)"
+              />
+            </LinearGradient>
+          </TouchableOpacity>
         )}
 
         {/* ── قائمة الخيارات ── */}
@@ -320,41 +199,51 @@ const s = StyleSheet.create({
   statCurrency:    { fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' },
 
   // ── صقر ──
-  saqrSection:         { marginHorizontal: 16, marginBottom: 16, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1e3a5f22', shadowColor: '#0c6679', shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
-  saqrToggle:          { borderRadius: 20, overflow: 'hidden' },
-  saqrToggleGradient:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  saqrToggleLeft:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  saqrIconBox:         { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  saqrEmoji:           { fontSize: 20 },
-  saqrToggleTitle:     { fontSize: 15, fontWeight: '800', color: '#fff' },
-  saqrToggleSub:       { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
-
-  // ✅ FIX: ارتفاع ثابت للشات بدل flex:1 داخل maxHeight
-  saqrChat:        { backgroundColor: '#fff', height: 380 },
-  msgList:         { flex: 1 },
-  msgListContent:  { padding: 12, gap: 10, flexGrow: 1 },
-
-  msgRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 6 },
-  msgRowUser: { flexDirection: 'row-reverse' },
-  msgRowSaqr: { flexDirection: 'row' },
-
-  saqrAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f0f9fa', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-
-  msgBubble:   { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  bubbleUser:  { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
-  bubbleSaqr:  { backgroundColor: '#f2f6f9', borderBottomLeftRadius: 4 },
-  msgText:     { fontSize: 13, lineHeight: 20 },
-  msgTextUser: { color: '#fff', textAlign: 'right' },
-  msgTextSaqr: { color: '#0d1b2a', textAlign: 'right' },
-
-  typingRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 0, paddingBottom: 6 },
-  typingBubble: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f2f6f9', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  typingText:   { fontSize: 12, color: '#64748b' },
-
-  inputRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderTopWidth: 1, borderTopColor: '#e8edf2', backgroundColor: '#fff' },
-  inputBox:        { flex: 1, height: 40, backgroundColor: '#f2f6f9', borderRadius: 20, paddingHorizontal: 14, fontSize: 13, color: '#0d1b2a', borderWidth: 1, borderColor: '#e8edf2' },
-  sendBtn:         { width: 40, height: 40, borderRadius: 20, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: '#9ca3af' },
+  saqrSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#1e3a5f22',
+    shadowColor: '#0c6679',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  saqrToggleGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  saqrToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  saqrIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saqrEmoji: {
+    fontSize: 20,
+  },
+  saqrToggleTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  saqrToggleSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 1,
+  },
 
   menuSection:      { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e8edf2', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   menuSectionTitle: { fontSize: 13, fontWeight: '600', color: '#9ca3af', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, textAlign: 'right' },

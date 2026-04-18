@@ -373,7 +373,7 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={s.summaryRow}>
-            <Text style={s.summaryLabel}>ربحك المتوقع 💰</Text>
+            <Text style={s.summaryLabel}>ربحك المتوقع</Text>
             <Text style={[s.summaryValue, s.profitValue]}>{profit.toLocaleString()} د.ع</Text>
           </View>
 
