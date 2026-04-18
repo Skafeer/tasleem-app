@@ -100,36 +100,39 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── صقر AI ── فقط للتجار ── */}
-        {user?.role !== 'admin' && (
-          <TouchableOpacity
-            style={s.saqrSection}
-            onPress={() => router.push('/saqr')}
-            activeOpacity={0.85}
+        {/* ── صقر AI ── للجميع (تاجر وأدمن) ── */}
+        <TouchableOpacity
+          style={s.saqrSection}
+          onPress={() => router.push('/saqr')}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={['#1e3a5f', '#0c6679']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={s.saqrToggleGradient}
           >
-            <LinearGradient
-              colors={['#1e3a5f', '#0c6679']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.saqrToggleGradient}
-            >
-              <View style={s.saqrToggleLeft}>
-                <View style={s.saqrIconBox}>
-                  <Text style={s.saqrEmoji}>🦅</Text>
-                </View>
-                <View>
-                  <Text style={s.saqrToggleTitle}>صقر AI</Text>
-                  <Text style={s.saqrToggleSub}>محلل المنتجات الذكي</Text>
-                </View>
+            <View style={s.saqrToggleLeft}>
+              <View style={s.saqrIconBox}>
+                <Text style={s.saqrEmoji}>🦅</Text>
               </View>
-              <Ionicons
-                name="arrow-back"
-                size={20}
-                color="rgba(255,255,255,0.7)"
-              />
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+              <View>
+                <View style={s.titleRow}>
+                  <Text style={s.saqrToggleTitle}>صقر AI</Text>
+                  <View style={s.betaBadge}>
+                    <Text style={s.betaText}>Beta</Text>
+                  </View>
+                </View>
+                <Text style={s.saqrToggleSub}>محلل المنتجات الذكي</Text>
+              </View>
+            </View>
+            <Ionicons
+              name="arrow-back"
+              size={20}
+              color="rgba(255,255,255,0.7)"
+            />
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* ── قائمة الخيارات ── */}
         <View style={s.menuSection}>
@@ -234,10 +237,28 @@ const s = StyleSheet.create({
   saqrEmoji: {
     fontSize: 20,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   saqrToggleTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#fff',
+  },
+  betaBadge: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  betaText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 0.5,
   },
   saqrToggleSub: {
     fontSize: 11,
