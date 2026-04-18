@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import api from '../src/lib/api';
+import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
@@ -41,15 +41,52 @@ export default function SaqrScreen() {
     setLoading(true);
 
     try {
+      console.log('Sending request to /api/saqr/analyze with:', { identifier: text });
+      
       const { data } = await api.post('/api/saqr/analyze', { identifier: text });
-      const reply = data?.analysis || data?.message || data?.text || JSON.stringify(data);
-      if (reply) {
+      console.log('Response from API:', data);
+      
+      // محاولة استخراج الرد بأكثر من طريقة
+      let reply = '';
+      if (typeof data === 'string') {
+        reply = data;
+      } else if (data?.analysis) {
+        reply = data.analysis;
+      } else if (data?.message) {
+        reply = data.message;
+      } else if (data?.text) {
+        reply = data.text;
+      } else if (data?.reply) {
+        reply = data.reply;
+      } else if (data?.response) {
+        reply = data.response;
+      } else {
+        reply = JSON.stringify(data, null, 2);
+      }
+      
+      if (reply && reply !== '{}') {
         setMessages(prev => [...prev, { role: 'saqr', text: reply }]);
       } else {
-        setMessages(prev => [...prev, { role: 'saqr', text: 'عذراً، لم أتمكن من تحليل المنتج. حاول مرة أخرى.' }]);
+        setMessages(prev => [...prev, { role: 'saqr', text: 'عذراً، لم أتمكن من تحليل المنتج. تأكد من الكود أو الاسم وحاول مرة أخرى.' }]);
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || 'صار عندي خلل فني بسيط، حاول مرة ثانية عيوني.';
+      console.error('Error in sendToSaqr:', err);
+      console.error('Error response:', err?.response?.data);
+      console.error('Error status:', err?.response?.status);
+      
+      // رسائل خطأ مخصصة حسب نوع الخطأ
+      let errMsg = 'صار عندي خلل فني بسيط، حاول مرة ثانية عيوني.';
+      
+      if (err?.response?.status === 401) {
+        errMsg = 'يبدو أن جلسة الدخول انتهت. الرجاء تسجيل الدخول مرة أخرى.';
+      } else if (err?.response?.status === 404) {
+        errMsg = 'عفواً، خدمة صقر غير متاحة حالياً. الرجاء المحاولة لاحقاً.';
+      } else if (err?.response?.data?.message) {
+        errMsg = err.response.data.message;
+      } else if (err?.message) {
+        errMsg = err.message;
+      }
+      
       setMessages(prev => [...prev, { role: 'saqr', text: errMsg }]);
     } finally {
       setLoading(false);
