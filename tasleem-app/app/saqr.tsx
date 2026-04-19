@@ -29,18 +29,25 @@ export default function SaqrScreen() {
       const { data } = await api.post('/api/saqr/analyze', { identifier: text });
       let reply = data?.analysis || data || '';
       
-      // استخراج الأزرار الديناميكية من الرد
+      // استخراج الأزرار الديناميكية
       const suggestionsIndex = reply.indexOf('اقتراحات:');
       if (suggestionsIndex !== -1) {
         const suggestionsText = reply.substring(suggestionsIndex).replace('اقتراحات:', '').trim();
-        setQuickReplies(suggestionsText.split(',').map((s: string) => s.trim()).slice(0, 3));
+        const buttons = suggestionsText.split(',').map((s: string) => s.trim()).slice(0, 3);
+        if (buttons.length > 0) setQuickReplies(buttons);
         reply = reply.substring(0, suggestionsIndex).trim();
       }
       
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'saqr', text: reply, timestamp: new Date() }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'saqr', text: 'عذراً، حاول مرة ثانية عيوني.', timestamp: new Date() }]);
-    } finally { setLoading(false); }
+    } catch (err: any) {
+      let errorMsg = 'عذراً عيني، صار عندي خلل فني. حاول مرة ثانية.';
+      if (err?.response?.status === 429) errorMsg = '🦅 صقر عليه ضغط حالياً، انتظر دقيقة وحاول مرة ثانية عيوني.';
+      
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'saqr', text: errorMsg, timestamp: new Date() }]);
+    } finally { 
+      setLoading(false); 
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
+    }
   };
 
   return (
@@ -75,7 +82,15 @@ export default function SaqrScreen() {
           )}
           ListFooterComponent={
             <View>
-              {loading && <ActivityIndicator color={PRIMARY} style={{ margin: 10 }} />}
+              {loading && (
+                <View style={styles.typingRow}>
+                  <View style={styles.saqrAvatar}><Text style={styles.saqrEmoji}>🦅</Text></View>
+                  <View style={styles.typingBubble}>
+                    <ActivityIndicator size="small" color={PRIMARY} />
+                    <Text style={styles.typingText}>صقر يحلل...</Text>
+                  </View>
+                </View>
+              )}
               {!loading && (
                 <View style={styles.quickRepliesContainer}>
                   {quickReplies.map((reply, i) => (
@@ -89,7 +104,9 @@ export default function SaqrScreen() {
           }
         />
         <View style={styles.inputRow}>
-          <TouchableOpacity style={styles.sendBtn} onPress={() => sendToSaqr()} disabled={loading}><Ionicons name="send" size={18} color="#fff" /></TouchableOpacity>
+          <TouchableOpacity style={styles.sendBtn} onPress={() => sendToSaqr()} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send" size={18} color="#fff" />}
+          </TouchableOpacity>
           <TextInput style={styles.input} value={input} onChangeText={setInput} placeholder="أرسل كود منتج أو اسمه..." textAlign="right" multiline />
         </View>
       </KeyboardAvoidingView>
@@ -121,6 +138,9 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '80%', padding: 12, borderRadius: 15 },
   bubbleSaqr: { backgroundColor: '#fff', borderBottomLeftRadius: 2 },
   bubbleUser: { backgroundColor: PRIMARY, borderBottomRightRadius: 2 },
+  typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 12, marginLeft: 15 },
+  typingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#e8edf2' },
+  typingText: { fontSize: 12, color: '#64748b' },
   quickRepliesContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', padding: 10 },
   quickReplyBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: PRIMARY, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, margin: 4 },
   quickReplyText: { color: PRIMARY, fontSize: 12 },
