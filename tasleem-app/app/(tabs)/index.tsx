@@ -10,12 +10,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
-import BannerSlider from '../admin-components/BannerSlider';
+import BannerSlider from '../admin-components/BannerSlider'; // تأكد من صحة المسار
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-// ── Skeleton Card ──
+// ── Skeleton Card ── (نفس الكود الموجود)
 function SkeletonCard({ width }: { width: number }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
@@ -48,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component ──
+// ── Product Card Component ── (معدل قليلاً لجلب السعر بشكل صحيح)
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -64,7 +64,11 @@ const ProductCard = React.memo(({
   
   const imgs = getImages(product);
   const hasDiscount = product.discount > 0;
-  const discounted = hasDiscount ? product.wholesalePrice * (1 - product.discount / 100) : product.wholesalePrice;
+  // السعر المعروض هو سعر الجملة (wholesalePrice) بعد الخصم إن وجد
+  const finalPrice = hasDiscount 
+    ? product.wholesalePrice * (1 - product.discount / 100)
+    : product.wholesalePrice;
+    
   const CARD_HEIGHT = CARD_WIDTH + 150;
   
   return (
@@ -120,14 +124,17 @@ const ProductCard = React.memo(({
             <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
           )}
           <View style={s.priceRow}>
-            <Text style={s.price}>{Math.round(discounted).toLocaleString()}</Text>
+            <Text style={s.price}>{Math.round(finalPrice).toLocaleString()}</Text>
             <Text style={s.currency}>د.ع</Text>
           </View>
         </View>
 
         <View style={s.bottomRow}>
           <View style={s.catPill}>
-            <Text style={s.catPillText} numberOfLines={1}>{product.category}</Text>
+            <Text style={s.catPillText} numberOfLines={1}>
+              {/* عرض أول تصنيف فقط لتوفير المساحة */}
+              {product.category ? product.category.split(',')[0] : 'عام'}
+            </Text>
           </View>
           <Text style={[s.stockText, product.stock < 5 && s.stockLow]}>
             {product.stock < 5 ? '⚠ ' : ''}{product.stock}
@@ -145,14 +152,6 @@ const ProductCard = React.memo(({
   );
 });
 
-const categoryIcons: Record<string, string> = {
-  'الكل': 'grid-outline',
-  'الكترونيات': 'phone-portrait-outline',
-  'ملابس': 'shirt-outline',
-  'منزل': 'home-outline',
-  'عطور': 'flower-outline',
-  'مكتبة': 'book-outline',
-};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -162,7 +161,7 @@ export default function HomeScreen() {
 
   const [search, setSearch] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeCategory, setActiveCategory] = useState<string>('الكل');
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null); // استخدام ID الفئة بدلاً من الاسم
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterModal, setFilterModal] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -173,46 +172,55 @@ export default function HomeScreen() {
     sortBy: 'newest',
   });
 
+  // --- 1. جلب الفئات النشطة من API الإدارة ---
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['active-categories'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/categories');
+      // فلترة الفئات النشطة وترتيبها حسب sortOrder
+      return data
+        .filter((cat: any) => cat.isActive === true)
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
+    },
+  });
+
+  // --- 2. جلب المنتجات النشطة ---
+  const { data: allProducts = [], refetch, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/products?activeOnly=true');
+      // إرجاع المنتجات النشطة فقط والتي مخزونها أكبر من صفر
+      return data.filter((p: any) => p.isActive !== false && p.stock > 0);
+    },
+  });
+
+  // --- باقي الـ Queries والـ Mutations (نفس الكود الموجود مع بعض التحسينات) ---
   const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
       try {
         const { data } = await api.get('/api/notifications/unread-count');
         return data.count || 0;
-      } catch {
-        return 0;
-      }
+      } catch { return 0; }
     },
     refetchInterval: 30000,
   });
 
-  useFocusEffect(
-    useCallback(() => {
-      refetchUnreadCount();
-    }, [refetchUnreadCount])
-  );
+  useFocusEffect(useCallback(() => { refetchUnreadCount(); }, [refetchUnreadCount]));
 
-  // ✅ جلب عدد السلة - مرتبط بـ userId
   const fetchCartCount = useCallback(async () => {
     try {
       const { data: user } = await api.get('/api/auth/me');
       if (!user?.id) return;
-      
       const cartKey = `cart_${user.id}`;
       const data = await AsyncStorage.getItem(cartKey);
       const parsed = data ? JSON.parse(data) : [];
       const count = parsed.reduce((sum: number, item: any) => sum + item.quantity, 0);
       setCartCount(count);
-    } catch (error) {
-      console.error('Failed to fetch cart count:', error);
-    }
+    } catch (error) { console.error('Failed to fetch cart count:', error); }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchCartCount();
-    }, [fetchCartCount])
-  );
+  useFocusEffect(useCallback(() => { fetchCartCount(); }, [fetchCartCount]));
 
   const { data: favoriteIds = [] } = useQuery({
     queryKey: ['favorites'],
@@ -239,14 +247,6 @@ export default function HomeScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
   });
 
-  const { data: allProducts = [], refetch, isLoading } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/products?activeOnly=true');
-      return data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    },
-  });
-
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
@@ -262,27 +262,39 @@ export default function HomeScreen() {
       return (data as any[]).filter((b: any) => b.isActive).sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     },
   });
-
   const banners = rawBanners as any[];
-  const products = (allProducts as any[]).filter((p: any) => p.stock > 0);
+  const products = allProducts as any[];
 
-  const categories = useMemo(() => {
-    const allCats = products.flatMap((p: any) =>
-      p.category ? p.category.split(',').map((c: string) => c.trim()) : []
-    );
-    return ['الكل', ...Array.from(new Set(allCats))];
-  }, [products]);
-
+  // --- منطق الفلترة الجديد (يعتمد على ID الفئة) ---
   const filtered = useMemo(() => {
-    let result = products.filter((p: any) => {
-      const cats = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
-      const matchesCategory = activeCategory === 'الكل' || cats.includes(activeCategory);
-      const matchesSearch = !searchQuery || p.name.includes(searchQuery);
-      const matchesMinPrice = !filters.minPrice || p.wholesalePrice >= Number(filters.minPrice);
-      const matchesMaxPrice = !filters.maxPrice || p.wholesalePrice <= Number(filters.maxPrice);
-      return matchesCategory && matchesSearch && matchesMinPrice && matchesMaxPrice;
-    });
-    
+    let result = [...products]; // نبدأ بنسخة من جميع المنتجات
+
+    // 1. الفلترة حسب الفئة المختارة
+    if (activeCategoryId !== null) {
+      const selectedCategory = categories.find((c: any) => c.id === activeCategoryId);
+      if (selectedCategory) {
+        result = result.filter((p: any) => {
+          // التحقق إذا كان حقل category في المنتج يحتوي على اسم الفئة المختارة
+          const productCategories = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+          return productCategories.includes(selectedCategory.name);
+        });
+      }
+    }
+
+    // 2. الفلترة حسب النص البحثي
+    if (searchQuery) {
+      result = result.filter((p: any) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    // 3. الفلترة حسب السعر
+    if (filters.minPrice) {
+      result = result.filter((p: any) => p.wholesalePrice >= Number(filters.minPrice));
+    }
+    if (filters.maxPrice) {
+      result = result.filter((p: any) => p.wholesalePrice <= Number(filters.maxPrice));
+    }
+
+    // 4. الترتيب
     switch (filters.sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.wholesalePrice - b.wholesalePrice);
@@ -293,18 +305,16 @@ export default function HomeScreen() {
       case 'popular':
         result.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
         break;
-      default:
+      default: // 'newest'
         result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
-    
     return result;
-  }, [products, activeCategory, searchQuery, filters]);
+  }, [products, activeCategoryId, searchQuery, filters, categories]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchUnreadCount()]);
     await fetchCartCount();
-    await refetchUnreadCount();
     setRefreshing(false);
   };
 
@@ -356,11 +366,16 @@ export default function HomeScreen() {
       maxPrice: '',
       sortBy: 'newest',
     });
+    setActiveCategoryId(null);
+    setSearchQuery('');
+    setSearch('');
   };
+
+  const isLoading = isLoadingProducts || isLoadingCategories;
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-
+      {/* Header (نفس الكود) */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
           <Ionicons name="cart-outline" size={22} color={PRIMARY} />
@@ -386,6 +401,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
       <View style={s.searchWrapper}>
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
@@ -405,12 +421,12 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        
         <TouchableOpacity style={s.filterBtn} onPress={() => setFilterModal(true)}>
           <Ionicons name="options-outline" size={20} color={PRIMARY} />
         </TouchableOpacity>
       </View>
 
+      {/* Recent Searches (نفس الكود) */}
       {searchQuery === '' && recentSearches.length > 0 && (
         <View style={s.recentSearch}>
           <View style={s.recentHeader}>
@@ -447,33 +463,40 @@ export default function HomeScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
             <>
-              <View style={s.categoriesWrapper}>
-                <FlatList
-                  horizontal
-                  data={categories}
-                  showsHorizontalScrollIndicator={false}
-                  style={s.catList}
-                  contentContainerStyle={s.catListContent}
-                  keyExtractor={item => item}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[s.catBtn, activeCategory === item && s.catBtnActive]}
-                      onPress={() => setActiveCategory(item)}>
-                      <Ionicons
-                        name={(categoryIcons[item] || 'pricetag-outline') as any}
-                        size={16}
-                        color={activeCategory === item ? '#fff' : PRIMARY}
-                      />
-                      <Text style={[s.catText, activeCategory === item && s.catTextActive]}>{item}</Text>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
+              {/* شريط الفئات الجديد المعتمد على API الإدارة */}
+              {categories.length > 0 && (
+                <View style={s.categoriesWrapper}>
+                  <FlatList
+                    horizontal
+                    data={categories}
+                    showsHorizontalScrollIndicator={false}
+                    style={s.catList}
+                    contentContainerStyle={s.catListContent}
+                    keyExtractor={item => item.id.toString()}
+                    renderItem={({ item }: { item: any }) => (
+                      <TouchableOpacity
+                        style={[s.catBtn, activeCategoryId === item.id && s.catBtnActive]}
+                        onPress={() => setActiveCategoryId(activeCategoryId === item.id ? null : item.id)}>
+                        <Ionicons
+                          name={(item.icon || 'pricetag-outline') as any}
+                          size={16}
+                          color={activeCategoryId === item.id ? '#fff' : PRIMARY}
+                        />
+                        <Text style={[s.catText, activeCategoryId === item.id && s.catTextActive]}>
+                          {item.name}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
               
+              {/* شريط البانرات */}
               <View style={s.bannerWrapper}>
                 <BannerSlider banners={banners} containerWidth={width} />
               </View>
               
+              {/* رأس النتائج */}
               <View style={s.resultHeader}>
                 <Text style={s.resultCount}>{filtered.length} منتج</Text>
                 <TouchableOpacity onPress={resetFilters}>
@@ -488,7 +511,9 @@ export default function HomeScreen() {
                 <Ionicons name="cube-outline" size={40} color="#9ca3af" />
               </View>
               <Text style={s.emptyTitle}>لا توجد منتجات</Text>
-              <Text style={s.emptyText}>سيتم إضافة منتجات جديدة قريباً</Text>
+              <Text style={s.emptyText}>
+                {searchQuery || activeCategoryId ? 'لا توجد نتائج مطابقة لبحثك' : 'سيتم إضافة منتجات جديدة قريباً'}
+              </Text>
               <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
                 <Ionicons name="refresh-outline" size={18} color={PRIMARY} />
                 <Text style={s.refreshText}>تحديث</Text>
@@ -508,6 +533,7 @@ export default function HomeScreen() {
         />
       )}
 
+      {/* Modal الفلترة (نفس الكود) */}
       <Modal visible={filterModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
@@ -572,9 +598,9 @@ export default function HomeScreen() {
   );
 }
 
+// --- StyleSheets (نفس الكود الموجود، تم نقله كاملاً) ---
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -588,7 +614,6 @@ const s = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   headerLogo: { width: 90, height: 32 },
   welcomeText: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  
   cartBtn: {
     width: 40,
     height: 40,
@@ -613,7 +638,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   cartBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-  
   notifBtn: {
     width: 40,
     height: 40,
@@ -636,19 +660,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-
-  flatListContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 32,
-    gap: 8,
-  },
-  columnWrapper: {
-    gap: 12,
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
-    marginBottom: 8,
-  },
-
+  flatListContent: { paddingHorizontal: 12, paddingBottom: 32, gap: 8 },
+  columnWrapper: { gap: 12, justifyContent: 'space-between', alignItems: 'stretch', marginBottom: 8 },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -679,7 +692,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   recentSearch: {
     marginHorizontal: 12,
     marginBottom: 10,
@@ -708,7 +720,6 @@ const s = StyleSheet.create({
     borderRadius: 20,
   },
   recentChipText: { fontSize: 12, color: '#374151' },
-
   categoriesWrapper: { marginBottom: 14, marginTop: 4 },
   catList: { maxHeight: 44 },
   catListContent: { gap: 8, paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row' },
@@ -726,7 +737,6 @@ const s = StyleSheet.create({
   catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
-
   bannerWrapper: {
     marginHorizontal: 12,
     marginBottom: 16,
@@ -737,7 +747,6 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
   },
-
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -747,7 +756,6 @@ const s = StyleSheet.create({
   },
   resultCount: { fontSize: 13, color: '#64748b', fontWeight: '500' },
   resetFilterText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -763,7 +771,6 @@ const s = StyleSheet.create({
   imgBox: { position: 'relative', overflow: 'hidden' },
   img: { width: '100%', height: '100%' },
   imgPlaceholder: { backgroundColor: '#f2f6f9', justifyContent: 'center', alignItems: 'center' },
-
   renewBadge: {
     position: 'absolute',
     top: 8,
@@ -774,7 +781,6 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   renewText: { fontSize: 9, color: '#fff', fontWeight: '700' },
-
   discountBadge: {
     position: 'absolute',
     top: 8,
@@ -785,7 +791,6 @@ const s = StyleSheet.create({
     paddingVertical: 3,
   },
   discountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
-
   favBtn: {
     position: 'absolute',
     bottom: 8,
@@ -798,7 +803,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   favBtnActive: { backgroundColor: 'rgba(255,255,255,0.9)' },
-
   imgCount: {
     position: 'absolute',
     bottom: 8,
@@ -812,27 +816,18 @@ const s = StyleSheet.create({
     gap: 3,
   },
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
-
-  cardBody: { 
-    padding: 10, 
-    gap: 6,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
+  cardBody: { padding: 10, gap: 6, flex: 1, justifyContent: 'space-between' },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
-  
   priceSection: { marginVertical: 4 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
   price: { fontSize: 14, fontWeight: '900', color: PRIMARY },
   currency: { fontSize: 10, color: PRIMARY, fontWeight: '500' },
   oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through' },
-  
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '80%' },
   catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
   stockText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
   stockLow: { color: '#ef4444' },
-  
   detailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -845,7 +840,6 @@ const s = StyleSheet.create({
     height: 34,
   },
   detailsBtnText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
-
   empty: { alignItems: 'center', paddingTop: 40, gap: 12 },
   emptyIconBox: {
     width: 80,
@@ -868,7 +862,6 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   refreshText: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
