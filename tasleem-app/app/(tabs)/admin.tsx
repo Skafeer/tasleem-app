@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
+
 import ProductsTab    from '../admin-components/ProductsTab';
 import OrdersTab      from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
@@ -17,6 +18,7 @@ import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
 import AdminsTab      from '../admin-components/AdminsTab';
 import SupportTab     from '../admin-components/SupportTab';
+import CategoriesTab  from '../admin-components/CategoriesTab'; // ✅ تمت الإضافة
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
@@ -29,6 +31,7 @@ const TABS = [
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
+  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',           activeIcon: 'grid' }, // ✅ تمت الإضافة
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', activeIcon: 'notifications' },
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',    activeIcon: 'shield-half' },
   { key: 'support',     label: 'الدعم',     icon: 'headset-outline',        activeIcon: 'headset' },
@@ -96,6 +99,7 @@ export default function AdminScreen() {
   };
 
   const isSuperAdmin = (user as any)?.is_super_admin || (user as any)?.isSuperAdmin || false;
+
   let userPermissions: string[] = [];
   try {
     userPermissions = JSON.parse((user as any)?.permissions || '[]');
@@ -125,7 +129,6 @@ export default function AdminScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
 
-      {/* ── Header (بدون تدرج) ── */}
       <View style={s.header}>
         <View style={s.headerTop}>
           <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
@@ -142,11 +145,7 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        {/* ── التبويبات ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.tabsContent}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsContent}>
           {visibleTabs.map(t => {
             const isActive = tab === t.key;
             const badge = getBadge(t.key);
@@ -174,13 +173,11 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
 
-      {/* ── عنوان القسم الحالي ── */}
       <View style={s.sectionBar}>
         <Ionicons name={currentTab?.activeIcon as any} size={16} color={PRIMARY} />
         <Text style={s.sectionBarText}>{currentTab?.label}</Text>
       </View>
 
-      {/* ── المحتوى ── */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 50 }}
@@ -196,6 +193,7 @@ export default function AdminScreen() {
         {tab === 'promos' && <PromosTab />}
         {tab === 'banners' && <BannersTab />}
         {tab === 'stats' && <StatsTab />}
+        {tab === 'categories' && <CategoriesTab />} {/* ✅ أهم سطر */}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'admins' && <AdminsTab />}
         {tab === 'support' && <SupportTab />}
@@ -208,7 +206,6 @@ export default function AdminScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  // ── Header (بدون تدرج) ──
   header: {
     backgroundColor: '#fff',
     paddingBottom: 12,
@@ -224,16 +221,9 @@ const s = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitleWrap: { alignItems: 'center' },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  headerSub: {
-    fontSize: 11,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  headerSub: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+
   headerBadge: {
     width: 40,
     height: 40,
@@ -244,6 +234,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   refreshBtn: {
     width: 40,
     height: 40,
@@ -255,12 +246,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── التبويبات ──
   tabsContent: {
     paddingHorizontal: 16,
     gap: 8,
     alignItems: 'center',
   },
+
   tabBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -272,38 +263,44 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
   },
+
   tabBtnActive: {
     backgroundColor: PRIMARY + '12',
     borderColor: PRIMARY,
   },
+
   tabText: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '600',
   },
+
   tabTextActive: {
     color: PRIMARY,
     fontWeight: '700',
   },
+
   tabBadge: {
     backgroundColor: '#e5e7eb',
     borderRadius: 8,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
+
   tabBadgeActive: {
     backgroundColor: PRIMARY,
   },
+
   tabBadgeText: {
     fontSize: 10,
     color: '#6b7280',
     fontWeight: 'bold',
   },
+
   tabBadgeTextActive: {
     color: '#fff',
   },
 
-  // ── شريط القسم ──
   sectionBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,6 +311,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
   },
+
   sectionBarText: {
     fontSize: 14,
     fontWeight: '700',

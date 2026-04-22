@@ -22,6 +22,7 @@ const ALL_PERMISSIONS = [
   { key: 'promos', label: 'الأكواد', icon: 'pricetag-outline' },
   { key: 'banners', label: 'البنرات', icon: 'images-outline' },
   { key: 'stats', label: 'الإحصائيات', icon: 'bar-chart-outline' },
+  { key: 'categories', label: 'الفئات', icon: 'grid-outline' },
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline' },
 ];
 
