@@ -10,12 +10,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../src/lib/api';
-import BannerSlider from '../admin-components/BannerSlider'; // تأكد من صحة المسار
+import BannerSlider from '../admin-components/BannerSlider';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-// ── Skeleton Card ── (نفس الكود الموجود)
+// ── Skeleton Card ──
 function SkeletonCard({ width }: { width: number }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
@@ -48,7 +48,7 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component ── (معدل قليلاً لجلب السعر بشكل صحيح)
+// ── Product Card Component ──
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
@@ -64,7 +64,6 @@ const ProductCard = React.memo(({
   
   const imgs = getImages(product);
   const hasDiscount = product.discount > 0;
-  // السعر المعروض هو سعر الجملة (wholesalePrice) بعد الخصم إن وجد
   const finalPrice = hasDiscount 
     ? product.wholesalePrice * (1 - product.discount / 100)
     : product.wholesalePrice;
@@ -132,7 +131,6 @@ const ProductCard = React.memo(({
         <View style={s.bottomRow}>
           <View style={s.catPill}>
             <Text style={s.catPillText} numberOfLines={1}>
-              {/* عرض أول تصنيف فقط لتوفير المساحة */}
               {product.category ? product.category.split(',')[0] : 'عام'}
             </Text>
           </View>
@@ -152,7 +150,6 @@ const ProductCard = React.memo(({
   );
 });
 
-
 export default function HomeScreen() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -161,7 +158,7 @@ export default function HomeScreen() {
 
   const [search, setSearch] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null); // استخدام ID الفئة بدلاً من الاسم
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null); // null = "الكل"
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterModal, setFilterModal] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -172,12 +169,12 @@ export default function HomeScreen() {
     sortBy: 'newest',
   });
 
-  // --- 1. جلب الفئات النشطة من API الإدارة ---
+  // --- 1. جلب الفئات النشطة فقط من API الإدارة ---
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['active-categories'],
     queryFn: async () => {
       const { data } = await api.get('/api/categories');
-      // فلترة الفئات النشطة وترتيبها حسب sortOrder
+      // ✅ فقط الفئات النشطة (isActive === true)
       return data
         .filter((cat: any) => cat.isActive === true)
         .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
@@ -189,12 +186,12 @@ export default function HomeScreen() {
     queryKey: ['products'],
     queryFn: async () => {
       const { data } = await api.get('/api/products?activeOnly=true');
-      // إرجاع المنتجات النشطة فقط والتي مخزونها أكبر من صفر
+      // ✅ المنتجات النشطة فقط والمخزون أكبر من صفر
       return data.filter((p: any) => p.isActive !== false && p.stock > 0);
     },
   });
 
-  // --- باقي الـ Queries والـ Mutations (نفس الكود الموجود مع بعض التحسينات) ---
+  // --- باقي الـ Queries والـ Mutations ---
   const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
@@ -265,16 +262,16 @@ export default function HomeScreen() {
   const banners = rawBanners as any[];
   const products = allProducts as any[];
 
-  // --- منطق الفلترة الجديد (يعتمد على ID الفئة) ---
+  // --- منطق الفلترة الجديد ---
   const filtered = useMemo(() => {
-    let result = [...products]; // نبدأ بنسخة من جميع المنتجات
+    let result = [...products];
 
     // 1. الفلترة حسب الفئة المختارة
+    // ✅ null = "الكل" -> نعرض جميع المنتجات
     if (activeCategoryId !== null) {
       const selectedCategory = categories.find((c: any) => c.id === activeCategoryId);
       if (selectedCategory) {
         result = result.filter((p: any) => {
-          // التحقق إذا كان حقل category في المنتج يحتوي على اسم الفئة المختارة
           const productCategories = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
           return productCategories.includes(selectedCategory.name);
         });
@@ -305,7 +302,7 @@ export default function HomeScreen() {
       case 'popular':
         result.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
         break;
-      default: // 'newest'
+      default:
         result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return result;
@@ -366,16 +363,24 @@ export default function HomeScreen() {
       maxPrice: '',
       sortBy: 'newest',
     });
-    setActiveCategoryId(null);
+    setActiveCategoryId(null); // العودة إلى "الكل"
     setSearchQuery('');
     setSearch('');
   };
 
   const isLoading = isLoadingProducts || isLoadingCategories;
 
+  // ✅ بناء قائمة الفئات المعروضة (مع إضافة "الكل" في البداية)
+  const displayCategories = useMemo(() => {
+    return [
+      { id: null, name: 'الكل', icon: 'grid-outline' }, // فئة "الكل" المخصصة
+      ...categories
+    ];
+  }, [categories]);
+
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-      {/* Header (نفس الكود) */}
+      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
           <Ionicons name="cart-outline" size={22} color={PRIMARY} />
@@ -426,7 +431,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Recent Searches (نفس الكود) */}
+      {/* Recent Searches */}
       {searchQuery === '' && recentSearches.length > 0 && (
         <View style={s.recentSearch}>
           <View style={s.recentHeader}>
@@ -463,16 +468,16 @@ export default function HomeScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
             <>
-              {/* شريط الفئات الجديد المعتمد على API الإدارة */}
-              {categories.length > 0 && (
+              {/* ✅ شريط الفئات مع إضافة "الكل" في البداية */}
+              {displayCategories.length > 0 && (
                 <View style={s.categoriesWrapper}>
                   <FlatList
                     horizontal
-                    data={categories}
+                    data={displayCategories}
                     showsHorizontalScrollIndicator={false}
                     style={s.catList}
                     contentContainerStyle={s.catListContent}
-                    keyExtractor={item => item.id.toString()}
+                    keyExtractor={item => item.id?.toString() || 'all'}
                     renderItem={({ item }: { item: any }) => (
                       <TouchableOpacity
                         style={[s.catBtn, activeCategoryId === item.id && s.catBtnActive]}
@@ -533,7 +538,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Modal الفلترة (نفس الكود) */}
+      {/* Modal الفلترة */}
       <Modal visible={filterModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
@@ -598,7 +603,7 @@ export default function HomeScreen() {
   );
 }
 
-// --- StyleSheets (نفس الكود الموجود، تم نقله كاملاً) ---
+// --- StyleSheets (نفس الكود الموجود) ---
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   header: {
