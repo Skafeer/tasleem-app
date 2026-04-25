@@ -181,6 +181,18 @@ export default function HomeScreen() {
     },
   });
 
+  // --- 1b. جلب الأكثر مبيعاً ⭐ ---
+  const { data: bestSellerIds = [] } = useQuery({
+    queryKey: ['best-sellers-ids'],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/api/categories/best-sellers');
+        return (data as any[]).map((p: any) => p.id) as number[];
+      } catch { return [] as number[]; }
+    },
+    staleTime: 5 * 60 * 1000, // 5 دقائق
+  });
+
   // --- 2. جلب المنتجات النشطة ---
   const { data: allProducts = [], refetch, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
@@ -267,8 +279,12 @@ export default function HomeScreen() {
     let result = [...products];
 
     // 1. الفلترة حسب الفئة المختارة
-    // ✅ null = "الكل" -> نعرض جميع المنتجات
-    if (activeCategoryId !== null) {
+    if (activeCategoryId === -1) {
+      // ✅ "الأكثر مبيعاً" — فقط المنتجات ذات المبيعات العالية
+      const bsIds = new Set(bestSellerIds as number[]);
+      result = result.filter((p: any) => bsIds.has(p.id));
+    } else if (activeCategoryId !== null) {
+      // ✅ فئة عادية من الـ API
       const selectedCategory = categories.find((c: any) => c.id === activeCategoryId);
       if (selectedCategory) {
         result = result.filter((p: any) => {
@@ -372,11 +388,13 @@ export default function HomeScreen() {
 
   // ✅ بناء قائمة الفئات المعروضة (مع إضافة "الكل" في البداية)
   const displayCategories = useMemo(() => {
+    const hasBestSellers = (bestSellerIds as number[]).length > 0;
     return [
-      { id: null, name: 'الكل', icon: 'grid-outline' }, // فئة "الكل" المخصصة
+      { id: null,         name: 'الكل',          icon: 'grid-outline'  },
+      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً ⭐', icon: 'flame-outline' }] : []),
       ...categories
     ];
-  }, [categories]);
+  }, [categories, bestSellerIds]);
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
