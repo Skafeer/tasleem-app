@@ -195,7 +195,7 @@ export default function CheckoutScreen() {
   const discount = (sellingTotal * promoDiscount) / 100;
   const shipping = province === 'البصرة' ? 3000 : 5000;
   const total = sellingTotal - discount + shipping;
-  const profit = sellingTotal - costTotal - discount;
+  const profit = sellingTotal - costTotal;
 
   if (loading || userLoading) {
     return (
