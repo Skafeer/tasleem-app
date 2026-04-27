@@ -192,7 +192,7 @@ export default function CheckoutScreen() {
 
   const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
   const costTotal = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
-  const discount = Math.round((sellingTotal * promoDiscount) / 100);
+  const discount = Math.floor((sellingTotal * promoDiscount) / 100);
   const shipping = province === 'البصرة' ? 3000 : 5000;
   const total = sellingTotal - discount + shipping;
   const profit = sellingTotal - costTotal;
