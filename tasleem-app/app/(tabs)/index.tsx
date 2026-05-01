@@ -68,7 +68,6 @@ const ProductCard = React.memo(({
     ? product.wholesalePrice * (1 - product.discount / 100)
     : product.wholesalePrice;
   
-  // ✅ ارتفاع ثابت لجميع البطاقات لضمان التوحيد
   const CARD_HEIGHT = CARD_WIDTH + 155;
   
   return (
@@ -119,13 +118,11 @@ const ProductCard = React.memo(({
       <View style={s.cardBody}>
         <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
 
-        {/* ✅ قسم السعر بدون ارتفاع ثابت */}
         <View style={s.priceSection}>
           <View style={s.priceRow}>
             <Text style={s.price}>{Math.round(finalPrice).toLocaleString()}</Text>
             <Text style={s.currency}>د.ع</Text>
           </View>
-          {/* ✅ عرض السعر القديم فقط عند وجود خصم */}
           {hasDiscount && (
             <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
           )}
@@ -386,232 +383,234 @@ export default function HomeScreen() {
   }, [categories, bestSellerIds]);
 
   return (
-    <SafeAreaView style={s.container} edges={['bottom']}>
-      {/* ✅ معالجة شريط الإشعارات */}
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
-      
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
-          <Ionicons name="cart-outline" size={22} color={PRIMARY} />
-          {cartCount > 0 && (
-            <View style={s.cartBadge}>
-              <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+    <View style={s.container}>
+      <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
+        
+        {/* Header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
+            <Ionicons name="cart-outline" size={22} color={PRIMARY} />
+            {cartCount > 0 && (
+              <View style={s.cartBadge}>
+                <Text style={s.cartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <View style={s.headerCenter}>
-          <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
-          <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
-        </View>
-
-        <TouchableOpacity onPress={() => router.push('/notification')} style={s.notifBtn}>
-          <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
-          {unreadCount > 0 && (
-            <View style={s.notifBadge}>
-              <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={s.searchWrapper}>
-        <View style={s.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9ca3af" />
-          <TextInput
-            style={s.searchInput}
-            placeholder="ابحث عن منتج..."
-            value={search}
-            onChangeText={setSearch}
-            placeholderTextColor="#9ca3af"
-            textAlign="right"
-            returnKeyType="search"
-            onSubmitEditing={performSearch}
-          />
-          {search ? (
-            <TouchableOpacity onPress={clearSearch}>
-              <Ionicons name="close-circle" size={18} color="#9ca3af" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <TouchableOpacity style={s.filterBtn} onPress={() => setFilterModal(true)}>
-          <Ionicons name="options-outline" size={20} color={PRIMARY} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Recent Searches */}
-      {searchQuery === '' && recentSearches.length > 0 && (
-        <View style={s.recentSearch}>
-          <View style={s.recentHeader}>
-            <Text style={s.recentTitle}>عمليات البحث الأخيرة</Text>
-            <TouchableOpacity onPress={() => setRecentSearches([])}>
-              <Text style={s.clearRecentText}>مسح الكل</Text>
-            </TouchableOpacity>
+          <View style={s.headerCenter}>
+            <Image source={require('../../assets/logo.png')} style={s.headerLogo} resizeMode="contain" />
+            <Text style={s.welcomeText}>مرحباً {user?.storeName || 'تاجر'} 👋</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.recentList}>
-            {recentSearches.map(term => (
-              <TouchableOpacity key={term} style={s.recentChip} onPress={() => handleRecentSearchPress(term)}>
-                <Text style={s.recentChipText}>{term}</Text>
-                <TouchableOpacity onPress={() => clearRecentSearch(term)}>
-                  <Ionicons name="close-circle" size={14} color="#9ca3af" />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
 
-      {isLoading ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 12, paddingTop: 12 }}>
-          {[...Array(6)].map((_, i) => <SkeletonCard key={i} width={CARD_WIDTH} />)}
+          <TouchableOpacity onPress={() => router.push('/notification')} style={s.notifBtn}>
+            <Ionicons name="notifications-outline" size={22} color={PRIMARY} />
+            {unreadCount > 0 && (
+              <View style={s.notifBadge}>
+                <Text style={s.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          numColumns={2}
-          keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
-          contentContainerStyle={s.flatListContent}
-          columnWrapperStyle={s.columnWrapper}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
-          ListHeaderComponent={
-            <>
-              {displayCategories.length > 0 && (
-                <View style={s.categoriesWrapper}>
-                  <FlatList
-                    horizontal
-                    data={displayCategories}
-                    showsHorizontalScrollIndicator={false}
-                    style={s.catList}
-                    contentContainerStyle={s.catListContent}
-                    keyExtractor={item => item.id?.toString() || 'all'}
-                    renderItem={({ item }: { item: any }) => (
-                      <TouchableOpacity
-                        style={[s.catBtn, activeCategoryId === item.id && s.catBtnActive]}
-                        onPress={() => setActiveCategoryId(activeCategoryId === item.id ? null : item.id)}>
-                        <Ionicons
-                          name={(item.icon || 'pricetag-outline') as any}
-                          size={16}
-                          color={activeCategoryId === item.id ? '#fff' : PRIMARY}
-                        />
-                        <Text style={[s.catText, activeCategoryId === item.id && s.catTextActive]}>
-                          {item.name}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              )}
-              
-              <View style={s.bannerWrapper}>
-                <BannerSlider banners={banners} containerWidth={width} />
-              </View>
-              
-              <View style={s.resultHeader}>
-                <Text style={s.resultCount}>{filtered.length} منتج</Text>
-                <TouchableOpacity onPress={resetFilters}>
-                  <Text style={s.resetFilterText}>إعادة تعيين</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          }
-          ListEmptyComponent={
-            <View style={s.empty}>
-              <View style={s.emptyIconBox}>
-                <Ionicons name="cube-outline" size={40} color="#9ca3af" />
-              </View>
-              <Text style={s.emptyTitle}>لا توجد منتجات</Text>
-              <Text style={s.emptyText}>
-                {searchQuery || activeCategoryId ? 'لا توجد نتائج مطابقة لبحثك' : 'سيتم إضافة منتجات جديدة قريباً'}
-              </Text>
-              <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
-                <Ionicons name="refresh-outline" size={18} color={PRIMARY} />
-                <Text style={s.refreshText}>تحديث</Text>
-              </TouchableOpacity>
-            </View>
-          }
-          renderItem={({ item: p }) => (
-            <ProductCard
-              product={p}
-              isFav={(favoriteIds as number[]).includes(p.id)}
-              CARD_WIDTH={CARD_WIDTH}
-              onPress={handleProductPress}
-              onToggleFav={handleToggleFav}
-              onViewDetails={handleViewDetails}
+
+        {/* Search Bar */}
+        <View style={s.searchWrapper}>
+          <View style={s.searchBox}>
+            <Ionicons name="search-outline" size={18} color="#9ca3af" />
+            <TextInput
+              style={s.searchInput}
+              placeholder="ابحث عن منتج..."
+              value={search}
+              onChangeText={setSearch}
+              placeholderTextColor="#9ca3af"
+              textAlign="right"
+              returnKeyType="search"
+              onSubmitEditing={performSearch}
             />
-          )}
-        />
-      )}
+            {search ? (
+              <TouchableOpacity onPress={clearSearch}>
+                <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <TouchableOpacity style={s.filterBtn} onPress={() => setFilterModal(true)}>
+            <Ionicons name="options-outline" size={20} color={PRIMARY} />
+          </TouchableOpacity>
+        </View>
 
-      {/* Modal الفلترة */}
-      <Modal visible={filterModal} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <View style={s.modalContent}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>فلترة المنتجات</Text>
-              <TouchableOpacity onPress={() => setFilterModal(false)}>
-                <Ionicons name="close" size={24} color="#64748b" />
+        {/* Recent Searches */}
+        {searchQuery === '' && recentSearches.length > 0 && (
+          <View style={s.recentSearch}>
+            <View style={s.recentHeader}>
+              <Text style={s.recentTitle}>عمليات البحث الأخيرة</Text>
+              <TouchableOpacity onPress={() => setRecentSearches([])}>
+                <Text style={s.clearRecentText}>مسح الكل</Text>
               </TouchableOpacity>
             </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={s.filterLabel}>نطاق السعر (د.ع)</Text>
-              <View style={s.priceRange}>
-                <TextInput
-                  style={s.priceInput}
-                  placeholder="من"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="numeric"
-                  value={filters.minPrice}
-                  onChangeText={(text) => setFilters(prev => ({ ...prev, minPrice: text }))}
-                />
-                <Text style={s.priceDash}>-</Text>
-                <TextInput
-                  style={s.priceInput}
-                  placeholder="إلى"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="numeric"
-                  value={filters.maxPrice}
-                  onChangeText={(text) => setFilters(prev => ({ ...prev, maxPrice: text }))}
-                />
-              </View>
-
-              <Text style={s.filterLabel}>ترتيب حسب</Text>
-              {[
-                { id: 'newest', label: 'الأحدث' },
-                { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
-                { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
-                { id: 'popular', label: 'الأكثر شهرة' },
-              ].map(option => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={s.sortOption}
-                  onPress={() => setFilters(prev => ({ ...prev, sortBy: option.id }))}>
-                  <View style={[s.radioCircle, filters.sortBy === option.id && s.radioSelected]} />
-                  <Text style={s.sortText}>{option.label}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.recentList}>
+              {recentSearches.map(term => (
+                <TouchableOpacity key={term} style={s.recentChip} onPress={() => handleRecentSearchPress(term)}>
+                  <Text style={s.recentChipText}>{term}</Text>
+                  <TouchableOpacity onPress={() => clearRecentSearch(term)}>
+                    <Ionicons name="close-circle" size={14} color="#9ca3af" />
+                  </TouchableOpacity>
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        )}
 
-            <View style={s.modalFooter}>
-              <TouchableOpacity style={s.resetFilterBtn} onPress={resetFilters}>
-                <Text style={s.resetFilterBtnText}>إعادة تعيين</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.applyFilterBtn} onPress={applyFilters}>
-                <Text style={s.applyFilterText}>تطبيق الفلتر</Text>
-              </TouchableOpacity>
+        {isLoading ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 12, paddingTop: 12 }}>
+            {[...Array(6)].map((_, i) => <SkeletonCard key={i} width={CARD_WIDTH} />)}
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            numColumns={2}
+            keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
+            contentContainerStyle={s.flatListContent}
+            columnWrapperStyle={s.columnWrapper}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
+            ListHeaderComponent={
+              <>
+                {displayCategories.length > 0 && (
+                  <View style={s.categoriesWrapper}>
+                    <FlatList
+                      horizontal
+                      data={displayCategories}
+                      showsHorizontalScrollIndicator={false}
+                      style={s.catList}
+                      contentContainerStyle={s.catListContent}
+                      keyExtractor={item => item.id?.toString() || 'all'}
+                      renderItem={({ item }: { item: any }) => (
+                        <TouchableOpacity
+                          style={[s.catBtn, activeCategoryId === item.id && s.catBtnActive]}
+                          onPress={() => setActiveCategoryId(activeCategoryId === item.id ? null : item.id)}>
+                          <Ionicons
+                            name={(item.icon || 'pricetag-outline') as any}
+                            size={16}
+                            color={activeCategoryId === item.id ? '#fff' : PRIMARY}
+                          />
+                          <Text style={[s.catText, activeCategoryId === item.id && s.catTextActive]}>
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    />
+                  </View>
+                )}
+                
+                <View style={s.bannerWrapper}>
+                  <BannerSlider banners={banners} containerWidth={width} />
+                </View>
+                
+                <View style={s.resultHeader}>
+                  <Text style={s.resultCount}>{filtered.length} منتج</Text>
+                  <TouchableOpacity onPress={resetFilters}>
+                    <Text style={s.resetFilterText}>إعادة تعيين</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            }
+            ListEmptyComponent={
+              <View style={s.empty}>
+                <View style={s.emptyIconBox}>
+                  <Ionicons name="cube-outline" size={40} color="#9ca3af" />
+                </View>
+                <Text style={s.emptyTitle}>لا توجد منتجات</Text>
+                <Text style={s.emptyText}>
+                  {searchQuery || activeCategoryId ? 'لا توجد نتائج مطابقة لبحثك' : 'سيتم إضافة منتجات جديدة قريباً'}
+                </Text>
+                <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
+                  <Ionicons name="refresh-outline" size={18} color={PRIMARY} />
+                  <Text style={s.refreshText}>تحديث</Text>
+                </TouchableOpacity>
+              </View>
+            }
+            renderItem={({ item: p }) => (
+              <ProductCard
+                product={p}
+                isFav={(favoriteIds as number[]).includes(p.id)}
+                CARD_WIDTH={CARD_WIDTH}
+                onPress={handleProductPress}
+                onToggleFav={handleToggleFav}
+                onViewDetails={handleViewDetails}
+              />
+            )}
+          />
+        )}
+
+        {/* Modal الفلترة */}
+        <Modal visible={filterModal} animationType="slide" transparent>
+          <View style={s.modalOverlay}>
+            <View style={s.modalContent}>
+              <View style={s.modalHeader}>
+                <Text style={s.modalTitle}>فلترة المنتجات</Text>
+                <TouchableOpacity onPress={() => setFilterModal(false)}>
+                  <Ionicons name="close" size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={s.filterLabel}>نطاق السعر (د.ع)</Text>
+                <View style={s.priceRange}>
+                  <TextInput
+                    style={s.priceInput}
+                    placeholder="من"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="numeric"
+                    value={filters.minPrice}
+                    onChangeText={(text) => setFilters(prev => ({ ...prev, minPrice: text }))}
+                  />
+                  <Text style={s.priceDash}>-</Text>
+                  <TextInput
+                    style={s.priceInput}
+                    placeholder="إلى"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="numeric"
+                    value={filters.maxPrice}
+                    onChangeText={(text) => setFilters(prev => ({ ...prev, maxPrice: text }))}
+                  />
+                </View>
+
+                <Text style={s.filterLabel}>ترتيب حسب</Text>
+                {[
+                  { id: 'newest', label: 'الأحدث' },
+                  { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
+                  { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
+                  { id: 'popular', label: 'الأكثر شهرة' },
+                ].map(option => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={s.sortOption}
+                    onPress={() => setFilters(prev => ({ ...prev, sortBy: option.id }))}>
+                    <View style={[s.radioCircle, filters.sortBy === option.id && s.radioSelected]} />
+                    <Text style={s.sortText}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={s.modalFooter}>
+                <TouchableOpacity style={s.resetFilterBtn} onPress={resetFilters}>
+                  <Text style={s.resetFilterBtnText}>إعادة تعيين</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.applyFilterBtn} onPress={applyFilters}>
+                  <Text style={s.applyFilterText}>تطبيق الفلتر</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
