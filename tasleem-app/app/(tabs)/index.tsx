@@ -68,7 +68,8 @@ const ProductCard = React.memo(({
     ? product.wholesalePrice * (1 - product.discount / 100)
     : product.wholesalePrice;
     
-  const CARD_HEIGHT = CARD_WIDTH + 150;
+  // ✅ حساب الارتفاع ديناميكياً أو استخدام ارتفاع ثابت أكبر قليلاً لاستيعاب الـ oldPrice
+  const CARD_HEIGHT = CARD_WIDTH + 155; // زيادة 5px لاستيعاب التباين
   
   return (
     <TouchableOpacity
@@ -118,15 +119,15 @@ const ProductCard = React.memo(({
       <View style={s.cardBody}>
         <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
 
+        {/* ✅ إزالة الارتفاع الثابت من priceSection وجعل المحتوى يتدفق طبيعياً */}
         <View style={s.priceSection}>
           <View style={s.priceRow}>
             <Text style={s.price}>{Math.round(finalPrice).toLocaleString()}</Text>
             <Text style={s.currency}>د.ع</Text>
           </View>
-          {hasDiscount ? (
+          {/* ✅ عرض oldPrice فقط عند وجود خصم، بدون مساحة فارغة */}
+          {hasDiscount && (
             <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
-          ) : (
-            <Text style={[s.oldPrice, { opacity: 0 }]}>0 د.ع</Text>
           )}
         </View>
 
@@ -160,7 +161,7 @@ export default function HomeScreen() {
 
   const [search, setSearch] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null); // null = "الكل"
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [filterModal, setFilterModal] = useState<boolean>(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -171,19 +172,16 @@ export default function HomeScreen() {
     sortBy: 'newest',
   });
 
-  // --- 1. جلب الفئات النشطة فقط من API الإدارة ---
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['active-categories'],
     queryFn: async () => {
       const { data } = await api.get('/api/categories');
-      // ✅ فقط الفئات النشطة (isActive === true)
       return data
         .filter((cat: any) => cat.isActive === true)
         .sort((a: any, b: any) => a.sortOrder - b.sortOrder);
     },
   });
 
-  // --- 1b. جلب الأكثر مبيعاً ⭐ ---
   const { data: bestSellerIds = [] } = useQuery({
     queryKey: ['best-sellers-ids'],
     queryFn: async () => {
@@ -192,20 +190,17 @@ export default function HomeScreen() {
         return (data as any[]).map((p: any) => p.id) as number[];
       } catch { return [] as number[]; }
     },
-    staleTime: 5 * 60 * 1000, // 5 دقائق
+    staleTime: 5 * 60 * 1000,
   });
 
-  // --- 2. جلب المنتجات النشطة ---
   const { data: allProducts = [], refetch, isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
       const { data } = await api.get('/api/products?activeOnly=true');
-      // ✅ المنتجات النشطة فقط والمخزون أكبر من صفر
       return data.filter((p: any) => p.isActive !== false && p.stock > 0);
     },
   });
 
-  // --- باقي الـ Queries والـ Mutations ---
   const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
@@ -276,17 +271,13 @@ export default function HomeScreen() {
   const banners = rawBanners as any[];
   const products = allProducts as any[];
 
-  // --- منطق الفلترة الجديد ---
   const filtered = useMemo(() => {
     let result = [...products];
 
-    // 1. الفلترة حسب الفئة المختارة
     if (activeCategoryId === -1) {
-      // ✅ "الأكثر مبيعاً" — فقط المنتجات ذات المبيعات العالية
       const bsIds = new Set(bestSellerIds as number[]);
       result = result.filter((p: any) => bsIds.has(p.id));
     } else if (activeCategoryId !== null) {
-      // ✅ فئة عادية من الـ API
       const selectedCategory = categories.find((c: any) => c.id === activeCategoryId);
       if (selectedCategory) {
         result = result.filter((p: any) => {
@@ -296,12 +287,10 @@ export default function HomeScreen() {
       }
     }
 
-    // 2. الفلترة حسب النص البحثي
     if (searchQuery) {
       result = result.filter((p: any) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // 3. الفلترة حسب السعر
     if (filters.minPrice) {
       result = result.filter((p: any) => p.wholesalePrice >= Number(filters.minPrice));
     }
@@ -309,7 +298,6 @@ export default function HomeScreen() {
       result = result.filter((p: any) => p.wholesalePrice <= Number(filters.maxPrice));
     }
 
-    // 4. الترتيب
     switch (filters.sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.wholesalePrice - b.wholesalePrice);
@@ -381,14 +369,13 @@ export default function HomeScreen() {
       maxPrice: '',
       sortBy: 'newest',
     });
-    setActiveCategoryId(null); // العودة إلى "الكل"
+    setActiveCategoryId(null);
     setSearchQuery('');
     setSearch('');
   };
 
   const isLoading = isLoadingProducts || isLoadingCategories;
 
-  // ✅ بناء قائمة الفئات المعروضة (مع إضافة "الكل" في البداية)
   const displayCategories = useMemo(() => {
     const hasBestSellers = (bestSellerIds as number[]).length > 0;
     return [
@@ -399,7 +386,7 @@ export default function HomeScreen() {
   }, [categories, bestSellerIds]);
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['bottom']}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
@@ -488,7 +475,6 @@ export default function HomeScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListHeaderComponent={
             <>
-              {/* ✅ شريط الفئات مع إضافة "الكل" في البداية */}
               {displayCategories.length > 0 && (
                 <View style={s.categoriesWrapper}>
                   <FlatList
@@ -516,12 +502,10 @@ export default function HomeScreen() {
                 </View>
               )}
               
-              {/* شريط البانرات */}
               <View style={s.bannerWrapper}>
                 <BannerSlider banners={banners} containerWidth={width} />
               </View>
               
-              {/* رأس النتائج */}
               <View style={s.resultHeader}>
                 <Text style={s.resultCount}>{filtered.length} منتج</Text>
                 <TouchableOpacity onPress={resetFilters}>
@@ -623,7 +607,6 @@ export default function HomeScreen() {
   );
 }
 
-// --- StyleSheets (نفس الكود الموجود) ---
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   header: {
@@ -633,8 +616,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: '#fff',
-// //     borderBottomWidth: 1,
-// //     borderBottomColor: '#e8edf2',
   },
   headerCenter: { alignItems: 'center' },
   headerLogo: { width: 90, height: 32 },
@@ -763,9 +744,9 @@ const s = StyleSheet.create({
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
   bannerWrapper: {
-    marginHorizontal: 0, // تم تصفير الهامش هنا لأن البانر نفسه يحتوي على هوامش داخلية وعرض محسوب
+    marginHorizontal: 0,
     marginBottom: 16,
-    overflow: 'visible', // السماح بظهور الظل الخاص بالبانر
+    overflow: 'visible',
   },
   resultHeader: {
     flexDirection: 'row',
@@ -794,8 +775,8 @@ const s = StyleSheet.create({
   renewBadge: {
     position: 'absolute',
     top: 8,
-    left: 8, // تغيير الموقع لليسار كما في الصورة
-    backgroundColor: '#3b82f6', // لون أزرق فاتح مميز
+    left: 8,
+    backgroundColor: '#3b82f6',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -805,7 +786,7 @@ const s = StyleSheet.create({
   discountBadge: {
     position: 'absolute',
     top: 8,
-    right: 8, // نقل الخصم لليمين لتجنب التداخل
+    right: 8,
     backgroundColor: '#ef4444',
     borderRadius: 8,
     paddingHorizontal: 7,
@@ -840,15 +821,16 @@ const s = StyleSheet.create({
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   cardBody: { padding: 10, gap: 6, flex: 1, justifyContent: 'space-between' },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
+  // ✅ تعديل priceSection: إزالة الارتفاع الثابت
   priceSection: { 
-    height: 40, // تثبيت الارتفاع لضمان تناسق البطاقات
+    marginVertical: 2,
+    minHeight: 40, // استخدام minHeight بدلاً من height لاستيعاب التغير
     justifyContent: 'center',
-    marginVertical: 2 
   },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
   price: { fontSize: 15, fontWeight: '900', color: PRIMARY },
   currency: { fontSize: 11, color: PRIMARY, fontWeight: '500' },
-  oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through', marginTop: -2 },
+  oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through', marginTop: 2 },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '80%' },
   catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
