@@ -119,13 +119,15 @@ const ProductCard = React.memo(({
         <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
 
         <View style={s.priceSection}>
-          {hasDiscount && (
-            <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
-          )}
           <View style={s.priceRow}>
             <Text style={s.price}>{Math.round(finalPrice).toLocaleString()}</Text>
             <Text style={s.currency}>د.ع</Text>
           </View>
+          {hasDiscount ? (
+            <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
+          ) : (
+            <Text style={[s.oldPrice, { opacity: 0 }]}>0 د.ع</Text>
+          )}
         </View>
 
         <View style={s.bottomRow}>
@@ -391,7 +393,7 @@ export default function HomeScreen() {
     const hasBestSellers = (bestSellerIds as number[]).length > 0;
     return [
       { id: null,         name: 'الكل',          icon: 'grid-outline'  },
-      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً', icon: 'flame-outline' }] : []),
+      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً ⭐', icon: 'flame-outline' }] : []),
       ...categories
     ];
   }, [categories, bestSellerIds]);
@@ -592,8 +594,8 @@ export default function HomeScreen() {
               <Text style={s.filterLabel}>ترتيب حسب</Text>
               {[
                 { id: 'newest', label: 'الأحدث' },
-                { id: 'price_asc', label: 'السعر : من الأقل للأعلى' },
-                { id: 'price_desc', label: 'السعر : من الأعلى للأقل' },
+                { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
+                { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
                 { id: 'popular', label: 'الأكثر شهرة' },
               ].map(option => (
                 <TouchableOpacity
@@ -838,11 +840,15 @@ const s = StyleSheet.create({
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   cardBody: { padding: 10, gap: 6, flex: 1, justifyContent: 'space-between' },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
-  priceSection: { marginVertical: 4 },
+  priceSection: { 
+    height: 40, // تثبيت الارتفاع لضمان تناسق البطاقات
+    justifyContent: 'center',
+    marginVertical: 2 
+  },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
-  price: { fontSize: 14, fontWeight: '900', color: PRIMARY },
-  currency: { fontSize: 10, color: PRIMARY, fontWeight: '500' },
-  oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through' },
+  price: { fontSize: 15, fontWeight: '900', color: PRIMARY },
+  currency: { fontSize: 11, color: PRIMARY, fontWeight: '500' },
+  oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through', marginTop: -2 },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   catPill: { backgroundColor: PRIMARY + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, maxWidth: '80%' },
   catPillText: { fontSize: 9, color: PRIMARY, fontWeight: '600' },
