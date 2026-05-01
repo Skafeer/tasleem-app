@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Image, RefreshControl, useWindowDimensions, Animated,
-  Modal, ScrollView, Keyboard
+  Modal, ScrollView, Keyboard, StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,9 +67,9 @@ const ProductCard = React.memo(({
   const finalPrice = hasDiscount 
     ? product.wholesalePrice * (1 - product.discount / 100)
     : product.wholesalePrice;
-    
-  // ✅ حساب الارتفاع ديناميكياً أو استخدام ارتفاع ثابت أكبر قليلاً لاستيعاب الـ oldPrice
-  const CARD_HEIGHT = CARD_WIDTH + 155; // زيادة 5px لاستيعاب التباين
+  
+  // ✅ ارتفاع ثابت لجميع البطاقات لضمان التوحيد
+  const CARD_HEIGHT = CARD_WIDTH + 155;
   
   return (
     <TouchableOpacity
@@ -119,13 +119,13 @@ const ProductCard = React.memo(({
       <View style={s.cardBody}>
         <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
 
-        {/* ✅ إزالة الارتفاع الثابت من priceSection وجعل المحتوى يتدفق طبيعياً */}
+        {/* ✅ قسم السعر بدون ارتفاع ثابت */}
         <View style={s.priceSection}>
           <View style={s.priceRow}>
             <Text style={s.price}>{Math.round(finalPrice).toLocaleString()}</Text>
             <Text style={s.currency}>د.ع</Text>
           </View>
-          {/* ✅ عرض oldPrice فقط عند وجود خصم، بدون مساحة فارغة */}
+          {/* ✅ عرض السعر القديم فقط عند وجود خصم */}
           {hasDiscount && (
             <Text style={s.oldPrice}>{product.wholesalePrice.toLocaleString()} د.ع</Text>
           )}
@@ -387,6 +387,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['bottom']}>
+      {/* ✅ معالجة شريط الإشعارات */}
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
+      
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
@@ -666,7 +669,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
-  flatListContent: { paddingHorizontal: 12, paddingBottom: 32, gap: 8 },
+  flatListContent: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
   columnWrapper: { gap: 12, justifyContent: 'space-between', alignItems: 'stretch', marginBottom: 8 },
   searchWrapper: {
     flexDirection: 'row',
@@ -821,10 +824,9 @@ const s = StyleSheet.create({
   imgCountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   cardBody: { padding: 10, gap: 6, flex: 1, justifyContent: 'space-between' },
   productName: { fontSize: 12, fontWeight: '700', color: '#0d1b2a', textAlign: 'right', lineHeight: 18 },
-  // ✅ تعديل priceSection: إزالة الارتفاع الثابت
   priceSection: { 
     marginVertical: 2,
-    minHeight: 40, // استخدام minHeight بدلاً من height لاستيعاب التغير
+    minHeight: 40,
     justifyContent: 'center',
   },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2, justifyContent: 'flex-start' },
