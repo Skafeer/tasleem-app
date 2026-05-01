@@ -57,13 +57,22 @@ export default function CategoriesTab() {
 
   const updateCat = useMutation({
     mutationFn: async ({ id, ...body }: any) => { const { data } = await api.patch(`/api/categories/${id}`, body); return data; },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-categories'] }); qc.invalidateQueries({ queryKey: ['categories'] }); closeModal(); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-categories'] });
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+      closeModal();
+    },
     onError: (e: any) => Alert.alert('خطأ', e?.response?.data?.message || 'فشل التعديل'),
   });
 
   const deleteCat = useMutation({
     mutationFn: async (id: number) => api.delete(`/api/categories/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-categories'] }); qc.invalidateQueries({ queryKey: ['categories'] }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-categories'] });
+      qc.invalidateQueries({ queryKey: ['categories'] });
+      qc.invalidateQueries({ queryKey: ['products'] });
+    },
   });
 
   const openAdd = () => {
