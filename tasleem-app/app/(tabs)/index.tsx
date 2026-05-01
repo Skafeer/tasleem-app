@@ -761,14 +761,9 @@ const s = StyleSheet.create({
   catText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   catTextActive: { color: '#fff' },
   bannerWrapper: {
-    marginHorizontal: 12,
+    marginHorizontal: 0, // تم تصفير الهامش هنا لأن البانر نفسه يحتوي على هوامش داخلية وعرض محسوب
     marginBottom: 16,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    overflow: 'visible', // السماح بظهور الظل الخاص بالبانر
   },
   resultHeader: {
     flexDirection: 'row',
