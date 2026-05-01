@@ -397,7 +397,7 @@ export default function HomeScreen() {
   }, [categories, bestSellerIds]);
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.push('/cart')} style={s.cartBtn}>
