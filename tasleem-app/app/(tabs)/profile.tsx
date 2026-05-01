@@ -42,7 +42,7 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={s.container} edges={['top' , 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
