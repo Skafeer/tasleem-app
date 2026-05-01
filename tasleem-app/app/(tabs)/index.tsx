@@ -391,7 +391,7 @@ export default function HomeScreen() {
     const hasBestSellers = (bestSellerIds as number[]).length > 0;
     return [
       { id: null,         name: 'الكل',          icon: 'grid-outline'  },
-      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً ⭐', icon: 'flame-outline' }] : []),
+      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً', icon: 'flame-outline' }] : []),
       ...categories
     ];
   }, [categories, bestSellerIds]);
@@ -792,21 +792,23 @@ const s = StyleSheet.create({
   renewBadge: {
     position: 'absolute',
     top: 8,
-    right: 8,
-    backgroundColor: PRIMARY,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    left: 8, // تغيير الموقع لليسار كما في الصورة
+    backgroundColor: '#3b82f6', // لون أزرق فاتح مميز
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    zIndex: 10,
   },
-  renewText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+  renewText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
   discountBadge: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    right: 8, // نقل الخصم لليمين لتجنب التداخل
     backgroundColor: '#ef4444',
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
+    zIndex: 10,
   },
   discountText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   favBtn: {

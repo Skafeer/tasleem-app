@@ -23,7 +23,8 @@ export default function ProductsTab() {
     name: '', description: '', categories: [] as string[],
     companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
     stock: '', discount: '', adLinks: '', images: [] as string[],
-    isActive: true
+    isActive: true,
+    isRenewable: false
   });
   const [uploadingImgs, setUploadingImgs] = useState(false);
 
@@ -183,6 +184,7 @@ export default function ProductsTab() {
       adLinks: form.adLinks,
       images: form.images.join(','),
       isActive: form.isActive,
+      isRenewable: form.isRenewable,
     });
   };
 
@@ -190,7 +192,7 @@ export default function ProductsTab() {
     setForm({
       name: '', description: '', categories: [],
       companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-      stock: '', discount: '', adLinks: '', images: [], isActive: true
+      stock: '', discount: '', adLinks: '', images: [], isActive: true, isRenewable: false
     });
     setEditingProduct(null);
   };
@@ -210,6 +212,7 @@ export default function ProductsTab() {
       adLinks: p.adLinks || '',
       images: p.images ? p.images.split(',').filter(Boolean) : [],
       isActive: p.isActive !== false,
+      isRenewable: !!p.isRenewable,
     });
     setShowModal(true);
   };
@@ -393,6 +396,18 @@ export default function ProductsTab() {
                 />
                 <Text style={s.switchLabel}>
                   {form.isActive ? '🟢 المنتج ظاهر' : '🔴 المنتج مخفي'}
+                </Text>
+              </View>
+
+              <View style={[s.switchRow, { borderColor: SECONDARY + '40' }]}>
+                <Switch
+                  value={form.isRenewable}
+                  onValueChange={v => setForm(p => ({ ...p, isRenewable: v }))}
+                  trackColor={{ false: '#d1d5db', true: SECONDARY + '50' }}
+                  thumbColor={form.isRenewable ? SECONDARY : '#f3f4f6'}
+                />
+                <Text style={[s.switchLabel, { color: SECONDARY }]}>
+                  {form.isRenewable ? '⭐ قابل للتجديد' : '⚪ غير قابل للتجديد'}
                 </Text>
               </View>
 
