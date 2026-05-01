@@ -592,8 +592,8 @@ export default function HomeScreen() {
               <Text style={s.filterLabel}>ترتيب حسب</Text>
               {[
                 { id: 'newest', label: 'الأحدث' },
-                { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
-                { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
+                { id: 'price_asc', label: 'السعر : من الأقل للأعلى' },
+                { id: 'price_desc', label: 'السعر : من الأعلى للأقل' },
                 { id: 'popular', label: 'الأكثر شهرة' },
               ].map(option => (
                 <TouchableOpacity
