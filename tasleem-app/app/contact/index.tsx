@@ -25,7 +25,7 @@ export default function ContactScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header RTL (زر رجوع يمين، عنوان وسط) ── */}
       <View style={s.header}>

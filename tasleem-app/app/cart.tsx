@@ -120,7 +120,7 @@ export default function CartScreen() {
   );
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>

@@ -199,7 +199,7 @@ export default function CheckoutScreen() {
 
   if (loading || userLoading) {
     return (
-      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={s.container} edges={['top']}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -216,7 +216,7 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header RTL ── */}
       <View style={s.header}>

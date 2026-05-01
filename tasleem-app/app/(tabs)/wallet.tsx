@@ -149,7 +149,7 @@ export default function WalletScreen() {
 
   return (
     <View style={s.container}>
-      <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={s.safeArea} edges={['top']}>
 
         {/* ── Header معكوس RTL ── */}
         <View style={s.header}>

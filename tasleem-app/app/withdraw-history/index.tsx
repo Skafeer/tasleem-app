@@ -39,7 +39,7 @@ export default function WithdrawHistoryScreen() {
     : '';
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header RTL (زر رجوع يمين، عنوان وسط) ── */}
       <View style={s.header}>

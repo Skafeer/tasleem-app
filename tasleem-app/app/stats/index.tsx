@@ -75,7 +75,7 @@ export default function StatsScreen() {
 
   if (ordersLoading) {
     return (
-      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={s.container} edges={['top']}>
         <View style={s.header}>
           <View style={s.headerContent}>
             <View style={{ width: 40 }} />
@@ -94,7 +94,7 @@ export default function StatsScreen() {
   }
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header RTL (زر رجوع يمين، عنوان وسط) ── */}
       <View style={s.header}>

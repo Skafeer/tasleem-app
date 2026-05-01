@@ -147,7 +147,7 @@ export default function SaqrScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header ── */}
       <View style={s.header}>

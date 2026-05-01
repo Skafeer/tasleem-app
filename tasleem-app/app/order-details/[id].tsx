@@ -88,7 +88,7 @@ export default function OrderDetailsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={s.container} edges={['top']}>
         <SkeletonDetails />
       </SafeAreaView>
     );
@@ -96,7 +96,7 @@ export default function OrderDetailsScreen() {
 
   if (!order) {
     return (
-      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={s.container} edges={['top']}>
         <View style={s.center}>
           <View style={s.emptyIconBox}>
             <Ionicons name="cube-outline" size={48} color="#9ca3af" />
@@ -113,7 +113,7 @@ export default function OrderDetailsScreen() {
   const status = STATUS[order.status] || STATUS.pending;
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* Header - بدون تدرج لوني */}
       <View style={s.header}>

@@ -133,7 +133,7 @@ export default function ProductDetailScreen() {
   const sliderHeight = Math.min(width, 420);
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header بدون تدرج RTL ── */}
       <View style={s.header}>

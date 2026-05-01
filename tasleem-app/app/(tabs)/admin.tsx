@@ -127,7 +127,7 @@ export default function AdminScreen() {
   const currentTab = TABS.find(t => t.key === tab);
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       <View style={s.header}>
         <View style={s.headerTop}>

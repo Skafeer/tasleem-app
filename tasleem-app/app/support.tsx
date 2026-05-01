@@ -126,7 +126,7 @@ export default function SupportScreen() {
   const msgList = messages as any[];
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header موحد RTL (زر رجوع يمين، عنوان وسط، حالة يسار) ── */}
       <View style={s.header}>

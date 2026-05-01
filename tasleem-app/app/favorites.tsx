@@ -68,7 +68,7 @@ export default function FavoritesScreen() {
   const getImages = (p: any) => p.images ? p.images.split(',').filter(Boolean) : p.imageUrl ? [p.imageUrl] : [];
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top']}>
 
       {/* ── Header RTL (زر رجوع يمين، عنوان وسط، عداد يسار) ── */}
       <View style={s.header}>
