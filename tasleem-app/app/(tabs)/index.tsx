@@ -383,8 +383,8 @@ export default function HomeScreen() {
   const displayCategories = useMemo(() => {
     const hasBestSellers = (bestSellerIds as number[]).length > 0;
     return [
-      { id: null,         name: 'الكل',          icon: 'grid-outline'  },
-      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً ⭐', icon: 'flame-outline' }] : []),
+      { id: null,  name: 'الكل' },
+      ...(hasBestSellers ? [{ id: -1, name: 'الأكثر مبيعاً' }] : []),
       ...categories
     ];
   }, [categories, bestSellerIds]);
@@ -495,11 +495,6 @@ export default function HomeScreen() {
                         <TouchableOpacity
                           style={[s.catBtn, activeCategoryId === item.id && s.catBtnActive]}
                           onPress={() => setActiveCategoryId(activeCategoryId === item.id ? null : item.id)}>
-                          <Ionicons
-                            name={(item.icon || 'pricetag-outline') as any}
-                            size={16}
-                            color={activeCategoryId === item.id ? '#fff' : PRIMARY}
-                          />
                           <Text style={[s.catText, activeCategoryId === item.id && s.catTextActive]}>
                             {item.name}
                           </Text>
