@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
-const ITEM_H  = 68; // ارتفاع كارد واحد + الـ gap بينها
+const ITEM_H  = 68;
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -24,7 +24,7 @@ type Category = {
 };
 
 // ─────────────────────────────────────────────────────────────────
-//  DraggableList  —  السحب الحقيقي بدون مكتبات خارجية
+//  DraggableList  —  السحب مع انميشن احترافي
 // ─────────────────────────────────────────────────────────────────
 function DraggableList({
   items,
@@ -39,44 +39,94 @@ function DraggableList({
   onDelete:  (cat: Category) => void;
   onToggleActive: (cat: Category) => void;
 }) {
-  // ── state ──────────────────────────────────────────────
-  const [dragging,  setDragging]  = useState(false);
-  const [dragFrom,  setDragFrom]  = useState(0);
-  const [dragTo,    setDragTo]    = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [dragFrom, setDragFrom] = useState(0);
+  const [dragTo,   setDragTo]   = useState(0);
 
-  // ── refs ───────────────────────────────────────────────
-  const dragY      = useRef(new Animated.Value(0)).current;
-  const scrollY    = useRef(0);
+  // انميشن الكارد المسحوب
+  const dragY       = useRef(new Animated.Value(0)).current;
+  const dragScale   = useRef(new Animated.Value(1)).current;    // تكبير عند التفعيل
+  const dragOpacity = useRef(new Animated.Value(1)).current;    // شفافية أثناء السحب
+  const shakeAnim   = useRef(new Animated.Value(0)).current;    // اهتزاز خفيف
+
   const fromRef    = useRef(0);
   const isDragging = useRef(false);
 
-  // PanResponder رئيسي على كامل القائمة
+  // ── اهتزاز قصير لحظة التفعيل ──────────────────────────────────
+  const triggerShake = () => {
+    shakeAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  4, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -3, duration: 35, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  3, duration: 35, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  0, duration: 30, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // ── تفعيل انميشن السحب ────────────────────────────────────────
+  const animateActivate = () => {
+    Animated.parallel([
+      Animated.spring(dragScale, {
+        toValue: 1.05,
+        useNativeDriver: true,
+        speed: 25,
+        bounciness: 8,
+      }),
+      Animated.timing(dragOpacity, {
+        toValue: 0.93,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // ── إلغاء تفعيل الانميشن عند الإفلات ─────────────────────────
+  const animateRelease = (callback: () => void) => {
+    Animated.parallel([
+      Animated.spring(dragY, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 28,
+        bounciness: 0,
+      }),
+      Animated.spring(dragScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 4,
+      }),
+      Animated.timing(dragOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(callback);
+  };
+
+  // ── PanResponder ──────────────────────────────────────────────
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder:       () => isDragging.current,
-      onStartShouldSetPanResponderCapture:() => isDragging.current,
-      onMoveShouldSetPanResponder:        () => isDragging.current,
-      onMoveShouldSetPanResponderCapture: () => isDragging.current,
+      onStartShouldSetPanResponder:        () => isDragging.current,
+      onStartShouldSetPanResponderCapture: () => isDragging.current,
+      onMoveShouldSetPanResponder:         () => isDragging.current,
+      onMoveShouldSetPanResponderCapture:  () => isDragging.current,
 
       onPanResponderMove: (_, gs) => {
         if (!isDragging.current) return;
         dragY.setValue(gs.dy);
 
-        const rawOffset = gs.dy;
-        const newIdx    = Math.round(fromRef.current + rawOffset / ITEM_H);
-        const clamped   = Math.max(0, Math.min(items.length - 1, newIdx));
+        const newIdx  = Math.round(fromRef.current + gs.dy / ITEM_H);
+        const clamped = Math.max(0, Math.min(items.length - 1, newIdx));
         setDragTo(clamped);
       },
 
       onPanResponderRelease: (_, gs) => {
         if (!isDragging.current) return;
-        const rawOffset = gs.dy;
-        const toIdx     = Math.max(0, Math.min(items.length - 1, Math.round(fromRef.current + rawOffset / ITEM_H)));
+        const toIdx = Math.max(0, Math.min(items.length - 1,
+          Math.round(fromRef.current + gs.dy / ITEM_H)));
 
-        Animated.spring(dragY, {
-          toValue: 0, useNativeDriver: true,
-          speed: 30, bounciness: 0,
-        }).start(() => {
+        animateRelease(() => {
           isDragging.current = false;
           setDragging(false);
           if (toIdx !== fromRef.current) onReorder(fromRef.current, toIdx);
@@ -84,21 +134,28 @@ function DraggableList({
       },
 
       onPanResponderTerminate: () => {
-        dragY.setValue(0);
-        isDragging.current = false;
-        setDragging(false);
+        animateRelease(() => {
+          isDragging.current = false;
+          setDragging(false);
+        });
       },
     })
   ).current;
 
-  // تفعيل السحب من onLongPress
+  // ── تفعيل السحب من onLongPress ────────────────────────────────
   const startDrag = (index: number) => {
     fromRef.current    = index;
     isDragging.current = true;
     dragY.setValue(0);
+    dragScale.setValue(1);
+    dragOpacity.setValue(1);
     setDragFrom(index);
     setDragTo(index);
     setDragging(true);
+
+    // انميشن التفعيل + اهتزاز
+    triggerShake();
+    animateActivate();
   };
 
   return (
@@ -108,27 +165,55 @@ function DraggableList({
         contentContainerStyle={{ padding: 16, gap: 10 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!dragging}
-        onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }}
         scrollEventThrottle={16}>
 
         {items.map((item, index) => {
-          const isThisOne  = dragging && dragFrom === index;
-          const isTarget   = dragging && dragTo === index && dragFrom !== index;
+          const isThisOne = dragging && dragFrom === index;
+          const isTarget  = dragging && dragTo === index && dragFrom !== index;
 
-          // إذا كان هذا الكارد يُسحب، نرفعه فوق البقية
-          const translateY = isThisOne ? dragY : new Animated.Value(0);
+          // الكارد المسحوب يأخذ كل الانميشنات
+          const cardStyle = isThisOne
+            ? {
+                transform: [
+                  { translateY: dragY },
+                  { translateX: shakeAnim },
+                  { scale: dragScale },
+                ],
+                opacity: dragOpacity,
+                zIndex: 999,
+                // ظل قوي مع لون البراند
+                shadowColor: PRIMARY,
+                shadowOpacity: 0.35,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: 16,
+              }
+            : {};
+
+          // انميشن الكاردات الأخرى: تنزاح بخفة لتحرر المكان
+          const otherTranslate = (() => {
+            if (!dragging || isThisOne) return 0;
+            const from = dragFrom;
+            const to   = dragTo;
+            if (from < to) {
+              // السحب لأسفل: الكاردات بين from+1 و to تطلع فوق
+              if (index > from && index <= to) return -ITEM_H;
+            } else {
+              // السحب لأعلى: الكاردات بين to و from-1 تنزل
+              if (index >= to && index < from) return ITEM_H;
+            }
+            return 0;
+          })();
 
           return (
             <Animated.View
               key={String(item.id)}
               style={[
-                isThisOne && {
-                  transform: [{ translateY }],
-                  zIndex: 999,
-                  shadowColor: PRIMARY,
-                  shadowOpacity: 0.3,
-                  shadowRadius: 14,
-                  elevation: 12,
+                cardStyle,
+                !isThisOne && {
+                  transform: [{
+                    translateY: otherTranslate,
+                  }],
                 },
               ]}>
 
@@ -141,14 +226,14 @@ function DraggableList({
 
                 {/* ☰  مقبض السحب */}
                 <TouchableOpacity
-                  delayLongPress={200}
+                  delayLongPress={180}
                   onLongPress={() => startDrag(index)}
-                  activeOpacity={0.5}
-                  style={s.dragHandle}>
+                  activeOpacity={0.6}
+                  style={[s.dragHandle, isThisOne && s.dragHandleActive]}>
                   <Ionicons
                     name="reorder-three-outline"
                     size={26}
-                    color={isThisOne ? PRIMARY : '#b0bec5'}
+                    color={isThisOne ? '#fff' : '#b0bec5'}
                   />
                 </TouchableOpacity>
 
@@ -393,10 +478,13 @@ const s = StyleSheet.create({
 
   card:         { backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#e8edf2', height: ITEM_H - 10 },
   cardInactive: { opacity: 0.55 },
-  cardDragging: { borderColor: PRIMARY, borderWidth: 2, backgroundColor: PRIMARY + '08' },
+  cardDragging: { borderColor: PRIMARY, borderWidth: 2, backgroundColor: PRIMARY + '0d' },
   cardTarget:   { borderColor: '#f59e0b', borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#fffbeb' },
 
-  dragHandle:  { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e8edf2' },
+  // الزر العادي
+  dragHandle:       { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e8edf2' },
+  // الزر عند التفعيل → خلفية لون البراند
+  dragHandleActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
 
   cardMid:     { flex: 1, alignItems: 'flex-end' },
   catName:     { fontSize: 15, fontWeight: '700', color: '#0d1b2a' },
