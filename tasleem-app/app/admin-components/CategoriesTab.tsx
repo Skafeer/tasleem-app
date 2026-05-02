@@ -24,7 +24,81 @@ type Category = {
 };
 
 // ─────────────────────────────────────────────────────────────────
-//  DraggableList  —  السحب مع انميشن احترافي
+//  DragHandle  —  كومبوننت مستقل، PanResponder مباشرة عليه
+// ─────────────────────────────────────────────────────────────────
+function DragHandle({
+  index,
+  isActive,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: {
+  index:       number;
+  isActive:    boolean;
+  onDragStart: (index: number) => void;
+  onDragMove:  (dy: number) => void;
+  onDragEnd:   (dy: number) => void;
+}) {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activated      = useRef(false);
+  const startY         = useRef(0);
+
+  const pan = useRef(
+    PanResponder.create({
+      // نأخذ الـ responder فوراً عند البدء
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => activated.current,
+      onMoveShouldSetPanResponderCapture: () => activated.current,
+
+      onPanResponderGrant: (e) => {
+        activated.current = false;
+        startY.current = e.nativeEvent.pageY;
+        // ضغطة مطولة 200ms
+        longPressTimer.current = setTimeout(() => {
+          activated.current = true;
+          onDragStart(index);
+        }, 200);
+      },
+
+      onPanResponderMove: (_, gs) => {
+        if (!activated.current) return;
+        onDragMove(gs.dy);
+      },
+
+      onPanResponderRelease: (_, gs) => {
+        if (longPressTimer.current) clearTimeout(longPressTimer.current);
+        if (activated.current) {
+          activated.current = false;
+          onDragEnd(gs.dy);
+        }
+      },
+
+      onPanResponderTerminate: (_, gs) => {
+        if (longPressTimer.current) clearTimeout(longPressTimer.current);
+        if (activated.current) {
+          activated.current = false;
+          onDragEnd(gs.dy ?? 0);
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      {...pan.panHandlers}
+      style={[s.dragHandle, isActive && s.dragHandleActive]}>
+      <Ionicons
+        name="reorder-three-outline"
+        size={26}
+        color={isActive ? '#fff' : '#b0bec5'}
+      />
+    </Animated.View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  DraggableList
 // ─────────────────────────────────────────────────────────────────
 function DraggableList({
   items,
@@ -39,234 +113,188 @@ function DraggableList({
   onDelete:  (cat: Category) => void;
   onToggleActive: (cat: Category) => void;
 }) {
-  const [dragging, setDragging] = useState(false);
-  const [dragFrom, setDragFrom] = useState(0);
-  const [dragTo,   setDragTo]   = useState(0);
+  const [activeDrag, setActiveDrag] = useState<number | null>(null);
 
-  // انميشن الكارد المسحوب
+  const dragFromRef = useRef(0);
+  const dragToRef   = useRef(0);
+  const itemsRef    = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+  // Animated values للكارد المسحوب
   const dragY       = useRef(new Animated.Value(0)).current;
-  const dragScale   = useRef(new Animated.Value(1)).current;    // تكبير عند التفعيل
-  const dragOpacity = useRef(new Animated.Value(1)).current;    // شفافية أثناء السحب
-  const shakeAnim   = useRef(new Animated.Value(0)).current;    // اهتزاز خفيف
+  const dragScale   = useRef(new Animated.Value(1)).current;
+  const dragOpacity = useRef(new Animated.Value(1)).current;
+  const shakeAnim   = useRef(new Animated.Value(0)).current;
 
-  const fromRef    = useRef(0);
-  const isDragging = useRef(false);
+  // Animated value لكل جار (ثابتة، مو تُعاد)
+  const neighborAnims = useRef(
+    Array.from({ length: 30 }, () => new Animated.Value(0))
+  ).current;
 
-  // ── اهتزاز قصير لحظة التفعيل ──────────────────────────────────
+  // ── تحريك الجيران ─────────────────────────────────────────────
+  const updateNeighbors = (from: number, to: number) => {
+    const len = itemsRef.current.length;
+    for (let i = 0; i < len; i++) {
+      if (i === from) continue;
+      let target = 0;
+      if (from < to && i > from && i <= to) target = -ITEM_H;
+      if (from > to && i >= to && i < from) target =  ITEM_H;
+      Animated.spring(neighborAnims[i], {
+        toValue: target, useNativeDriver: true, speed: 24, bounciness: 0,
+      }).start();
+    }
+  };
+
+  const resetNeighbors = (len: number) => {
+    for (let i = 0; i < len; i++) {
+      Animated.spring(neighborAnims[i], {
+        toValue: 0, useNativeDriver: true, speed: 24, bounciness: 0,
+      }).start();
+    }
+  };
+
+  // ── اهتزاز ────────────────────────────────────────────────────
   const triggerShake = () => {
     shakeAnim.setValue(0);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue:  4, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -5, duration: 40, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  5, duration: 40, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -3, duration: 35, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue:  3, duration: 35, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue:  0, duration: 30, useNativeDriver: true }),
     ]).start();
   };
 
-  // ── تفعيل انميشن السحب ────────────────────────────────────────
-  const animateActivate = () => {
-    Animated.parallel([
-      Animated.spring(dragScale, {
-        toValue: 1.05,
-        useNativeDriver: true,
-        speed: 25,
-        bounciness: 8,
-      }),
-      Animated.timing(dragOpacity, {
-        toValue: 0.93,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  // ── إلغاء تفعيل الانميشن عند الإفلات ─────────────────────────
-  const animateRelease = (callback: () => void) => {
-    Animated.parallel([
-      Animated.spring(dragY, {
-        toValue: 0,
-        useNativeDriver: true,
-        speed: 28,
-        bounciness: 0,
-      }),
-      Animated.spring(dragScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 20,
-        bounciness: 4,
-      }),
-      Animated.timing(dragOpacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(callback);
-  };
-
-  // ── PanResponder ──────────────────────────────────────────────
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder:        () => isDragging.current,
-      onStartShouldSetPanResponderCapture: () => isDragging.current,
-      onMoveShouldSetPanResponder:         () => isDragging.current,
-      onMoveShouldSetPanResponderCapture:  () => isDragging.current,
-
-      onPanResponderMove: (_, gs) => {
-        if (!isDragging.current) return;
-        dragY.setValue(gs.dy);
-
-        const newIdx  = Math.round(fromRef.current + gs.dy / ITEM_H);
-        const clamped = Math.max(0, Math.min(items.length - 1, newIdx));
-        setDragTo(clamped);
-      },
-
-      onPanResponderRelease: (_, gs) => {
-        if (!isDragging.current) return;
-        const toIdx = Math.max(0, Math.min(items.length - 1,
-          Math.round(fromRef.current + gs.dy / ITEM_H)));
-
-        animateRelease(() => {
-          isDragging.current = false;
-          setDragging(false);
-          if (toIdx !== fromRef.current) onReorder(fromRef.current, toIdx);
-        });
-      },
-
-      onPanResponderTerminate: () => {
-        animateRelease(() => {
-          isDragging.current = false;
-          setDragging(false);
-        });
-      },
-    })
-  ).current;
-
-  // ── تفعيل السحب من onLongPress ────────────────────────────────
-  const startDrag = (index: number) => {
-    fromRef.current    = index;
-    isDragging.current = true;
+  // ── بدء السحب ─────────────────────────────────────────────────
+  const handleDragStart = (index: number) => {
+    dragFromRef.current = index;
+    dragToRef.current   = index;
     dragY.setValue(0);
     dragScale.setValue(1);
     dragOpacity.setValue(1);
-    setDragFrom(index);
-    setDragTo(index);
-    setDragging(true);
-
-    // انميشن التفعيل + اهتزاز
+    shakeAnim.setValue(0);
+    setActiveDrag(index);
     triggerShake();
-    animateActivate();
+    Animated.parallel([
+      Animated.spring(dragScale, { toValue: 1.06, useNativeDriver: true, speed: 20, bounciness: 5 }),
+      Animated.timing(dragOpacity, { toValue: 0.93, duration: 120, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // ── أثناء السحب ───────────────────────────────────────────────
+  const handleDragMove = (dy: number) => {
+    dragY.setValue(dy);
+    const len   = itemsRef.current.length;
+    const newTo = Math.max(0, Math.min(len - 1,
+      Math.round(dragFromRef.current + dy / ITEM_H)));
+    if (newTo !== dragToRef.current) {
+      dragToRef.current = newTo;
+      updateNeighbors(dragFromRef.current, newTo);
+    }
+  };
+
+  // ── إفلات ─────────────────────────────────────────────────────
+  const handleDragEnd = (dy: number) => {
+    const len   = itemsRef.current.length;
+    const from  = dragFromRef.current;
+    const toIdx = Math.max(0, Math.min(len - 1,
+      Math.round(from + dy / ITEM_H)));
+
+    resetNeighbors(len);
+
+    Animated.parallel([
+      Animated.spring(dragY,     { toValue: 0, useNativeDriver: true, speed: 28, bounciness: 0 }),
+      Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, speed: 22, bounciness: 3 }),
+      Animated.timing(dragOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      setActiveDrag(null);
+      if (toIdx !== from) onReorder(from, toIdx);
+    });
   };
 
   return (
-    <View style={{ flex: 1 }} {...pan.panHandlers}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={!dragging}
-        scrollEventThrottle={16}>
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: 16, gap: 10 }}
+      showsVerticalScrollIndicator={false}
+      scrollEnabled={activeDrag === null}
+      scrollEventThrottle={16}>
 
-        {items.map((item, index) => {
-          const isThisOne = dragging && dragFrom === index;
-          const isTarget  = dragging && dragTo === index && dragFrom !== index;
+      {items.map((item, index) => {
+        const isDraggingThis = activeDrag === index;
+        const isTarget = activeDrag !== null &&
+          dragToRef.current === index && dragFromRef.current !== index;
 
-          // الكارد المسحوب يأخذ كل الانميشنات
-          const cardStyle = isThisOne
-            ? {
-                transform: [
-                  { translateY: dragY },
-                  { translateX: shakeAnim },
-                  { scale: dragScale },
-                ],
-                opacity: dragOpacity,
-                zIndex: 999,
-                // ظل قوي مع لون البراند
-                shadowColor: PRIMARY,
-                shadowOpacity: 0.35,
-                shadowRadius: 18,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: 16,
-              }
-            : {};
+        return (
+          <Animated.View
+            key={String(item.id)}
+            style={
+              isDraggingThis
+                ? {
+                    transform: [
+                      { translateY: dragY },
+                      { translateX: shakeAnim },
+                      { scale: dragScale },
+                    ],
+                    opacity: dragOpacity,
+                    zIndex: 999,
+                    shadowColor: PRIMARY,
+                    shadowOpacity: 0.4,
+                    shadowRadius: 20,
+                    shadowOffset: { width: 0, height: 8 },
+                    elevation: 18,
+                  }
+                : {
+                    transform: [{ translateY: neighborAnims[index] }],
+                    zIndex: 1,
+                  }
+            }>
 
-          // انميشن الكاردات الأخرى: تنزاح بخفة لتحرر المكان
-          const otherTranslate = (() => {
-            if (!dragging || isThisOne) return 0;
-            const from = dragFrom;
-            const to   = dragTo;
-            if (from < to) {
-              // السحب لأسفل: الكاردات بين from+1 و to تطلع فوق
-              if (index > from && index <= to) return -ITEM_H;
-            } else {
-              // السحب لأعلى: الكاردات بين to و from-1 تنزل
-              if (index >= to && index < from) return ITEM_H;
-            }
-            return 0;
-          })();
+            <View style={[
+              s.card,
+              !item.isActive && s.cardInactive,
+              isDraggingThis && s.cardDragging,
+              isTarget && s.cardTarget,
+            ]}>
 
-          return (
-            <Animated.View
-              key={String(item.id)}
-              style={[
-                cardStyle,
-                !isThisOne && {
-                  transform: [{
-                    translateY: otherTranslate,
-                  }],
-                },
-              ]}>
+              {/* ☰  مقبض السحب — PanResponder مباشرة عليه */}
+              <DragHandle
+                index={index}
+                isActive={isDraggingThis}
+                onDragStart={handleDragStart}
+                onDragMove={handleDragMove}
+                onDragEnd={handleDragEnd}
+              />
 
-              <View style={[
-                s.card,
-                !item.isActive && s.cardInactive,
-                isThisOne && s.cardDragging,
-                isTarget   && s.cardTarget,
-              ]}>
+              {/* اسم الفئة */}
+              <View style={s.cardMid}>
+                <Text style={[s.catName, !item.isActive && s.inactiveText]}>{item.name}</Text>
+                <Text style={s.catOrder}>الترتيب: {index + 1}</Text>
+              </View>
 
-                {/* ☰  مقبض السحب */}
+              {/* أزرار */}
+              <View style={s.cardLeft}>
                 <TouchableOpacity
-                  delayLongPress={180}
-                  onLongPress={() => startDrag(index)}
-                  activeOpacity={0.6}
-                  style={[s.dragHandle, isThisOne && s.dragHandleActive]}>
-                  <Ionicons
-                    name="reorder-three-outline"
-                    size={26}
-                    color={isThisOne ? '#fff' : '#b0bec5'}
-                  />
+                  onPress={() => onToggleActive(item)}
+                  style={[s.toggleBtn, item.isActive && s.toggleOn]}>
+                  <Text style={[s.toggleText, item.isActive && s.toggleTextOn]}>
+                    {item.isActive ? 'نشط' : 'مخفي'}
+                  </Text>
                 </TouchableOpacity>
 
-                {/* اسم الفئة */}
-                <View style={s.cardMid}>
-                  <Text style={[s.catName, !item.isActive && s.inactiveText]}>{item.name}</Text>
-                  <Text style={s.catOrder}>الترتيب: {index + 1}</Text>
-                </View>
+                <TouchableOpacity onPress={() => onEdit(item)} style={s.editBtn}>
+                  <Ionicons name="pencil-outline" size={16} color={PRIMARY} />
+                </TouchableOpacity>
 
-                {/* أزرار */}
-                <View style={s.cardLeft}>
-                  <TouchableOpacity
-                    onPress={() => onToggleActive(item)}
-                    style={[s.toggleBtn, item.isActive && s.toggleOn]}>
-                    <Text style={[s.toggleText, item.isActive && s.toggleTextOn]}>
-                      {item.isActive ? 'نشط' : 'مخفي'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => onEdit(item)} style={s.editBtn}>
-                    <Ionicons name="pencil-outline" size={16} color={PRIMARY} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => onDelete(item)} style={s.deleteBtn}>
-                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={() => onDelete(item)} style={s.deleteBtn}>
+                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                </TouchableOpacity>
               </View>
-            </Animated.View>
-          );
-        })}
-      </ScrollView>
-    </View>
+            </View>
+          </Animated.View>
+        );
+      })}
+    </ScrollView>
   );
 }
 
@@ -517,4 +545,3 @@ const s = StyleSheet.create({
   cancelBtn:   { height: 44, justifyContent: 'center', alignItems: 'center' },
   cancelText:  { color: '#9ca3af', fontSize: 14 },
 });
-
