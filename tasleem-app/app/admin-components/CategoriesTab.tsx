@@ -1,13 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, FlatList,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Alert, ActivityIndicator,
+  PanResponder, Animated, Platform, UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
+const ITEM_H  = 68; // ارتفاع كارد واحد + الـ gap بينها
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Category = {
   id: number;
@@ -17,108 +23,191 @@ type Category = {
   isActive: boolean;
 };
 
-// ── DraggableItem ──────────────────────────────────────────────
-function DraggableItem({
-  item,
-  index,
-  total,
+// ─────────────────────────────────────────────────────────────────
+//  DraggableList  —  السحب الحقيقي بدون مكتبات خارجية
+// ─────────────────────────────────────────────────────────────────
+function DraggableList({
+  items,
+  onReorder,
   onEdit,
   onDelete,
   onToggleActive,
-  onMoveUp,
-  onMoveDown,
-  isDragging,
-  onLongPress,
 }: {
-  item: Category;
-  index: number;
-  total: number;
-  onEdit: (cat: Category) => void;
-  onDelete: (cat: Category) => void;
+  items: Category[];
+  onReorder: (from: number, to: number) => void;
+  onEdit:    (cat: Category) => void;
+  onDelete:  (cat: Category) => void;
   onToggleActive: (cat: Category) => void;
-  onMoveUp: (index: number) => void;
-  onMoveDown: (index: number) => void;
-  isDragging: boolean;
-  onLongPress: () => void;
 }) {
+  // ── state ──────────────────────────────────────────────
+  const [dragging,  setDragging]  = useState(false);
+  const [dragFrom,  setDragFrom]  = useState(0);
+  const [dragTo,    setDragTo]    = useState(0);
+
+  // ── refs ───────────────────────────────────────────────
+  const dragY      = useRef(new Animated.Value(0)).current;
+  const scrollY    = useRef(0);
+  const fromRef    = useRef(0);
+  const isDragging = useRef(false);
+
+  // PanResponder رئيسي على كامل القائمة
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder:       () => isDragging.current,
+      onStartShouldSetPanResponderCapture:() => isDragging.current,
+      onMoveShouldSetPanResponder:        () => isDragging.current,
+      onMoveShouldSetPanResponderCapture: () => isDragging.current,
+
+      onPanResponderMove: (_, gs) => {
+        if (!isDragging.current) return;
+        dragY.setValue(gs.dy);
+
+        const rawOffset = gs.dy;
+        const newIdx    = Math.round(fromRef.current + rawOffset / ITEM_H);
+        const clamped   = Math.max(0, Math.min(items.length - 1, newIdx));
+        setDragTo(clamped);
+      },
+
+      onPanResponderRelease: (_, gs) => {
+        if (!isDragging.current) return;
+        const rawOffset = gs.dy;
+        const toIdx     = Math.max(0, Math.min(items.length - 1, Math.round(fromRef.current + rawOffset / ITEM_H)));
+
+        Animated.spring(dragY, {
+          toValue: 0, useNativeDriver: true,
+          speed: 30, bounciness: 0,
+        }).start(() => {
+          isDragging.current = false;
+          setDragging(false);
+          if (toIdx !== fromRef.current) onReorder(fromRef.current, toIdx);
+        });
+      },
+
+      onPanResponderTerminate: () => {
+        dragY.setValue(0);
+        isDragging.current = false;
+        setDragging(false);
+      },
+    })
+  ).current;
+
+  // تفعيل السحب من onLongPress
+  const startDrag = (index: number) => {
+    fromRef.current    = index;
+    isDragging.current = true;
+    dragY.setValue(0);
+    setDragFrom(index);
+    setDragTo(index);
+    setDragging(true);
+  };
+
   return (
-    <View style={[s.card, !item.isActive && s.cardInactive, isDragging && s.cardDragging]}>
-      {/* مقبض السحب */}
-      <TouchableOpacity
-        onLongPress={onLongPress}
-        delayLongPress={300}
-        style={s.dragHandle}
-        activeOpacity={0.6}>
-        <Ionicons name="reorder-three-outline" size={22} color={isDragging ? PRIMARY : '#9ca3af'} />
-      </TouchableOpacity>
+    <View style={{ flex: 1 }} {...pan.panHandlers}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, gap: 10 }}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!dragging}
+        onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}>
 
-      {/* اسم الفئة والترتيب */}
-      <View style={s.cardMid}>
-        <Text style={[s.catName, !item.isActive && s.inactiveText]}>{item.name}</Text>
-        <Text style={s.catOrder}>الترتيب: {index + 1}</Text>
-      </View>
+        {items.map((item, index) => {
+          const isThisOne  = dragging && dragFrom === index;
+          const isTarget   = dragging && dragTo === index && dragFrom !== index;
 
-      {/* أزرار التحكم */}
-      <View style={s.cardLeft}>
-        {/* أسهم الأعلى والأسفل */}
-        <View style={s.arrowCol}>
-          <TouchableOpacity
-            style={[s.arrowBtn, index === 0 && s.arrowBtnDisabled]}
-            onPress={() => onMoveUp(index)}
-            disabled={index === 0}>
-            <Ionicons name="chevron-up-outline" size={14} color={index === 0 ? '#d1d5db' : PRIMARY} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.arrowBtn, index === total - 1 && s.arrowBtnDisabled]}
-            onPress={() => onMoveDown(index)}
-            disabled={index === total - 1}>
-            <Ionicons name="chevron-down-outline" size={14} color={index === total - 1 ? '#d1d5db' : PRIMARY} />
-          </TouchableOpacity>
-        </View>
+          // إذا كان هذا الكارد يُسحب، نرفعه فوق البقية
+          const translateY = isThisOne ? dragY : new Animated.Value(0);
 
-        <TouchableOpacity onPress={() => onToggleActive(item)} style={[s.toggleBtn, item.isActive && s.toggleOn]}>
-          <Text style={[s.toggleText, item.isActive && s.toggleTextOn]}>
-            {item.isActive ? 'نشط' : 'مخفي'}
-          </Text>
-        </TouchableOpacity>
+          return (
+            <Animated.View
+              key={String(item.id)}
+              style={[
+                isThisOne && {
+                  transform: [{ translateY }],
+                  zIndex: 999,
+                  shadowColor: PRIMARY,
+                  shadowOpacity: 0.3,
+                  shadowRadius: 14,
+                  elevation: 12,
+                },
+              ]}>
 
-        <TouchableOpacity onPress={() => onEdit(item)} style={s.editBtn}>
-          <Ionicons name="pencil-outline" size={16} color={PRIMARY} />
-        </TouchableOpacity>
+              <View style={[
+                s.card,
+                !item.isActive && s.cardInactive,
+                isThisOne && s.cardDragging,
+                isTarget   && s.cardTarget,
+              ]}>
 
-        <TouchableOpacity onPress={() => onDelete(item)} style={s.deleteBtn}>
-          <Ionicons name="trash-outline" size={16} color="#ef4444" />
-        </TouchableOpacity>
-      </View>
+                {/* ☰  مقبض السحب */}
+                <TouchableOpacity
+                  delayLongPress={200}
+                  onLongPress={() => startDrag(index)}
+                  activeOpacity={0.5}
+                  style={s.dragHandle}>
+                  <Ionicons
+                    name="reorder-three-outline"
+                    size={26}
+                    color={isThisOne ? PRIMARY : '#b0bec5'}
+                  />
+                </TouchableOpacity>
+
+                {/* اسم الفئة */}
+                <View style={s.cardMid}>
+                  <Text style={[s.catName, !item.isActive && s.inactiveText]}>{item.name}</Text>
+                  <Text style={s.catOrder}>الترتيب: {index + 1}</Text>
+                </View>
+
+                {/* أزرار */}
+                <View style={s.cardLeft}>
+                  <TouchableOpacity
+                    onPress={() => onToggleActive(item)}
+                    style={[s.toggleBtn, item.isActive && s.toggleOn]}>
+                    <Text style={[s.toggleText, item.isActive && s.toggleTextOn]}>
+                      {item.isActive ? 'نشط' : 'مخفي'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => onEdit(item)} style={s.editBtn}>
+                    <Ionicons name="pencil-outline" size={16} color={PRIMARY} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => onDelete(item)} style={s.deleteBtn}>
+                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+//  Main Component
+// ─────────────────────────────────────────────────────────────────
 export default function CategoriesTab() {
   const qc = useQueryClient();
-  const [showModal, setShowModal]         = useState(false);
-  const [editItem, setEditItem]           = useState<Category | null>(null);
-  const [form, setForm]                   = useState({ name: '' });
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-  const [localCategories, setLocalCategories] = useState<Category[]>([]);
+  const [showModal,     setShowModal]     = useState(false);
+  const [editItem,      setEditItem]      = useState<Category | null>(null);
+  const [form,          setForm]          = useState({ name: '' });
+  const [localList,     setLocalList]     = useState<Category[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ['admin-categories'],
     queryFn: async () => {
       const { data } = await api.get('/api/categories');
-      const sorted = (data as Category[]).sort((a, b) => a.sortOrder - b.sortOrder);
-      setLocalCategories(sorted);
+      const sorted   = (data as Category[]).sort((a, b) => a.sortOrder - b.sortOrder);
+      setLocalList(sorted);
       return sorted;
     },
   });
 
   const createCat = useMutation({
-    mutationFn: async (body: any) => {
-      const { data } = await api.post('/api/categories', body);
-      return data;
-    },
+    mutationFn: async (body: any) => { const { data } = await api.post('/api/categories', body); return data; },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-categories'] });
       qc.invalidateQueries({ queryKey: ['categories'] });
@@ -128,10 +217,7 @@ export default function CategoriesTab() {
   });
 
   const updateCat = useMutation({
-    mutationFn: async ({ id, ...body }: any) => {
-      const { data } = await api.patch(`/api/categories/${id}`, body);
-      return data;
-    },
+    mutationFn: async ({ id, ...body }: any) => { const { data } = await api.patch(`/api/categories/${id}`, body); return data; },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-categories'] });
       qc.invalidateQueries({ queryKey: ['categories'] });
@@ -150,41 +236,21 @@ export default function CategoriesTab() {
     },
   });
 
-  const openAdd = () => {
-    setEditItem(null);
-    setForm({ name: '' });
-    setShowModal(true);
-  };
-
-  const openEdit = (cat: Category) => {
-    setEditItem(cat);
-    setForm({ name: cat.name });
-    setShowModal(true);
-  };
-
+  const openAdd    = () => { setEditItem(null); setForm({ name: '' }); setShowModal(true); };
+  const openEdit   = (cat: Category) => { setEditItem(cat); setForm({ name: cat.name }); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setEditItem(null); };
 
   const handleSave = () => {
     if (!form.name.trim()) return Alert.alert('', 'اسم الفئة مطلوب');
-
     if (editItem) {
       updateCat.mutate({
-        id: editItem.id,
-        name: form.name.trim(),
+        id: editItem.id, name: form.name.trim(),
         icon: editItem.icon || 'grid-outline',
-        sortOrder: editItem.sortOrder,
-        isActive: editItem.isActive,
+        sortOrder: editItem.sortOrder, isActive: editItem.isActive,
       });
     } else {
-      // الفئة الجديدة دائماً آخر واحدة
-      const maxOrder = localCategories.length > 0
-        ? Math.max(...localCategories.map(c => c.sortOrder))
-        : -1;
-      createCat.mutate({
-        name: form.name.trim(),
-        icon: 'grid-outline',
-        sortOrder: maxOrder + 1,
-      });
+      const maxOrder = localList.length > 0 ? Math.max(...localList.map(c => c.sortOrder)) : -1;
+      createCat.mutate({ name: form.name.trim(), icon: 'grid-outline', sortOrder: maxOrder + 1 });
     }
   };
 
@@ -197,35 +263,26 @@ export default function CategoriesTab() {
 
   const toggleActive = (cat: Category) => {
     updateCat.mutate({
-      id: cat.id,
-      isActive: !cat.isActive,
+      id: cat.id, isActive: !cat.isActive,
       icon: cat.icon || 'grid-outline',
-      name: cat.name,
-      sortOrder: cat.sortOrder,
+      name: cat.name, sortOrder: cat.sortOrder,
     });
   };
 
-  // ── منطق إعادة الترتيب ──────────────────────────────────────
-  const reorder = async (from: number, to: number) => {
-    if (from === to) return;
-    const updated = [...localCategories];
-    const [moved] = updated.splice(from, 1);
+  const handleReorder = async (from: number, to: number) => {
+    const updated   = [...localList];
+    const [moved]   = updated.splice(from, 1);
     updated.splice(to, 0, moved);
-
-    // تحديث sortOrder لكل عنصر
     const reindexed = updated.map((cat, i) => ({ ...cat, sortOrder: i }));
-    setLocalCategories(reindexed);
+    setLocalList(reindexed);
 
-    // حفظ في الباك اند
     setIsSavingOrder(true);
     try {
       await Promise.all(
         reindexed.map(cat =>
           api.patch(`/api/categories/${cat.id}`, {
-            name: cat.name,
-            icon: cat.icon || 'grid-outline',
-            sortOrder: cat.sortOrder,
-            isActive: cat.isActive,
+            name: cat.name, icon: cat.icon || 'grid-outline',
+            sortOrder: cat.sortOrder, isActive: cat.isActive,
           })
         )
       );
@@ -233,41 +290,15 @@ export default function CategoriesTab() {
       qc.invalidateQueries({ queryKey: ['categories'] });
     } catch {
       Alert.alert('خطأ', 'فشل حفظ الترتيب');
-      setLocalCategories([...categories]);
+      setLocalList([...categories]);
     } finally {
       setIsSavingOrder(false);
     }
   };
 
-  const moveUp   = (index: number) => reorder(index, index - 1);
-  const moveDown = (index: number) => reorder(index, index + 1);
-
-  // الضغط المطوّل يفتح قائمة لاختيار الموضع الجديد
-  const handleLongPress = (index: number) => {
-    setDraggingIndex(index);
-    const current = localCategories[index];
-    Alert.alert(
-      `نقل: ${current.name}`,
-      'اختر الموضع الجديد للفئة:',
-      [
-        { text: 'إلغاء', style: 'cancel', onPress: () => setDraggingIndex(null) },
-        ...localCategories.map((cat, i) => ({
-          text: i === index
-            ? `← ${cat.name} (الحالي)`
-            : `${i + 1}. ${cat.name}`,
-          onPress: () => {
-            reorder(index, i);
-            setDraggingIndex(null);
-          },
-        })),
-      ],
-      { cancelable: true, onDismiss: () => setDraggingIndex(null) }
-    );
-  };
-
   if (isLoading) return <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />;
 
-  const displayList = localCategories.length > 0 ? localCategories : categories;
+  const displayList = localList.length > 0 ? localList : categories;
 
   return (
     <View style={s.container}>
@@ -289,37 +320,18 @@ export default function CategoriesTab() {
         </TouchableOpacity>
       </View>
 
-      {/* تعليمات */}
+      {/* تعليمة */}
       <View style={s.hint}>
         <Ionicons name="information-circle-outline" size={14} color="#64748b" />
-        <Text style={s.hintText}>اضغط مطولاً على ☰ لنقل الفئة، أو استخدم أسهم ↑↓</Text>
+        <Text style={s.hintText}>اضغط مطولاً على ☰ واسحب لتغيير الترتيب</Text>
       </View>
 
-      <FlatList
-        data={displayList}
-        keyExtractor={item => String(item.id)}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item, index }) => (
-          <DraggableItem
-            item={item}
-            index={index}
-            total={displayList.length}
-            onEdit={openEdit}
-            onDelete={confirmDelete}
-            onToggleActive={toggleActive}
-            onMoveUp={moveUp}
-            onMoveDown={moveDown}
-            isDragging={draggingIndex === index}
-            onLongPress={() => handleLongPress(index)}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={s.empty}>
-            <Ionicons name="list-outline" size={40} color="#9ca3af" />
-            <Text style={s.emptyText}>لا توجد فئات</Text>
-          </View>
-        }
+      <DraggableList
+        items={displayList}
+        onReorder={handleReorder}
+        onEdit={openEdit}
+        onDelete={confirmDelete}
+        onToggleActive={toggleActive}
       />
 
       {/* Modal إضافة/تعديل */}
@@ -366,24 +378,25 @@ export default function CategoriesTab() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f6f9' },
+  container:  { flex: 1, backgroundColor: '#f2f6f9' },
 
-  topRow:    { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  topLeft:   { alignItems: 'flex-end', gap: 4 },
-  count:     { fontSize: 13, color: '#64748b', fontWeight: '600' },
-  savingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savingText:{ fontSize: 11, color: PRIMARY },
-  addBtn:    { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
-  addBtnText:{ color: '#fff', fontWeight: '700', fontSize: 13 },
+  topRow:     { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  topLeft:    { alignItems: 'flex-end', gap: 4 },
+  count:      { fontSize: 13, color: '#64748b', fontWeight: '600' },
+  savingRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  savingText: { fontSize: 11, color: PRIMARY },
+  addBtn:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   hint:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   hintText: { fontSize: 11, color: '#64748b', textAlign: 'right' },
 
-  card:         { backgroundColor: '#fff', borderRadius: 16, padding: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#e8edf2' },
+  card:         { backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#e8edf2', height: ITEM_H - 10 },
   cardInactive: { opacity: 0.55 },
-  cardDragging: { borderColor: PRIMARY, borderWidth: 2, backgroundColor: PRIMARY + '08', shadowColor: PRIMARY, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  cardDragging: { borderColor: PRIMARY, borderWidth: 2, backgroundColor: PRIMARY + '08' },
+  cardTarget:   { borderColor: '#f59e0b', borderWidth: 2, borderStyle: 'dashed', backgroundColor: '#fffbeb' },
 
-  dragHandle:  { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e8edf2' },
+  dragHandle:  { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e8edf2' },
 
   cardMid:     { flex: 1, alignItems: 'flex-end' },
   catName:     { fontSize: 15, fontWeight: '700', color: '#0d1b2a' },
@@ -392,10 +405,6 @@ const s = StyleSheet.create({
 
   cardLeft:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
-  arrowCol:         { flexDirection: 'column', gap: 2 },
-  arrowBtn:         { width: 26, height: 26, borderRadius: 8, backgroundColor: PRIMARY + '10', justifyContent: 'center', alignItems: 'center' },
-  arrowBtnDisabled: { backgroundColor: '#f3f4f6' },
-
   toggleBtn:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb' },
   toggleOn:     { backgroundColor: '#ecfdf5', borderColor: '#86efac' },
   toggleText:   { fontSize: 11, fontWeight: '700', color: '#9ca3af' },
@@ -403,9 +412,6 @@ const s = StyleSheet.create({
 
   editBtn:   { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY + '10', justifyContent: 'center', alignItems: 'center' },
   deleteBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center' },
-
-  empty:     { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyText: { fontSize: 14, color: '#9ca3af' },
 
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modal:       { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 44 },
