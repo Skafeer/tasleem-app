@@ -10,21 +10,171 @@ import api from '../../src/lib/api';
 const PRIMARY = '#0c6679';
 
 const AVAILABLE_ICONS = [
-  { icon: 'grid-outline',             label: 'عام' },
-  { icon: 'phone-portrait-outline',   label: 'إلكترونيات' },
-  { icon: 'home-outline',             label: 'منزل' },
-  { icon: 'shirt-outline',            label: 'ملابس' },
-  { icon: 'rose-outline',             label: 'اكسسوارات' },
-  { icon: 'book-outline',             label: 'كتب' },
-  { icon: 'bicycle-outline',          label: 'رياضة' },
-  { icon: 'flower-outline',           label: 'عطور' },
-  { icon: 'nutrition-outline',        label: 'غذاء' },
-  { icon: 'construct-outline',        label: 'أدوات' },
-  { icon: 'sparkles-outline',         label: 'تجميل' },
-  { icon: 'car-outline',              label: 'سيارات' },
-  { icon: 'game-controller-outline',  label: 'ألعاب' },
-  { icon: 'paw-outline',              label: 'حيوانات' },
-  { icon: 'briefcase-outline',        label: 'مكتب' },
+  // عام وتصنيفات
+  { icon: 'grid-outline',                 label: 'عام' },
+  { icon: 'apps-outline',                 label: 'تطبيقات' },
+  { icon: 'layers-outline',              label: 'طبقات' },
+  { icon: 'albums-outline',              label: 'ألبوم' },
+  { icon: 'bookmark-outline',            label: 'مفضلة' },
+  { icon: 'flag-outline',                label: 'علم' },
+  { icon: 'star-outline',               label: 'نجمة' },
+  { icon: 'heart-outline',              label: 'قلب' },
+  { icon: 'ribbon-outline',             label: 'شارة' },
+  { icon: 'trophy-outline',             label: 'جائزة' },
+  // إلكترونيات وتقنية
+  { icon: 'phone-portrait-outline',     label: 'جوال' },
+  { icon: 'laptop-outline',             label: 'لابتوب' },
+  { icon: 'desktop-outline',            label: 'كمبيوتر' },
+  { icon: 'tablet-portrait-outline',    label: 'تابلت' },
+  { icon: 'watch-outline',              label: 'ساعة ذكية' },
+  { icon: 'headset-outline',            label: 'سماعات' },
+  { icon: 'camera-outline',             label: 'كاميرا' },
+  { icon: 'tv-outline',                 label: 'تلفاز' },
+  { icon: 'radio-outline',              label: 'راديو' },
+  { icon: 'battery-charging-outline',   label: 'شحن' },
+  { icon: 'wifi-outline',               label: 'واي فاي' },
+  { icon: 'bluetooth-outline',          label: 'بلوتوث' },
+  { icon: 'hardware-chip-outline',      label: 'رقائق' },
+  { icon: 'print-outline',              label: 'طابعة' },
+  { icon: 'scan-outline',               label: 'ماسح' },
+  // منزل وأثاث
+  { icon: 'home-outline',               label: 'منزل' },
+  { icon: 'bed-outline',                label: 'غرفة نوم' },
+  { icon: 'restaurant-outline',         label: 'مطبخ' },
+  { icon: 'water-outline',              label: 'حمام' },
+  { icon: 'bulb-outline',               label: 'إضاءة' },
+  { icon: 'thermometer-outline',        label: 'تكييف' },
+  { icon: 'lock-closed-outline',        label: 'أمن منزل' },
+  { icon: 'color-palette-outline',      label: 'ديكور' },
+  { icon: 'leaf-outline',               label: 'نباتات' },
+  { icon: 'bonfire-outline',            label: 'مدفأة' },
+  // ملابس وأزياء
+  { icon: 'shirt-outline',              label: 'ملابس' },
+  { icon: 'body-outline',               label: 'أزياء' },
+  { icon: 'glasses-outline',            label: 'نظارات' },
+  { icon: 'umbrella-outline',           label: 'مظلة' },
+  { icon: 'bag-outline',                label: 'حقيبة' },
+  { icon: 'backpack-outline',           label: 'حقيبة ظهر' },
+  { icon: 'wallet-outline',             label: 'محفظة' },
+  { icon: 'diamond-outline',            label: 'مجوهرات' },
+  // اكسسوارات وعطور
+  { icon: 'rose-outline',               label: 'اكسسوارات' },
+  { icon: 'flower-outline',             label: 'عطور' },
+  { icon: 'color-wand-outline',         label: 'مكياج' },
+  { icon: 'cut-outline',                label: 'حلاقة' },
+  { icon: 'hand-left-outline',          label: 'عناية يد' },
+  { icon: 'happy-outline',              label: 'عناية بشرة' },
+  // كتب وتعليم
+  { icon: 'book-outline',               label: 'كتب' },
+  { icon: 'library-outline',            label: 'مكتبة' },
+  { icon: 'school-outline',             label: 'تعليم' },
+  { icon: 'pencil-outline',             label: 'قرطاسية' },
+  { icon: 'document-text-outline',      label: 'وثائق' },
+  { icon: 'newspaper-outline',          label: 'مجلات' },
+  { icon: 'calculator-outline',         label: 'حاسبة' },
+  { icon: 'easel-outline',              label: 'فنون' },
+  // رياضة ولياقة
+  { icon: 'bicycle-outline',            label: 'رياضة' },
+  { icon: 'football-outline',           label: 'كرة قدم' },
+  { icon: 'basketball-outline',         label: 'كرة سلة' },
+  { icon: 'tennisball-outline',         label: 'تنس' },
+  { icon: 'barbell-outline',            label: 'صالة رياضة' },
+  { icon: 'walk-outline',               label: 'مشي' },
+  { icon: 'fitness-outline',            label: 'لياقة' },
+  { icon: 'boat-outline',               label: 'رياضة مائية' },
+  { icon: 'golf-outline',               label: 'جولف' },
+  // غذاء ومشروبات
+  { icon: 'nutrition-outline',          label: 'غذاء' },
+  { icon: 'fast-food-outline',          label: 'وجبات سريعة' },
+  { icon: 'pizza-outline',              label: 'بيتزا' },
+  { icon: 'ice-cream-outline',          label: 'حلويات' },
+  { icon: 'cafe-outline',               label: 'قهوة' },
+  { icon: 'wine-outline',               label: 'مشروبات' },
+  { icon: 'beer-outline',               label: 'عصائر' },
+  { icon: 'fish-outline',               label: 'مأكولات بحرية' },
+  // أدوات وصيانة
+  { icon: 'construct-outline',          label: 'أدوات' },
+  { icon: 'hammer-outline',             label: 'بناء' },
+  { icon: 'hardware-chip-outline',      label: 'قطع غيار' },
+  { icon: 'wrench-outline',             label: 'إصلاح' },
+  { icon: 'cog-outline',                label: 'ميكانيكا' },
+  { icon: 'flash-outline',              label: 'كهرباء' },
+  { icon: 'color-fill-outline',         label: 'طلاء' },
+  // تجميل وعناية
+  { icon: 'sparkles-outline',           label: 'تجميل' },
+  { icon: 'brush-outline',              label: 'مكياج' },
+  { icon: 'medkit-outline',             label: 'صحة وجمال' },
+  // سيارات ومواصلات
+  { icon: 'car-outline',                label: 'سيارات' },
+  { icon: 'car-sport-outline',          label: 'سيارات رياضية' },
+  { icon: 'bus-outline',                label: 'باصات' },
+  { icon: 'train-outline',              label: 'قطار' },
+  { icon: 'airplane-outline',           label: 'طيران' },
+  { icon: 'boat-outline',               label: 'قوارب' },
+  { icon: 'bicycle-outline',            label: 'دراجات' },
+  { icon: 'speedometer-outline',        label: 'إكسسوارات سيارات' },
+  // ألعاب وترفيه
+  { icon: 'game-controller-outline',    label: 'ألعاب' },
+  { icon: 'dice-outline',               label: 'ألعاب طاولة' },
+  { icon: 'musical-notes-outline',      label: 'موسيقى' },
+  { icon: 'film-outline',               label: 'أفلام' },
+  { icon: 'mic-outline',                label: 'ترفيه' },
+  { icon: 'headset-outline',            label: 'بودكاست' },
+  { icon: 'image-outline',              label: 'تصوير' },
+  // حيوانات
+  { icon: 'paw-outline',                label: 'حيوانات' },
+  { icon: 'fish-outline',               label: 'أسماك' },
+  { icon: 'bug-outline',                label: 'حشرات' },
+  // مكتب وأعمال
+  { icon: 'briefcase-outline',          label: 'مكتب' },
+  { icon: 'business-outline',           label: 'أعمال' },
+  { icon: 'stats-chart-outline',        label: 'إحصائيات' },
+  { icon: 'trending-up-outline',        label: 'استثمار' },
+  { icon: 'card-outline',               label: 'دفع إلكتروني' },
+  { icon: 'cash-outline',               label: 'مالية' },
+  { icon: 'receipt-outline',            label: 'فواتير' },
+  { icon: 'archive-outline',            label: 'أرشيف' },
+  { icon: 'mail-outline',               label: 'بريد' },
+  { icon: 'call-outline',               label: 'اتصالات' },
+  // صحة وطب
+  { icon: 'medkit-outline',             label: 'صيدلية' },
+  { icon: 'heart-circle-outline',       label: 'صحة' },
+  { icon: 'bandage-outline',            label: 'إسعافات' },
+  { icon: 'pulse-outline',              label: 'لياقة صحية' },
+  { icon: 'eye-outline',                label: 'بصريات' },
+  // سفر وسياحة
+  { icon: 'globe-outline',              label: 'سفر' },
+  { icon: 'map-outline',                label: 'خرائط' },
+  { icon: 'compass-outline',            label: 'مغامرات' },
+  { icon: 'camera-outline',             label: 'سياحة' },
+  { icon: 'bed-outline',                label: 'فنادق' },
+  { icon: 'location-outline',           label: 'وجهات' },
+  // أطفال
+  { icon: 'happy-outline',              label: 'أطفال' },
+  { icon: 'balloon-outline',            label: 'ترفيه أطفال' },
+  { icon: 'color-palette-outline',      label: 'رسم أطفال' },
+  { icon: 'bicycle-outline',            label: 'دراجات أطفال' },
+  // طاقة وبيئة
+  { icon: 'sunny-outline',              label: 'طاقة شمسية' },
+  { icon: 'leaf-outline',               label: 'بيئة' },
+  { icon: 'earth-outline',              label: 'مستدام' },
+  { icon: 'water-outline',              label: 'مياه' },
+  // خدمات
+  { icon: 'people-outline',             label: 'خدمات' },
+  { icon: 'person-outline',             label: 'أفراد' },
+  { icon: 'shield-outline',             label: 'أمن وحماية' },
+  { icon: 'cloud-outline',              label: 'خدمات سحابية' },
+  { icon: 'settings-outline',           label: 'تقنية' },
+  { icon: 'build-outline',              label: 'تطوير' },
+  { icon: 'chatbubble-outline',         label: 'تواصل' },
+  { icon: 'share-social-outline',       label: 'سوشيال ميديا' },
+  { icon: 'storefront-outline',         label: 'متاجر' },
+  { icon: 'gift-outline',               label: 'هدايا' },
+  { icon: 'balloon-outline',            label: 'مناسبات' },
+  { icon: 'cart-outline',               label: 'تسوق' },
+  { icon: 'bag-handle-outline',         label: 'مشتريات' },
+  { icon: 'pricetag-outline',           label: 'عروض' },
+  { icon: 'megaphone-outline',          label: 'إعلانات' },
 ];
 
 type Category = {
@@ -40,6 +190,7 @@ export default function CategoriesTab() {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem]   = useState<Category | null>(null);
   const [form, setForm] = useState({ name: '', icon: 'grid-outline', sortOrder: '0' });
+  const [iconSearch, setIconSearch] = useState('');
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ['admin-categories'],
@@ -87,7 +238,7 @@ export default function CategoriesTab() {
     setShowModal(true);
   };
 
-  const closeModal = () => { setShowModal(false); setEditItem(null); };
+  const closeModal = () => { setShowModal(false); setEditItem(null); setIconSearch(''); };
 
   const handleSave = () => {
     if (!form.name.trim()) return Alert.alert('', 'اسم الفئة مطلوب');
@@ -186,11 +337,20 @@ export default function CategoriesTab() {
             />
 
             <Text style={s.label}>الأيقونة</Text>
+            <TextInput
+              style={[s.input, { marginBottom: 10 }]}
+              value={iconSearch}
+              onChangeText={setIconSearch}
+              placeholder="ابحث عن أيقونة... مثال: غذاء"
+              textAlign="right"
+              placeholderTextColor="#9ca3af"
+            />
             <FlatList
-              data={AVAILABLE_ICONS}
+              data={AVAILABLE_ICONS.filter(i => i.label.includes(iconSearch))}
               numColumns={4}
-              keyExtractor={item => item.icon}
-              style={{ maxHeight: 160, marginBottom: 16 }}
+              keyExtractor={item => item.icon + item.label}
+              style={{ maxHeight: 200, marginBottom: 16 }}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[s.iconOption, form.icon === item.icon && s.iconOptionActive]}
