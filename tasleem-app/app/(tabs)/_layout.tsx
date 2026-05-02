@@ -1,4 +1,4 @@
-import { I18nManager, View, Text } from 'react-native';
+import { I18nManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs } from 'expo-router';
@@ -10,24 +10,6 @@ I18nManager.forceRTL(true);
 
 const PRIMARY = '#0c6679';
 
-// ✅ Badge الإشعارات
-function NotifBadge({ count }: { count: number }) {
-  if (count === 0) return null;
-  return (
-    <View style={{
-      position: 'absolute', top: -4, right: -8,
-      backgroundColor: '#ef4444', borderRadius: 10,
-      minWidth: 18, height: 18, paddingHorizontal: 4,
-      justifyContent: 'center', alignItems: 'center',
-      borderWidth: 1.5, borderColor: '#fff', zIndex: 10,
-    }}>
-      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>
-        {count > 99 ? '99+' : count}
-      </Text>
-    </View>
-  );
-}
-
 export default function TabsLayout() {
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -37,19 +19,6 @@ export default function TabsLayout() {
     },
     staleTime: 0,
     refetchOnMount: 'always',
-  });
-
-  // ✅ عدد الإشعارات غير المقروءة
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['unread-notifications'],
-    refetchInterval: 15000,
-    queryFn: async () => {
-      try {
-        const { data } = await api.get('/api/notifications');
-        const all = Array.isArray(data) ? data : [];
-        return all.filter((n: any) => !n.isRead).length;
-      } catch { return 0; }
-    },
   });
 
   const isAdmin = user?.role === 'admin';
@@ -114,10 +83,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
-          <View style={{ position: 'relative' }}>
-            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
-            <NotifBadge count={unreadCount as number} />
-          </View>
+          <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={24} color={color} />
         ),
       }} />
     </Tabs>

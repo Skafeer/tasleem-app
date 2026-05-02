@@ -100,10 +100,36 @@ export default function NotificationsScreen() {
     mutationFn: async () => {
       await api.post('/api/notifications/mark-all-read');
     },
+    onMutate: async () => {
+      // إلغاء أي refetch جاري
+      await qc.cancelQueries({ queryKey: ['user-notifications'] });
+      await qc.cancelQueries({ queryKey: ['unread-notifications-count'] });
+
+      // حفظ البيانات القديمة للـ rollback
+      const prevNotifications = qc.getQueryData(['user-notifications']);
+      const prevCount = qc.getQueryData(['unread-notifications-count']);
+
+      // تحديث فوري: كل الإشعارات تصبح مقروءة
+      qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
+        old.map((n) => ({ ...n, is_read: true }))
+      );
+
+      // تصفير العداد فوراً
+      qc.setQueryData(['unread-notifications-count'], 0);
+
+      return { prevNotifications, prevCount };
+    },
+    onError: (_err, _vars, ctx) => {
+      // في حالة فشل الـ API، نرجع للبيانات القديمة
+      if (ctx?.prevNotifications) qc.setQueryData(['user-notifications'], ctx.prevNotifications);
+      if (ctx?.prevCount !== undefined) qc.setQueryData(['unread-notifications-count'], ctx.prevCount);
+    },
     onSuccess: () => {
+      toast.success('تم تحديد الكل كمقروء');
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['user-notifications'] });
       qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
-      toast.success('تم تحديد الكل كمقروء');
     },
   });
 
