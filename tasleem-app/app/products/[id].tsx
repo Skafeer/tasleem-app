@@ -224,10 +224,17 @@ export default function ProductDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={s.catPill}>
-            <Ionicons name="pricetags-outline" size={12} color={PRIMARY} />
-            <Text style={s.catText}>{product.category}</Text>
-          </View>
+          {(() => {
+            const cats = product.category
+              ? product.category.split(',').map((c: string) => c.trim()).filter((c: string) => c && c !== 'عام')
+              : [];
+            return cats.length > 0 ? (
+              <View style={s.catPill}>
+                <Ionicons name="pricetags-outline" size={12} color={PRIMARY} />
+                <Text style={s.catText}>{cats.join('، ')}</Text>
+              </View>
+            ) : null;
+          })()}
 
           {/* Info Grid */}
           <View style={s.infoGrid}>

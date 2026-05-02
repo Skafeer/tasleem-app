@@ -129,11 +129,16 @@ const ProductCard = React.memo(({
         </View>
 
         <View style={s.bottomRow}>
-          <View style={s.catPill}>
-            <Text style={s.catPillText} numberOfLines={1}>
-              {product.category ? product.category.split(',')[0] : 'عام'}
-            </Text>
-          </View>
+          {(() => {
+            const cats = product.category
+              ? product.category.split(',').map((c: string) => c.trim()).filter((c: string) => c && c !== 'عام')
+              : [];
+            return cats.length > 0 ? (
+              <View style={s.catPill}>
+                <Text style={s.catPillText} numberOfLines={1}>{cats[0]}</Text>
+              </View>
+            ) : null;
+          })()}
           <Text style={[s.stockText, product.stock < 5 && s.stockLow]}>
             {product.stock < 5 ? '⚠ ' : ''}{product.stock}
           </Text>
@@ -278,7 +283,9 @@ export default function HomeScreen() {
       const selectedCategory = categories.find((c: any) => c.id === activeCategoryId);
       if (selectedCategory) {
         result = result.filter((p: any) => {
-          const productCategories = p.category ? p.category.split(',').map((c: string) => c.trim()) : [];
+          const productCategories = p.category
+            ? p.category.split(',').map((c: string) => c.trim()).filter((c: string) => c && c !== 'عام')
+            : [];
           return productCategories.includes(selectedCategory.name);
         });
       }
