@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Modal, TextInput, ActivityIndicator,
-  FlatList, Alert, Clipboard, Linking, useWindowDimensions, Animated
+  FlatList, Alert, Clipboard, Linking, useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,20 +30,11 @@ export default function ProductDetailScreen() {
   const { width } = useWindowDimensions();
   const [activeImg, setActiveImg] = useState(0);
   const [showCart, setShowCart] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const flatRef = useRef<FlatList>(null);
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-  const toastMsg     = useRef('');
-
-  const showToast = (msg: string) => {
-    toastMsg.current = msg;
-    Animated.sequence([
-      Animated.timing(toastOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.delay(2000),
-      Animated.timing(toastOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
-    ]).start();
-  };
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -128,10 +119,12 @@ export default function ProductDetailScreen() {
 
   // ✅ حفظ صورة واحدة للمعرض
   const saveImage = async (url: string) => {
+    setShowDownload(false);
+    setSaving(true);
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
+        toast.error('يجب منح صلاحية الوصول للمعرض');
         return;
       }
       const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
@@ -139,23 +132,27 @@ export default function ProductDetailScreen() {
       const tempUri  = FileSystem.cacheDirectory + filename;
       await FileSystem.downloadAsync(url, tempUri);
       await MediaLibrary.saveToLibraryAsync(tempUri);
-      showToast('✅  تم حفظ الصورة في المعرض');
+      toast.success('تم حفظ الصورة في المعرض ✅');
     } catch (e) {
-      showToast('❌  فشل حفظ الصورة');
+      toast.error('فشل حفظ الصورة');
+    } finally {
+      setSaving(false);
     }
   };
 
-  // ✅ حفظ جميع الصور — كل صورة بـ index فريد لتجنب تكرار الـ filename
+  // ✅ حفظ جميع الصور
   const saveAllImages = async () => {
+    setShowDownload(false);
+    setSaving(true);
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
+        toast.error('يجب منح صلاحية الوصول للمعرض');
         return;
       }
       const imgs = product ? getImages(product) : [];
-      let saved = 0;
       const base = Date.now();
+      let saved = 0;
       for (let i = 0; i < imgs.length; i++) {
         const url      = imgs[i];
         const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
@@ -165,9 +162,11 @@ export default function ProductDetailScreen() {
         await MediaLibrary.saveToLibraryAsync(tempUri);
         saved++;
       }
-      showToast(`✅  تم حفظ ${saved} صورة في المعرض`);
+      toast.success(`تم حفظ ${saved} صورة في المعرض ✅`);
     } catch (e) {
-      showToast('❌  فشل حفظ الصور');
+      toast.error('فشل حفظ الصور');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -225,15 +224,11 @@ export default function ProductDetailScreen() {
 
           <TouchableOpacity
             style={s.downloadBtn}
-            onPress={() => Alert.alert('حفظ الصور', 'اختر خيار الحفظ', [
-              { text: 'حفظ هذه الصورة', onPress: () => saveImage(images[activeImg]) },
-              {
-                text: `حفظ جميع الصور (${images.length})`,
-                onPress: () => saveAllImages()
-              },
-              { text: 'إلغاء', style: 'cancel' },
-            ])}>
-            <Ionicons name="download-outline" size={18} color="#fff" />
+            onPress={() => setShowDownload(true)}>
+            {saving
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="download-outline" size={18} color="#fff" />
+            }
           </TouchableOpacity>
 
           {images.length > 1 && (
@@ -450,10 +445,64 @@ export default function ProductDetailScreen() {
         </View>
       </Modal>
 
-      {/* ── Toast مخصص ── */}
-      <Animated.View style={[s.toast, { opacity: toastOpacity }]} pointerEvents="none">
-        <Text style={s.toastText}>{toastMsg.current}</Text>
-      </Animated.View>
+      {/* ── Modal حفظ الصور ── */}
+      <Modal visible={showDownload} transparent animationType="fade">
+        <TouchableOpacity
+          style={s.dlOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDownload(false)}>
+          <View style={s.dlSheet}>
+            {/* مقبض */}
+            <View style={s.dlHandle} />
+
+            {/* أيقونة + عنوان */}
+            <View style={s.dlHeader}>
+              <View style={s.dlIconBox}>
+                <Ionicons name="download-outline" size={22} color={PRIMARY} />
+              </View>
+              <View>
+                <Text style={s.dlTitle}>حفظ الصور</Text>
+                <Text style={s.dlSub}>{images?.length ?? 0} صورة متاحة</Text>
+              </View>
+            </View>
+
+            {/* خيار ١ */}
+            <TouchableOpacity
+              style={s.dlOption}
+              onPress={() => saveImage(images[activeImg])}>
+              <View style={[s.dlOptIcon, { backgroundColor: PRIMARY + '12' }]}>
+                <Ionicons name="image-outline" size={20} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dlOptTitle}>حفظ هذه الصورة</Text>
+                <Text style={s.dlOptSub}>الصورة {activeImg + 1} من {images?.length ?? 0}</Text>
+              </View>
+              <Ionicons name="chevron-back" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+
+            {/* خيار ٢ */}
+            <TouchableOpacity
+              style={[s.dlOption, { borderBottomWidth: 0 }]}
+              onPress={saveAllImages}>
+              <View style={[s.dlOptIcon, { backgroundColor: '#f59e0b18' }]}>
+                <Ionicons name="images-outline" size={20} color="#f59e0b" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dlOptTitle}>حفظ جميع الصور</Text>
+                <Text style={s.dlOptSub}>{images?.length ?? 0} صورة دفعة واحدة</Text>
+              </View>
+              <Ionicons name="chevron-back" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+
+            {/* إلغاء */}
+            <TouchableOpacity
+              style={s.dlCancel}
+              onPress={() => setShowDownload(false)}>
+              <Text style={s.dlCancelText}>إلغاء</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -465,28 +514,64 @@ const s = StyleSheet.create({
   notFoundText: { fontSize: 16, color: '#9ca3af' },
   scrollContent: { paddingBottom: 100 },
 
-  toast: {
-    position: 'absolute',
-    bottom: 110,
-    alignSelf: 'center',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 20,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    flexDirection: 'row',
+  // ── Download Modal ──
+  dlOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  dlSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    paddingTop: 14,
+  },
+  dlHandle: {
+    width: 38, height: 4, borderRadius: 2,
+    backgroundColor: '#e2e8f0',
+    alignSelf: 'center', marginBottom: 18,
+  },
+  dlHeader: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 10,
-    maxWidth: '85%',
+    gap: 12,
+    marginBottom: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  toastText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
+  dlIconBox: {
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: PRIMARY + '12',
+    justifyContent: 'center', alignItems: 'center',
   },
+  dlTitle: { fontSize: 16, fontWeight: '800', color: '#0d1b2a', textAlign: 'right' },
+  dlSub:   { fontSize: 12, color: '#94a3b8', textAlign: 'right', marginTop: 2 },
+  dlOption: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  dlOptIcon: {
+    width: 42, height: 42, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  dlOptTitle: { fontSize: 14, fontWeight: '700', color: '#0d1b2a', textAlign: 'right' },
+  dlOptSub:   { fontSize: 11, color: '#94a3b8', textAlign: 'right', marginTop: 2 },
+  dlCancel: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dlCancelText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
 
   // ── Header RTL ──
   header: {
