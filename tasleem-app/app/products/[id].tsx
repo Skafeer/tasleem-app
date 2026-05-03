@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Modal, TextInput, ActivityIndicator,
-  FlatList, Alert, Clipboard, Linking, useWindowDimensions
+  FlatList, Alert, Clipboard, Linking, useWindowDimensions, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +33,17 @@ export default function ProductDetailScreen() {
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const flatRef = useRef<FlatList>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastMsg     = useRef('');
+
+  const showToast = (msg: string) => {
+    toastMsg.current = msg;
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+    ]).start();
+  };
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -128,13 +139,13 @@ export default function ProductDetailScreen() {
       const tempUri  = FileSystem.cacheDirectory + filename;
       await FileSystem.downloadAsync(url, tempUri);
       await MediaLibrary.saveToLibraryAsync(tempUri);
-      Alert.alert('✅', 'تم حفظ الصورة في المعرض');
+      showToast('✅  تم حفظ الصورة في المعرض');
     } catch (e) {
-      Alert.alert('خطأ', 'فشل حفظ الصورة');
+      showToast('❌  فشل حفظ الصورة');
     }
   };
 
-  // ✅ حفظ جميع الصور
+  // ✅ حفظ جميع الصور — كل صورة بـ index فريد لتجنب تكرار الـ filename
   const saveAllImages = async () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -144,17 +155,19 @@ export default function ProductDetailScreen() {
       }
       const imgs = product ? getImages(product) : [];
       let saved = 0;
-      for (const url of imgs) {
+      const base = Date.now();
+      for (let i = 0; i < imgs.length; i++) {
+        const url      = imgs[i];
         const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
-        const filename = `tasleem_${Date.now()}_${saved}.${ext}`;
+        const filename = `tasleem_${base}_${i}.${ext}`;
         const tempUri  = FileSystem.cacheDirectory + filename;
         await FileSystem.downloadAsync(url, tempUri);
         await MediaLibrary.saveToLibraryAsync(tempUri);
         saved++;
       }
-      Alert.alert('✅', `تم حفظ ${saved} صورة في المعرض`);
+      showToast(`✅  تم حفظ ${saved} صورة في المعرض`);
     } catch (e) {
-      Alert.alert('خطأ', 'فشل حفظ الصور');
+      showToast('❌  فشل حفظ الصور');
     }
   };
 
@@ -216,7 +229,7 @@ export default function ProductDetailScreen() {
               { text: 'حفظ هذه الصورة', onPress: () => saveImage(images[activeImg]) },
               {
                 text: `حفظ جميع الصور (${images.length})`,
-                onPress: () => images.forEach((u: string) => Linking.openURL(u))
+                onPress: () => saveAllImages()
               },
               { text: 'إلغاء', style: 'cancel' },
             ])}>
@@ -436,6 +449,12 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Toast مخصص ── */}
+      <Animated.View style={[s.toast, { opacity: toastOpacity }]} pointerEvents="none">
+        <Text style={s.toastText}>{toastMsg.current}</Text>
+      </Animated.View>
+
     </SafeAreaView>
   );
 }
@@ -445,6 +464,29 @@ const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   notFoundText: { fontSize: 16, color: '#9ca3af' },
   scrollContent: { paddingBottom: 100 },
+
+  toast: {
+    position: 'absolute',
+    bottom: 110,
+    alignSelf: 'center',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+    maxWidth: '85%',
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
 
   // ── Header RTL ──
   header: {
