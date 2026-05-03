@@ -10,8 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-// @ts-ignore
-import ExpoFileSystem from 'expo-file-system';
+
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ مفتاح السلة مرتبط بالـ userId
@@ -125,8 +125,8 @@ export default function ProductDetailScreen() {
       }
       const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
       const filename = `tasleem_${Date.now()}.${ext}`;
-      const tempUri  = (ExpoFileSystem as any).cacheDirectory + filename;
-      await (ExpoFileSystem as any).downloadAsync(url, tempUri);
+      const tempUri  = FileSystem.cacheDirectory + filename;
+      await FileSystem.downloadAsync(url, tempUri);
       await MediaLibrary.saveToLibraryAsync(tempUri);
       Alert.alert('✅', 'تم حفظ الصورة في المعرض');
     } catch (e) {
@@ -147,8 +147,8 @@ export default function ProductDetailScreen() {
       for (const url of imgs) {
         const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
         const filename = `tasleem_${Date.now()}_${saved}.${ext}`;
-        const tempUri  = (ExpoFileSystem as any).cacheDirectory + filename;
-        await (ExpoFileSystem as any).downloadAsync(url, tempUri);
+        const tempUri  = FileSystem.cacheDirectory + filename;
+        await FileSystem.downloadAsync(url, tempUri);
         await MediaLibrary.saveToLibraryAsync(tempUri);
         saved++;
       }
