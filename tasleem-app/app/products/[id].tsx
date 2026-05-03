@@ -13,20 +13,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 
+// ✅ مفتاح السلة مرتبط بالـ userId
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
+const SECONDARY = '#f5a006';
 const SUCCESS = '#10b981';
 const BG = '#f2f6f9';
 
-// =============================================================
-// InternalToast component
-// =============================================================
-function InternalToast({ message, type, visible }: {
-  message: string; type: 'success' | 'error'; visible: boolean;
-}) {
+// ── مكوّن الإشعار الداخلي ──
+function InternalToast({ message, type, visible }: { message: string; type: 'success' | 'error'; visible: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -42,11 +40,7 @@ function InternalToast({ message, type, visible }: {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[
-      s.internalToast,
-      type === 'success' ? s.toastSuccess : s.toastError,
-      { opacity }
-    ]}>
+    <Animated.View style={[s.internalToast, type === 'success' ? s.toastSuccess : s.toastError, { opacity }]}>
       <Ionicons
         name={type === 'success' ? 'checkmark-circle' : 'close-circle'}
         size={20}
@@ -57,51 +51,30 @@ function InternalToast({ message, type, visible }: {
   );
 }
 
-// =============================================================
-// THE FIX: Convert any Cloudinary URL to a direct JPG download
-//
-// Problem: Cloudinary serves AVIF/WebP based on User-Agent header.
-//   expo-file-system gets a binary file it cannot identify,
-//   and expo-media-library rejects it because it has no valid extension.
-//
-// Solution: Inject "fl_attachment,f_jpg" into the Cloudinary URL.
-//   fl_attachment  -> forces a download response (no CORS issues)
-//   f_jpg          -> forces JPG format regardless of client
-//   We strip all existing transformations to get the clean original.
-// =============================================================
-function toCloudinaryJpg(url: string): string {
-  if (!url) return '';
-  if (!url.includes('cloudinary.com')) return url;
-  // Strip everything between /upload/ and the version or folder segment
-  // e.g. /upload/w_800,h_800,c_limit/q_auto/v123/... -> /upload/fl_attachment,f_jpg/v123/...
-  return url.replace(/\/upload\/(?:[^/]+\/)*(?=v\d|[^v])/, '/upload/fl_attachment,f_jpg/');
-}
-
-// =============================================================
-// Main Screen
-// =============================================================
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [activeImg, setActiveImg] = useState(0);
   const [showCart, setShowCart] = useState(false);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const flatRef = useRef<FlatList>(null);
 
-  // Internal toast state
+  // ── حالة الإشعار الداخلي ──
   const [toastMsg, setToastMsg] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [toastVisible, setToastVisible] = useState(false);
+  const toastKey = useRef(0);
 
   const showInternalToast = (message: string, type: 'success' | 'error') => {
+    toastKey.current += 1;
     setToastMsg(message);
     setToastType(type);
     setToastVisible(false);
-    setTimeout(() => setToastVisible(true), 20);
-    setTimeout(() => setToastVisible(false), 3200);
+    // تأخير بسيط لإعادة تشغيل الأنيميشن
+    setTimeout(() => setToastVisible(true), 30);
+    setTimeout(() => setToastVisible(false), 3000);
   };
 
   const { data: user } = useQuery({
@@ -136,55 +109,37 @@ export default function ProductDetailScreen() {
 
   const profit = sellingPrice ? Number(sellingPrice) - discountedPrice : 0;
 
-  // -----------------------------------------------------------
-  // Download single image using Cloudinary JPG trick
-  // -----------------------------------------------------------
+  // ── دالة تحميل صورة واحدة داخلياً ──
   const downloadSingleImage = async (url: string) => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        showInternalToast('يجب منح صلاحية الوصول للصور', 'error');
+        showInternalToast('يجب منح صلاحية الوصول إلى الصور', 'error');
         return;
       }
 
-      // Convert URL to guaranteed JPG
-      const downloadUrl = toCloudinaryJpg(url);
+      const filename = `product_${Date.now()}.jpg`;
+      const fileUri = FileSystem.documentDirectory + filename;
 
-      // Use cacheDirectory (writable on both iOS and Android)
-      const fileUri = FileSystem.cacheDirectory + `tasleem_${Date.now()}.jpg`;
+      const downloadResult = await FileSystem.downloadAsync(url, fileUri);
 
-      const result = await FileSystem.downloadAsync(downloadUrl, fileUri);
-
-      if (result.status === 200) {
-        // createAssetAsync is more reliable than saveToLibraryAsync
-        const asset = await MediaLibrary.createAssetAsync(result.uri);
-        // Optional: save in a named album
-        try {
-          const album = await MediaLibrary.getAlbumAsync('Tasleem');
-          if (album) {
-            await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-          } else {
-            await MediaLibrary.createAlbumAsync('Tasleem', asset, false);
-          }
-        } catch (_) { /* album is optional */ }
-
-        showInternalToast('تم حفظ الصورة في المعرض ✅', 'success');
+      if (downloadResult.status === 200) {
+        await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
+        showInternalToast('تم تحميل الصورة بنجاح ✅', 'success');
       } else {
         showInternalToast('فشل تحميل الصورة ❌', 'error');
       }
-    } catch (_) {
+    } catch (err) {
       showInternalToast('فشل تحميل الصورة ❌', 'error');
     }
   };
 
-  // -----------------------------------------------------------
-  // Download all images
-  // -----------------------------------------------------------
+  // ── دالة تحميل جميع الصور داخلياً ──
   const downloadAllImages = async (imageUrls: string[]) => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        showInternalToast('يجب منح صلاحية الوصول للصور', 'error');
+        showInternalToast('يجب منح صلاحية الوصول إلى الصور', 'error');
         return;
       }
 
@@ -193,52 +148,46 @@ export default function ProductDetailScreen() {
 
       for (let i = 0; i < imageUrls.length; i++) {
         try {
-          const downloadUrl = toCloudinaryJpg(imageUrls[i]);
-          const fileUri = FileSystem.cacheDirectory + `tasleem_${Date.now()}_${i}.jpg`;
-          const result = await FileSystem.downloadAsync(downloadUrl, fileUri);
+          const filename = `product_${Date.now()}_${i}.jpg`;
+          const fileUri = FileSystem.documentDirectory + filename;
+          const downloadResult = await FileSystem.downloadAsync(imageUrls[i], fileUri);
 
-          if (result.status === 200) {
-            const asset = await MediaLibrary.createAssetAsync(result.uri);
-            try {
-              const album = await MediaLibrary.getAlbumAsync('Tasleem');
-              if (album) {
-                await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-              } else {
-                await MediaLibrary.createAlbumAsync('Tasleem', asset, false);
-              }
-            } catch (_) { /* album is optional */ }
+          if (downloadResult.status === 200) {
+            await MediaLibrary.saveToLibraryAsync(downloadResult.uri);
             successCount++;
           } else {
             failCount++;
           }
-        } catch (_) {
+        } catch {
           failCount++;
         }
       }
 
       if (failCount === 0) {
-        showInternalToast(`تم حفظ ${successCount} صورة في المعرض ✅`, 'success');
+        showInternalToast(`تم تحميل ${successCount} صورة بنجاح ✅`, 'success');
       } else if (successCount === 0) {
-        showInternalToast('فشل تحميل جميع الصور ❌', 'error');
+        showInternalToast(`فشل تحميل جميع الصور ❌`, 'error');
       } else {
-        showInternalToast(`تم ${successCount} وفشل ${failCount} ⚠️`, 'error');
+        showInternalToast(`تم تحميل ${successCount} وفشل ${failCount} ⚠️`, 'error');
       }
-    } catch (_) {
+    } catch (err) {
       showInternalToast('حدث خطأ أثناء التحميل ❌', 'error');
     }
   };
 
+  // ── دالة زر التحميل ──
   const handleDownload = (images: string[]) => {
     if (images.length === 1) {
       downloadSingleImage(images[0]);
-    } else {
-      setShowDownloadMenu(true);
+      return;
     }
+
+    // عرض خيارات التحميل بدون Alert خارجي — نستخدم modal بسيط
+    setShowDownloadMenu(true);
   };
 
-  // -----------------------------------------------------------
-  // Cart
-  // -----------------------------------------------------------
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
   const addToCart = async () => {
     if (!sellingPrice || Number(sellingPrice) < product.sellingPriceMin) {
       toast.warning('السعر يجب أن يكون أكبر من سعر الجملة');
@@ -286,9 +235,6 @@ export default function ProductDetailScreen() {
     toast.success('تم نسخ ID المنتج ✅');
   };
 
-  // -----------------------------------------------------------
-  // Render
-  // -----------------------------------------------------------
   if (isLoading) {
     return (
       <View style={s.center}>
@@ -312,10 +258,10 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* Internal Toast */}
+      {/* ── الإشعار الداخلي العائم ── */}
       <InternalToast message={toastMsg} type={toastType} visible={toastVisible} />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -326,7 +272,7 @@ export default function ProductDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
 
-        {/* Image Slider */}
+        {/* ── Slider ── */}
         <View style={[s.sliderBox, { height: sliderHeight }]}>
           <FlatList
             ref={flatRef}
@@ -344,7 +290,7 @@ export default function ProductDetailScreen() {
             )}
           />
 
-          {/* Download Button */}
+          {/* ── زر التحميل الداخلي ── */}
           <TouchableOpacity
             style={s.downloadBtn}
             onPress={() => handleDownload(images)}>
@@ -483,7 +429,7 @@ export default function ProductDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Download Menu Modal */}
+      {/* ── Modal اختيار تحميل الصور (داخلي بدل Alert) ── */}
       <Modal visible={showDownloadMenu} transparent animationType="fade">
         <TouchableOpacity
           style={s.modalOverlay}
@@ -611,12 +557,12 @@ const s = StyleSheet.create({
   notFoundText: { fontSize: 16, color: '#9ca3af' },
   scrollContent: { paddingBottom: 100 },
 
-  // Internal Toast
+  // ── الإشعار الداخلي ──
   internalToast: {
     position: 'absolute',
     top: 70,
-    left: 16,
-    right: 16,
+    left: 20,
+    right: 20,
     zIndex: 9999,
     flexDirection: 'row',
     alignItems: 'center',
@@ -625,15 +571,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 14,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 10,
-    elevation: 10,
+    elevation: 8,
   },
   toastSuccess: { backgroundColor: '#10b981' },
   toastError: { backgroundColor: '#ef4444' },
   toastText: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1, textAlign: 'right' },
 
-  // Header
+  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -662,7 +608,6 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Slider
   sliderBox: { position: 'relative', backgroundColor: '#f3f4f6' },
   downloadBtn: {
     position: 'absolute',
@@ -726,9 +671,9 @@ const s = StyleSheet.create({
   },
   imgCounterText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
 
-  // Content
   content: { padding: 16 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'right', marginBottom: 8 },
+
   codeChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -742,7 +687,8 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   productCode: { fontSize: 13, color: PRIMARY, fontWeight: '600', letterSpacing: 1 },
-  copyCodeBtn: { padding: 4, borderRadius: 16 },
+  copyCodeBtn: { padding: 4, borderRadius: 16, backgroundColor: 'transparent' },
+
   catPill: {
     backgroundColor: PRIMARY + '15',
     borderRadius: 9,
@@ -756,7 +702,6 @@ const s = StyleSheet.create({
   },
   catText: { fontSize: 11, color: PRIMARY, fontWeight: 'bold' },
 
-  // Info Grid
   infoGrid: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -787,7 +732,6 @@ const s = StyleSheet.create({
   infoVal: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through', marginTop: 2 },
 
-  // Section
   section: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -812,6 +756,7 @@ const s = StyleSheet.create({
     marginLeft: 'auto',
   },
   description: { fontSize: 13, color: '#374151', lineHeight: 21, textAlign: 'right' },
+
   adLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -823,7 +768,6 @@ const s = StyleSheet.create({
   },
   adLinkText: { flex: 1, fontSize: 12, color: PRIMARY, textAlign: 'right' },
 
-  // Float Button
   floatWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -831,6 +775,7 @@ const s = StyleSheet.create({
     right: 0,
     padding: 16,
     paddingBottom: 20,
+    backgroundColor: 'transparent',
   },
   floatBtn: {
     height: 52,
@@ -847,11 +792,11 @@ const s = StyleSheet.create({
   },
   floatBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 
-  // Download Menu
+  // ── Download Menu Modal ──
   downloadMenuCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    margin: 32,
+    margin: 24,
     padding: 8,
     shadowColor: '#000',
     shadowOpacity: 0.15,
@@ -876,11 +821,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  downloadMenuText: { fontSize: 14, color: '#111827', fontWeight: '500', flex: 1, textAlign: 'right' },
+  downloadMenuText: { fontSize: 14, color: '#111827', fontWeight: '500', textAlign: 'right', flex: 1 },
   downloadMenuCancel: { borderBottomWidth: 0, justifyContent: 'center' },
   downloadMenuCancelText: { fontSize: 14, color: '#ef4444', fontWeight: '600', textAlign: 'center', flex: 1 },
 
-  // Modal
+  // ── Cart Modal ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#fff',
@@ -897,6 +842,7 @@ const s = StyleSheet.create({
     marginBottom: 18,
   },
   modalTitle: { fontSize: 17, fontWeight: 'bold', color: '#111827' },
+
   inputLabel: {
     fontSize: 12,
     color: '#374151',
@@ -928,6 +874,7 @@ const s = StyleSheet.create({
   },
   profitVal: { fontSize: 15, fontWeight: 'bold' },
   profitLabel: { fontSize: 10, color: '#6b7280' },
+
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18 },
   qtyBtn: {
     width: 42,
@@ -938,11 +885,13 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   qtyVal: { fontSize: 22, fontWeight: 'bold', color: '#111827', minWidth: 36, textAlign: 'center' },
+
   summary: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginTop: 14 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
   summaryTotal: { borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8, marginTop: 4 },
   summaryLabel: { fontSize: 12, color: '#6b7280' },
   summaryVal: { fontSize: 13, color: '#111827', fontWeight: '600' },
+
   addBtn: {
     backgroundColor: PRIMARY,
     borderRadius: 14,
