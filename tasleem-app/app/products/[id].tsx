@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ مفتاح السلة مرتبط بالـ userId
@@ -113,7 +115,47 @@ export default function ProductDetailScreen() {
   };
 
   if (isLoading) {
-    return (
+    // ✅ حفظ صورة واحدة للمعرض
+  const saveImage = async (url: string) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
+        return;
+      }
+      const filename = url.split('/').pop() || 'image.jpg';
+      const fileUri  = FileSystem.documentDirectory + filename;
+      const { uri }  = await FileSystem.downloadAsync(url, fileUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('✅', 'تم حفظ الصورة في المعرض');
+    } catch (e) {
+      Alert.alert('خطأ', 'فشل حفظ الصورة');
+    }
+  };
+
+  // ✅ حفظ جميع الصور
+  const saveAllImages = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
+        return;
+      }
+      let saved = 0;
+      for (const url of images) {
+        const filename = url.split('/').pop() || 'image.jpg';
+        const fileUri  = FileSystem.documentDirectory + filename;
+        const { uri }  = await FileSystem.downloadAsync(url, fileUri);
+        await MediaLibrary.saveToLibraryAsync(uri);
+        saved++;
+      }
+      Alert.alert('✅', `تم حفظ ${saved} صورة في المعرض`);
+    } catch (e) {
+      Alert.alert('خطأ', 'فشل حفظ الصور');
+    }
+  };
+
+  return (
       <View style={s.center}>
         <ActivityIndicator size="large" color={PRIMARY} />
       </View>
@@ -166,10 +208,10 @@ export default function ProductDetailScreen() {
 
           <TouchableOpacity
             style={s.downloadBtn}
-            onPress={() => Alert.alert('تحميل الصور', 'اختر خيار التحميل', [
-              { text: 'تحميل هذه الصورة', onPress: () => Linking.openURL(images[activeImg]) },
+            onPress={() => Alert.alert('حفظ الصور', 'اختر خيار الحفظ', [
+              { text: 'حفظ هذه الصورة', onPress: () => saveImage(images[activeImg]) },
               {
-                text: `تحميل جميع الصور (${images.length})`,
+                text: `حفظ جميع الصور (${images.length})`,
                 onPress: () => images.forEach((u: string) => Linking.openURL(u))
               },
               { text: 'إلغاء', style: 'cancel' },
