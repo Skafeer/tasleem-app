@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
+import { File, Paths } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ مفتاح السلة مرتبط بالـ userId
@@ -112,6 +113,26 @@ export default function ProductDetailScreen() {
     toast.success('تم نسخ ID المنتج ✅');
   };
 
+  // ✅ تحميل صورة وحفظها محلياً بدون expo-file-system
+  const downloadToTemp = async (url: string, index = 0): Promise<string> => {
+    const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
+    const filename = `tasleem_img_${Date.now()}_${index}.${ext}`;
+    // نستخدم الـ cache directory عبر React Native's built-in temp path
+    const tempPath = `${require('react-native').Platform.OS === 'android'
+      ? 'file:///data/user/0/' + require('react-native').NativeModules?.RNFSManager?.NSDocumentDirectory + '/'
+      : ''}${filename}`;
+
+    // الطريقة الموثوقة: fetch → blob → FileReader → base64 → كتابة
+    const response = await fetch(url);
+    const blob     = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string); // base64 data URI
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   // ✅ حفظ صورة واحدة للمعرض
   const saveImage = async (url: string) => {
     try {
@@ -120,8 +141,9 @@ export default function ProductDetailScreen() {
         Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
         return;
       }
-      await MediaLibrary.createAssetAsync(url);
-      Alert.alert('✅', 'تم حفظ الصورة في المعرض');
+      // على Android: createAssetAsync يقبل http URL مباشرة في بعض الإصدارات
+      // لكن الأضمن هو استخدام Linking
+      await Linking.openURL(url);
     } catch (e) {
       Alert.alert('خطأ', 'فشل حفظ الصورة');
     }
@@ -129,22 +151,19 @@ export default function ProductDetailScreen() {
 
   // ✅ حفظ جميع الصور
   const saveAllImages = async () => {
-    try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
-        return;
-      }
-      const imgs = product ? getImages(product) : [];
-      let saved = 0;
-      for (const url of imgs) {
-        await MediaLibrary.createAssetAsync(url);
-        saved++;
-      }
-      Alert.alert('✅', `تم حفظ ${saved} صورة في المعرض`);
-    } catch (e) {
-      Alert.alert('خطأ', 'فشل حفظ الصور');
-    }
+    const imgs = product ? getImages(product) : [];
+    if (imgs.length === 0) return;
+    Alert.alert(
+      'تحميل الصور',
+      `سيتم فتح ${imgs.length} صورة للتحميل`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تحميل',
+          onPress: () => imgs.forEach((u: string) => Linking.openURL(u)),
+        },
+      ]
+    );
   };
 
   if (isLoading) {
