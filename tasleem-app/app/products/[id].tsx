@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ مفتاح السلة مرتبط بالـ userId
@@ -108,14 +107,12 @@ export default function ProductDetailScreen() {
     toast.success('تم النسخ ✅');
   };
 
-  // ✅ دالة نسخ ID المنتج (بدلاً من الكود المتولد)
   const copyProductId = () => {
     Clipboard.setString(String(product.id));
     toast.success('تم نسخ ID المنتج ✅');
   };
 
-  if (isLoading) {
-    // ✅ حفظ صورة واحدة للمعرض
+  // ✅ حفظ صورة واحدة للمعرض
   const saveImage = async (url: string) => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -123,10 +120,7 @@ export default function ProductDetailScreen() {
         Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
         return;
       }
-      const filename = url.split('/').pop() || 'image.jpg';
-      const fileUri  = FileSystem.documentDirectory + filename;
-      const { uri }  = await FileSystem.downloadAsync(url, fileUri);
-      await MediaLibrary.saveToLibraryAsync(uri);
+      await MediaLibrary.createAssetAsync(url);
       Alert.alert('✅', 'تم حفظ الصورة في المعرض');
     } catch (e) {
       Alert.alert('خطأ', 'فشل حفظ الصورة');
@@ -141,12 +135,10 @@ export default function ProductDetailScreen() {
         Alert.alert('خطأ', 'يجب منح صلاحية الوصول للمعرض');
         return;
       }
+      const imgs = product ? getImages(product) : [];
       let saved = 0;
-      for (const url of images) {
-        const filename = url.split('/').pop() || 'image.jpg';
-        const fileUri  = FileSystem.documentDirectory + filename;
-        const { uri }  = await FileSystem.downloadAsync(url, fileUri);
-        await MediaLibrary.saveToLibraryAsync(uri);
+      for (const url of imgs) {
+        await MediaLibrary.createAssetAsync(url);
         saved++;
       }
       Alert.alert('✅', `تم حفظ ${saved} صورة في المعرض`);
@@ -155,7 +147,8 @@ export default function ProductDetailScreen() {
     }
   };
 
-  return (
+  if (isLoading) {
+    return (
       <View style={s.center}>
         <ActivityIndicator size="large" color={PRIMARY} />
       </View>
