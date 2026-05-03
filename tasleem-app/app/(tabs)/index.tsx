@@ -207,8 +207,18 @@ export default function HomeScreen() {
     queryKey: ['unread-notifications-count'],
     queryFn: async () => {
       try {
+        // أولاً: نجرب الـ endpoint المخصص
         const { data } = await api.get('/api/notifications/unread-count');
-        return data.count || 0;
+        if (typeof data?.count === 'number') return data.count;
+        // ثانياً: نحسبه من قائمة الإشعارات كـ fallback
+        const [{ data: notifs }, { data: user }] = await Promise.all([
+          api.get('/api/notifications'),
+          api.get('/api/auth/me'),
+        ]);
+        if (!Array.isArray(notifs)) return 0;
+        return notifs.filter((n: any) =>
+          !n.is_read && (!n.user_id || n.user_id === user.id)
+        ).length;
       } catch { return 0; }
     },
     refetchInterval: 30000,
