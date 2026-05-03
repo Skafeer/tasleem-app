@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "expo-file-system": "^55.0.17",
+    "expo-media-library": "^55.0.15",
     "react-native-markdown-display": "^7.0.2"
   }
 }
