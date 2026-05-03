@@ -3,8 +3,10 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Modal, TextInput, ActivityIndicator,
-  FlatList, Alert, Clipboard, Linking, useWindowDimensions
+  FlatList, Alert, Clipboard, Linking, useWindowDimensions, Animated,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -29,6 +31,9 @@ export default function ProductDetailScreen() {
   const [showCart, setShowCart] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [downloading, setDownloading] = useState(false);
+  const [dlToast, setDlToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const dlToastAnim = useRef(new Animated.Value(0)).current;
   const flatRef = useRef<FlatList>(null);
 
   const { data: user } = useQuery({
@@ -112,6 +117,56 @@ export default function ProductDetailScreen() {
     toast.success('تم نسخ ID المنتج ✅');
   };
 
+  // ── إشعار التنزيل الداخلي ──────────────────────────────────
+  const showDlToast = (msg: string, type: 'success' | 'error') => {
+    setDlToast({ msg, type });
+    dlToastAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(dlToastAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(2200),
+      Animated.timing(dlToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setDlToast(null));
+  };
+
+  // ── تنزيل صورة واحدة داخلياً ──────────────────────────────
+  const downloadSingleImage = async (url: string) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') { showDlToast('يجب منح إذن الوصول للصور', 'error'); return; }
+      const filename  = url.split('/').pop()?.split('?')[0] || `img_${Date.now()}.jpg`;
+      const localUri  = FileSystem.documentDirectory + filename;
+      const { status: dlStatus } = await FileSystem.downloadAsync(url, localUri);
+      if (dlStatus !== 200) throw new Error('failed');
+      await MediaLibrary.saveToLibraryAsync(localUri);
+      showDlToast('تم حفظ الصورة في المعرض ✅', 'success');
+    } catch {
+      showDlToast('فشل تنزيل الصورة ❌', 'error');
+    }
+  };
+
+  // ── تنزيل جميع الصور ──────────────────────────────────────
+  const downloadAllImages = async (urls: string[]) => {
+    setDownloading(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') { showDlToast('يجب منح إذن الوصول للصور', 'error'); return; }
+      let saved = 0;
+      for (const url of urls) {
+        try {
+          const filename  = url.split('/').pop()?.split('?')[0] || `img_${Date.now()}.jpg`;
+          const localUri  = FileSystem.documentDirectory + filename;
+          const { status: dlStatus } = await FileSystem.downloadAsync(url, localUri);
+          if (dlStatus === 200) { await MediaLibrary.saveToLibraryAsync(localUri); saved++; }
+        } catch { /* تجاوز الصورة الفاشلة */ }
+      }
+      if (saved === urls.length)   showDlToast(`تم حفظ جميع الصور (${saved}) ✅`, 'success');
+      else if (saved > 0)          showDlToast(`تم حفظ ${saved} من ${urls.length} صور ✅`, 'success');
+      else                         showDlToast('فشل تنزيل الصور ❌', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={s.center}>
@@ -135,7 +190,22 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header بدون تدرج RTL ── */}
+      {/* ── إشعار التنزيل الداخلي ── */}
+      {dlToast && (
+        <Animated.View style={[
+          s.dlToast,
+          dlToast.type === 'success' ? s.dlToastSuccess : s.dlToastError,
+          {
+            opacity: dlToastAnim,
+            transform: [{ translateY: dlToastAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+          },
+        ]}>
+          <Ionicons name={dlToast.type === 'success' ? 'checkmark-circle' : 'close-circle'} size={18} color="#fff" />
+          <Text style={s.dlToastText}>{dlToast.msg}</Text>
+        </Animated.View>
+      )}
+
+      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -166,15 +236,15 @@ export default function ProductDetailScreen() {
 
           <TouchableOpacity
             style={s.downloadBtn}
+            disabled={downloading}
             onPress={() => Alert.alert('تحميل الصور', 'اختر خيار التحميل', [
-              { text: 'تحميل هذه الصورة', onPress: () => Linking.openURL(images[activeImg]) },
-              {
-                text: `تحميل جميع الصور (${images.length})`,
-                onPress: () => images.forEach((u: string) => Linking.openURL(u))
-              },
+              { text: 'تحميل هذه الصورة', onPress: () => downloadSingleImage(images[activeImg]) },
+              { text: `تحميل جميع الصور (${images.length})`, onPress: () => downloadAllImages(images) },
               { text: 'إلغاء', style: 'cancel' },
             ])}>
-            <Ionicons name="download-outline" size={18} color="#fff" />
+            {downloading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="download-outline" size={18} color="#fff" />}
           </TouchableOpacity>
 
           {images.length > 1 && (
@@ -690,4 +760,25 @@ const s = StyleSheet.create({
     marginTop: 14,
   },
   addBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+
+  dlToast: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    zIndex: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  dlToastSuccess: { backgroundColor: '#16a34a' },
+  dlToastError:   { backgroundColor: '#dc2626' },
+  dlToastText:    { color: '#fff', fontSize: 13, fontWeight: '700', flex: 1, textAlign: 'right' },
 });
