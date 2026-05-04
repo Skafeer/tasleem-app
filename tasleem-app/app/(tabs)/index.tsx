@@ -203,28 +203,29 @@ export default function HomeScreen() {
     },
   });
 
-  const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
-    queryKey: ['unread-notifications-count'],
+  // ── العداد: نحسبه مباشرة من الكاش بدون endpoint منفصل ──────
+  const { data: allNotifications = [] } = useQuery({
+    queryKey: ['user-notifications'],
     queryFn: async () => {
       try {
-        // أولاً: نجرب الـ endpoint المخصص
-        const { data } = await api.get('/api/notifications/unread-count');
-        if (typeof data?.count === 'number') return data.count;
-        // ثانياً: نحسبه من قائمة الإشعارات كـ fallback
-        const [{ data: notifs }, { data: user }] = await Promise.all([
+        const [{ data }, { data: user }] = await Promise.all([
           api.get('/api/notifications'),
           api.get('/api/auth/me'),
         ]);
-        if (!Array.isArray(notifs)) return 0;
-        return notifs.filter((n: any) =>
-          !n.is_read && (!n.user_id || n.user_id === user.id)
-        ).length;
-      } catch { return 0; }
+        if (!Array.isArray(data)) return [];
+        return data
+          .filter((n: any) => !n.user_id || n.user_id === user.id)
+          .sort((a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+      } catch { return []; }
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
-  useFocusEffect(useCallback(() => { refetchUnreadCount(); }, [refetchUnreadCount]));
+  const unreadCount = (allNotifications as any[]).filter((n: any) => !n.is_read).length;
+  const refetchUnreadCount = () => {};
 
   const fetchCartCount = useCallback(async () => {
     try {
