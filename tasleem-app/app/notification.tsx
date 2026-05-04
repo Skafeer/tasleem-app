@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Modal, Pressable
@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
@@ -99,8 +99,15 @@ export default function NotificationsScreen() {
     staleTime: Infinity,
   });
 
-  // ✅ جلب يدوي فقط عند فتح الصفحة
-  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+  // ✅ جلب فقط إذا الكاش فارغ — يمنع مسح التحديثات عند إعادة فتح الصفحة
+  React.useEffect(() => {
+    const cached = qc.getQueryData(['user-notifications']);
+    if (!cached || (Array.isArray(cached) && cached.length === 0)) {
+      refetch();
+    }
+  }, []);
+
+  // ✅ لا useFocusEffect — يمنع مسح التحديثات (قراءة/حذف) عند العودة للصفحة
 
   // ── قراءة إشعار واحد ──────────────────────────────────────────
   const markAsRead = useMutation({
@@ -119,27 +126,32 @@ export default function NotificationsScreen() {
     // ✅ بدون invalidate — العداد يُحسب من الكاش مباشرة
   });
 
-  // ── قراءة الكل ────────────────────────────────────────────────
+  // ── قراءة الكل — نستخدم endpoint الفردي لكل إشعار ────────────
   const markAllAsRead = useMutation({
-    mutationFn: () => api.patch('/api/notifications/read-all'),
+    mutationFn: async () => {
+      const notifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
+      const unread = notifs.filter(n => !n.is_read);
+      // نرسل الطلبات بالتوازي
+      await Promise.all(
+        unread.map(n => api.patch(`/api/notifications/${n.id}/read`).catch(() => {}))
+      );
+    },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prevNotifs = qc.getQueryData(['user-notifications']);
-      // ✅ تحديث فوري — الكل يصبح مقروءاً في الكاش
+      // تحديث فوري في الكاش
       qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
         old.map(n => ({ ...n, is_read: true }))
       );
       return { prevNotifs };
     },
     onError: (_e, _v, ctx: any) => {
-      // rollback عند فشل الـ API
       if (ctx?.prevNotifs) qc.setQueryData(['user-notifications'], ctx.prevNotifs);
       toast.error('فشل تحديث الإشعارات');
     },
     onSuccess: () => {
       toast.success('تم تحديد الكل كمقروء ✅');
     },
-    // ✅ بدون onSettled/invalidate — يمنع مسح التحديث المحلي
   });
 
   // ── حذف إشعار ─────────────────────────────────────────────────
