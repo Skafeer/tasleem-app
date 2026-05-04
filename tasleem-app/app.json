@@ -48,7 +48,8 @@
           "color": "#0c6679",
           "sounds": []
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "tasleem",
     "extra": {
