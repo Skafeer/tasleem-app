@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { I18nManager, Platform, StatusBar } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { useNotifications } from './hooks/useNotifications';
-import { useFonts } from 'expo-font';
-import { Ionicons } from '@expo/vector-icons';
 
-// منع إخفاء شاشة التحميل تلقائياً
 SplashScreen.preventAutoHideAsync();
 
 if (Platform.OS !== 'web') {
@@ -25,9 +21,8 @@ const queryClient = new QueryClient({
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
+  const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  
-  // تمرير حالة تسجيل الدخول للهوك كما يتطلب مشروعك
   useNotifications(isLoggedIn);
 
   useEffect(() => {
@@ -38,56 +33,44 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     try {
       const token = await AsyncStorage.getItem('token');
       const inAuth = segments[0] === 'auth';
-
+      
       if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setIsLoggedIn(true);
-        const res = await api.post('/api/auth/verify');
-        if (res.status !== 200) {
-          await AsyncStorage.removeItem('token');
-          setIsLoggedIn(false);
-          router.replace('/auth');
-        } else if (inAuth) {
+        if (inAuth) {
           router.replace('/(tabs)');
         }
-      } else if (!inAuth) {
-        setIsLoggedIn(false);
-        router.replace('/auth');
+      } else {
+        delete api.defaults.headers.common['Authorization'];
+        if (!inAuth) {
+          router.replace('/auth');
+        }
       }
-    } catch (error) {
-      console.error('Auth error:', error);
+    } catch (e) {
+      console.error('Auth check error:', e);
       router.replace('/auth');
+    } finally {
+      setIsReady(true);
+      SplashScreen.hideAsync();
     }
   };
+
+  if (!isReady) return null;
 
   return <>{children}</>;
 }
 
 export default function RootLayout() {
-  // ✅ تحميل الأيقونات والخطوط يدوياً لضمان ظهورها في نسخة الـ Build
-  const [fontsLoaded, fontError] = useFonts({
-    ...Ionicons.font,
-  });
-
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      // إخفاء شاشة التحميل بمجرد جاهزية الخطوط
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
-  // إذا لم يتم تحميل الخطوط بعد، لا تعرض شيئاً (ستبقى شاشة التحميل ظاهرة)
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthGuard>
-          <StatusBar barStyle="dark-content" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <StatusBar backgroundColor="transparent" translucent={true} barStyle="dark-content" />
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+            <Stack.Screen name="auth" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="cart" />
+            <Stack.Screen name="products/[id]" />
           </Stack>
         </AuthGuard>
       </ToastProvider>
