@@ -203,8 +203,8 @@ export default function HomeScreen() {
     },
   });
 
-  // ── العداد: نحسبه مباشرة من الكاش بدون endpoint منفصل ──────
-  const { data: allNotifications = [] } = useQuery({
+  // ── العداد: نحسبه مباشرة من الكاش ──────────────────────────
+  const { data: allNotifications = [], refetch: refetchNotifs } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: async () => {
       try {
@@ -220,12 +220,18 @@ export default function HomeScreen() {
           );
       } catch { return []; }
     },
-    refetchInterval: 60000,
-    staleTime: 30000,
+    // ✅ نوقف كل auto-refetch — يمنع مسح التحديثات المحلية
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
   });
 
   const unreadCount = (allNotifications as any[]).filter((n: any) => !n.is_read).length;
-  const refetchUnreadCount = () => {};
+
+  // ✅ جلب عند فتح الصفحة الرئيسية فقط
+  useFocusEffect(useCallback(() => { refetchNotifs(); }, [refetchNotifs]));
 
   const fetchCartCount = useCallback(async () => {
     try {
@@ -331,7 +337,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetch(), refetchUnreadCount()]);
+    await Promise.all([refetch(), refetchNotifs()]);
     await fetchCartCount();
     setRefreshing(false);
   };
@@ -666,21 +672,23 @@ const s = StyleSheet.create({
     backgroundColor: '#f0f9fa',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
   notifBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -6,
+    right: -6,
     backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 10,
   },
-  notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: 'bold' },
+  notifBadgeText: { fontSize: 10, color: '#fff', fontWeight: '900' },
   flatListContent: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
   columnWrapper: { gap: 12, justifyContent: 'space-between', alignItems: 'stretch', marginBottom: 8 },
   searchWrapper: {

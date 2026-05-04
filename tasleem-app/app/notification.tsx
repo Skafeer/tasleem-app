@@ -77,6 +77,7 @@ export default function NotificationsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
 
   // ── جلب الإشعارات ─────────────────────────────────────────────
+  // ✅ نوقف كل auto-refetch لمنع مسح التحديثات المحلية (قراءة/حذف)
   const { data: notifications = [], isLoading, refetch, error } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: async () => {
@@ -85,19 +86,23 @@ export default function NotificationsScreen() {
         api.get('/api/auth/me'),
       ]);
       if (!Array.isArray(data)) return [];
-      // إشعارات الـ broadcast (بدون user_id) + إشعارات المستخدم الحالي
       return data
         .filter((n: any) => !n.user_id || n.user_id === user.id)
         .sort((a: Notification, b: Notification) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
     },
-    refetchInterval: 30000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity,
   });
 
+  // ✅ جلب يدوي فقط عند فتح الصفحة
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  // ── قراءة إشعار ───────────────────────────────────────────────
+  // ── قراءة إشعار واحد ──────────────────────────────────────────
   const markAsRead = useMutation({
     mutationFn: (id: number) => api.patch(`/api/notifications/${id}/read`),
     onMutate: async (id) => {
@@ -106,15 +111,12 @@ export default function NotificationsScreen() {
       qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
         old.map(n => n.id === id ? { ...n, is_read: true } : n)
       );
-      qc.setQueryData(['unread-notifications-count'], (old: number = 0) =>
-        Math.max(0, old - 1)
-      );
       return { prev };
     },
     onError: (_e, _v, ctx: any) => {
       if (ctx?.prev) qc.setQueryData(['user-notifications'], ctx.prev);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['unread-notifications-count'] }),
+    // ✅ بدون invalidate — العداد يُحسب من الكاش مباشرة
   });
 
   // ── قراءة الكل ────────────────────────────────────────────────
@@ -122,24 +124,22 @@ export default function NotificationsScreen() {
     mutationFn: () => api.patch('/api/notifications/read-all'),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
-      await qc.cancelQueries({ queryKey: ['unread-notifications-count'] });
       const prevNotifs = qc.getQueryData(['user-notifications']);
-      const prevCount  = qc.getQueryData(['unread-notifications-count']);
+      // ✅ تحديث فوري — الكل يصبح مقروءاً في الكاش
       qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
         old.map(n => ({ ...n, is_read: true }))
       );
-      qc.setQueryData(['unread-notifications-count'], 0);
-      return { prevNotifs, prevCount };
+      return { prevNotifs };
     },
     onError: (_e, _v, ctx: any) => {
+      // rollback عند فشل الـ API
       if (ctx?.prevNotifs) qc.setQueryData(['user-notifications'], ctx.prevNotifs);
-      if (ctx?.prevCount !== undefined) qc.setQueryData(['unread-notifications-count'], ctx.prevCount);
+      toast.error('فشل تحديث الإشعارات');
     },
-    onSuccess: () => toast.success('تم تحديد الكل كمقروء ✅'),
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['user-notifications'] });
-      qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
+    onSuccess: () => {
+      toast.success('تم تحديد الكل كمقروء ✅');
     },
+    // ✅ بدون onSettled/invalidate — يمنع مسح التحديث المحلي
   });
 
   // ── حذف إشعار ─────────────────────────────────────────────────
@@ -148,23 +148,25 @@ export default function NotificationsScreen() {
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prev = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
-      const wasUnread = prev.find(n => n.id === id && !n.is_read);
+      // ✅ حذف فوري من الكاش
       qc.setQueryData(['user-notifications'], prev.filter(n => n.id !== id));
-      if (wasUnread)
-        qc.setQueryData(['unread-notifications-count'], (old: number = 0) => Math.max(0, old - 1));
       return { prev };
     },
     onError: (_e, _v, ctx: any) => {
       if (ctx?.prev) qc.setQueryData(['user-notifications'], ctx.prev);
     },
-    onSuccess: () => { setModalVisible(false); toast.success('تم حذف الإشعار'); },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['user-notifications'] });
-      qc.invalidateQueries({ queryKey: ['unread-notifications-count'] });
+    onSuccess: () => {
+      setModalVisible(false);
+      toast.success('تم حذف الإشعار');
     },
+    // ✅ بدون onSettled/invalidate — يمنع إعادة ظهور الإشعار المحذوف
   });
 
-  const onRefresh = async () => { setRefreshing(true); await refetch(); setRefreshing(false); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const handlePress = (notif: Notification) => {
     if (!notif.is_read) markAsRead.mutate(notif.id);
@@ -172,6 +174,7 @@ export default function NotificationsScreen() {
     setModalVisible(true);
   };
 
+  // ✅ العداد محسوب مباشرة من الكاش — يتحدث فوراً مع كل تغيير
   const unreadCount = (notifications as Notification[]).filter(n => !n.is_read).length;
 
   // ── كارد الإشعار ──────────────────────────────────────────────
@@ -187,12 +190,15 @@ export default function NotificationsScreen() {
         onPress={() => handlePress(item)}
         activeOpacity={0.75}>
 
+        {/* خط جانبي ملون للغير مقروء */}
         {isUnread && <View style={[s.unreadBar, { backgroundColor: color }]} />}
 
+        {/* أيقونة */}
         <View style={[s.iconBox, { backgroundColor: bg }]}>
           <Ionicons name={icon as any} size={22} color={color} />
         </View>
 
+        {/* المحتوى */}
         <View style={s.content}>
           <View style={s.topRow}>
             <Text style={s.time}>{timeAgo(item.created_at)}</Text>
@@ -203,6 +209,7 @@ export default function NotificationsScreen() {
           </Text>
           <Text style={s.body} numberOfLines={2}>{item.body}</Text>
 
+          {/* بادج حالة الطلب */}
           {isOrder && d?.status && ORDER_STATUS[d.status] && (
             <View style={[s.badge, { backgroundColor: ORDER_STATUS[d.status].color + '15' }]}>
               <Ionicons name={ORDER_STATUS[d.status].icon as any} size={11} color={ORDER_STATUS[d.status].color} />
@@ -216,6 +223,7 @@ export default function NotificationsScreen() {
           )}
         </View>
 
+        {/* زر حذف */}
         <TouchableOpacity
           style={s.delBtn}
           onPress={() => deleteNotif.mutate(item.id)}
@@ -234,7 +242,11 @@ export default function NotificationsScreen() {
     const isOrder = d?.type === 'order_status';
 
     return (
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}>
         <Pressable style={s.overlay} onPress={() => setModalVisible(false)}>
           <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
             <View style={s.sheetHandle} />
@@ -248,7 +260,10 @@ export default function NotificationsScreen() {
             </View>
 
             {isOrder && d?.status && ORDER_STATUS[d.status] && (
-              <View style={[s.sheetBadge, { backgroundColor: ORDER_STATUS[d.status].color + '12', borderColor: ORDER_STATUS[d.status].color + '35' }]}>
+              <View style={[s.sheetBadge, {
+                backgroundColor: ORDER_STATUS[d.status].color + '12',
+                borderColor: ORDER_STATUS[d.status].color + '35',
+              }]}>
                 <Ionicons name={ORDER_STATUS[d.status].icon as any} size={16} color={ORDER_STATUS[d.status].color} />
                 <Text style={[s.sheetBadgeText, { color: ORDER_STATUS[d.status].color }]}>
                   {ORDER_STATUS[d.status].label}
@@ -262,11 +277,15 @@ export default function NotificationsScreen() {
             <Text style={s.sheetBody}>{selected.body}</Text>
 
             <View style={s.sheetFooter}>
-              <TouchableOpacity style={s.sheetDel} onPress={() => deleteNotif.mutate(selected.id)}>
+              <TouchableOpacity
+                style={s.sheetDel}
+                onPress={() => deleteNotif.mutate(selected.id)}>
                 <Ionicons name="trash-outline" size={17} color="#ef4444" />
                 <Text style={s.sheetDelText}>حذف</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.sheetClose} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity
+                style={s.sheetClose}
+                onPress={() => setModalVisible(false)}>
                 <Text style={s.sheetCloseText}>إغلاق</Text>
               </TouchableOpacity>
             </View>
@@ -299,12 +318,16 @@ export default function NotificationsScreen() {
             style={s.markAllBtn}
             onPress={() => markAllAsRead.mutate()}
             disabled={markAllAsRead.isPending}>
-            <Text style={s.markAllText}>{markAllAsRead.isPending ? '...' : 'قراءة الكل'}</Text>
+            <Text style={s.markAllText}>
+              {markAllAsRead.isPending ? '...' : 'قراءة الكل'}
+            </Text>
           </TouchableOpacity>
-        ) : <View style={{ width: 72 }} />}
+        ) : (
+          <View style={{ width: 72 }} />
+        )}
       </View>
 
-      {/* محتوى */}
+      {/* المحتوى */}
       {error ? (
         <View style={s.center}>
           <View style={s.emptyIconBox}>
@@ -328,7 +351,9 @@ export default function NotificationsScreen() {
           renderItem={renderItem}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+          }
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListEmptyComponent={
             <View style={s.center}>
@@ -349,8 +374,9 @@ export default function NotificationsScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 60 },
+  center:    { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 60 },
 
+  // ── Header ──
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
@@ -361,8 +387,8 @@ const s = StyleSheet.create({
     backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#d4eef3',
     justifyContent: 'center', alignItems: 'center',
   },
-  headerMid: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0d1b2a' },
+  headerMid:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:     { fontSize: 18, fontWeight: '800', color: '#0d1b2a' },
   headerBadge: {
     backgroundColor: '#ef4444', borderRadius: 10,
     minWidth: 20, height: 20, paddingHorizontal: 5,
@@ -375,8 +401,10 @@ const s = StyleSheet.create({
   },
   markAllText: { fontSize: 12, color: PRIMARY, fontWeight: '700' },
 
+  // ── List ──
   list: { padding: 14, paddingBottom: 30 },
 
+  // ── Card ──
   card: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff', borderRadius: 16,
@@ -384,51 +412,59 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
     borderWidth: 1, borderColor: '#e8edf2', overflow: 'hidden',
   },
-  cardUnread: { borderColor: PRIMARY + '30', shadowOpacity: 0.08, elevation: 2 },
-  unreadBar: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 3 },
-  iconBox: { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
-  content: { flex: 1, gap: 3 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { fontSize: 10, color: '#94a3b8' },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  title: { fontSize: 13, fontWeight: '600', color: '#374151', textAlign: 'right' },
-  titleBold: { fontWeight: '800', color: '#0d1b2a' },
-  body: { fontSize: 12, color: '#64748b', lineHeight: 17, textAlign: 'right' },
+  cardUnread:  { borderColor: PRIMARY + '30', shadowOpacity: 0.08, elevation: 2 },
+  unreadBar:   { position: 'absolute', right: 0, top: 0, bottom: 0, width: 3 },
+  iconBox:     { width: 46, height: 46, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  content:     { flex: 1, gap: 3 },
+  topRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  time:        { fontSize: 10, color: '#94a3b8' },
+  dot:         { width: 7, height: 7, borderRadius: 4 },
+  title:       { fontSize: 13, fontWeight: '600', color: '#374151', textAlign: 'right' },
+  titleBold:   { fontWeight: '800', color: '#0d1b2a' },
+  body:        { fontSize: 12, color: '#64748b', lineHeight: 17, textAlign: 'right' },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
     marginTop: 4, alignSelf: 'flex-end',
   },
   badgeText: { fontSize: 11, fontWeight: '700' },
-  delBtn: { padding: 4 },
+  delBtn:    { padding: 4 },
 
-  emptyIconBox: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#374151' },
-  emptyText: { fontSize: 13, color: '#9ca3af', textAlign: 'center' },
-  retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
-  retryText: { color: '#fff', fontWeight: '700' },
+  // ── Empty / Error ──
+  emptyIconBox: {
+    width: 90, height: 90, borderRadius: 45,
+    backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center',
+  },
+  emptyTitle:  { fontSize: 16, fontWeight: '800', color: '#374151' },
+  emptyText:   { fontSize: 13, color: '#9ca3af', textAlign: 'center' },
+  retryBtn:    { backgroundColor: PRIMARY, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
+  retryText:   { color: '#fff', fontWeight: '700' },
   loadingText: { fontSize: 13, color: '#9ca3af' },
 
+  // ── Bottom Sheet ──
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26,
     paddingHorizontal: 20, paddingBottom: 36, paddingTop: 14,
   },
-  sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: '#e2e8f0', alignSelf: 'center', marginBottom: 20 },
-  sheetTop: { alignItems: 'center', gap: 10, marginBottom: 16 },
-  sheetIcon: { width: 60, height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  sheetTitle: { fontSize: 17, fontWeight: '800', color: '#0d1b2a', textAlign: 'center' },
-  sheetTime: { fontSize: 11, color: '#94a3b8' },
+  sheetHandle:    { width: 38, height: 4, borderRadius: 2, backgroundColor: '#e2e8f0', alignSelf: 'center', marginBottom: 20 },
+  sheetTop:       { alignItems: 'center', gap: 10, marginBottom: 16 },
+  sheetIcon:      { width: 60, height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  sheetTitle:     { fontSize: 17, fontWeight: '800', color: '#0d1b2a', textAlign: 'center' },
+  sheetTime:      { fontSize: 11, color: '#94a3b8' },
   sheetBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
     borderWidth: 1, alignSelf: 'center', marginBottom: 14,
   },
   sheetBadgeText: { fontSize: 13, fontWeight: '700' },
-  sheetBody: { fontSize: 15, color: '#374151', lineHeight: 24, textAlign: 'right', marginBottom: 24 },
-  sheetFooter: { flexDirection: 'row', gap: 10 },
-  sheetDel: { flex: 1, height: 46, borderRadius: 13, backgroundColor: '#fee2e2', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 },
-  sheetDelText: { fontSize: 14, color: '#ef4444', fontWeight: '700' },
-  sheetClose: { flex: 2, height: 46, borderRadius: 13, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
+  sheetBody:      { fontSize: 15, color: '#374151', lineHeight: 24, textAlign: 'right', marginBottom: 24 },
+  sheetFooter:    { flexDirection: 'row', gap: 10 },
+  sheetDel: {
+    flex: 1, height: 46, borderRadius: 13, backgroundColor: '#fee2e2',
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7,
+  },
+  sheetDelText:   { fontSize: 14, color: '#ef4444', fontWeight: '700' },
+  sheetClose:     { flex: 2, height: 46, borderRadius: 13, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
   sheetCloseText: { fontSize: 14, color: '#fff', fontWeight: '700' },
 });
