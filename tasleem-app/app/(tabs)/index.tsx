@@ -223,15 +223,13 @@ export default function HomeScreen() {
     // ✅ نوقف كل auto-refetch — يمنع مسح التحديثات المحلية
     refetchInterval: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true,   // جلب مرة واحدة عند أول تحميل فقط
     refetchOnReconnect: false,
     staleTime: Infinity,
   });
 
   const unreadCount = (allNotifications as any[]).filter((n: any) => !n.is_read).length;
-
-  // ✅ جلب عند فتح الصفحة الرئيسية فقط
-  useFocusEffect(useCallback(() => { refetchNotifs(); }, [refetchNotifs]));
+  // ✅ لا useFocusEffect هنا — يمنع مسح التحديثات عند العودة من صفحة الإشعارات
 
   const fetchCartCount = useCallback(async () => {
     try {
@@ -337,7 +335,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetch(), refetchNotifs()]);
+    await Promise.all([refetch()]);
     await fetchCartCount();
     setRefreshing(false);
   };

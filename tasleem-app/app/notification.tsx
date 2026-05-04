@@ -99,14 +99,8 @@ export default function NotificationsScreen() {
     staleTime: Infinity,
   });
 
-  // ✅ جلب عند أول فتح فقط، أو بعد سحب يدوي للتحديث
-  const lastFetchedAt = React.useRef<number>(0);
-  useFocusEffect(useCallback(() => {
-    const now = Date.now();
-    // لا نجلب إذا مر أقل من 5 دقائق من آخر جلب
-    if (now - lastFetchedAt.current < 5 * 60 * 1000) return;
-    refetch().then(() => { lastFetchedAt.current = Date.now(); });
-  }, [refetch]));
+  // ✅ جلب يدوي فقط عند فتح الصفحة
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   // ── قراءة إشعار واحد ──────────────────────────────────────────
   const markAsRead = useMutation({
@@ -125,32 +119,27 @@ export default function NotificationsScreen() {
     // ✅ بدون invalidate — العداد يُحسب من الكاش مباشرة
   });
 
-  // ── قراءة الكل — نستخدم endpoint الفردي لكل إشعار ────────────
+  // ── قراءة الكل ────────────────────────────────────────────────
   const markAllAsRead = useMutation({
-    mutationFn: async () => {
-      const notifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
-      const unread = notifs.filter(n => !n.is_read);
-      // نرسل الطلبات بالتوازي
-      await Promise.all(
-        unread.map(n => api.patch(`/api/notifications/${n.id}/read`).catch(() => {}))
-      );
-    },
+    mutationFn: () => api.patch('/api/notifications/read-all'),
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prevNotifs = qc.getQueryData(['user-notifications']);
-      // تحديث فوري في الكاش
+      // ✅ تحديث فوري — الكل يصبح مقروءاً في الكاش
       qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
         old.map(n => ({ ...n, is_read: true }))
       );
       return { prevNotifs };
     },
     onError: (_e, _v, ctx: any) => {
+      // rollback عند فشل الـ API
       if (ctx?.prevNotifs) qc.setQueryData(['user-notifications'], ctx.prevNotifs);
       toast.error('فشل تحديث الإشعارات');
     },
     onSuccess: () => {
       toast.success('تم تحديد الكل كمقروء ✅');
     },
+    // ✅ بدون onSettled/invalidate — يمنع مسح التحديث المحلي
   });
 
   // ── حذف إشعار ─────────────────────────────────────────────────
@@ -176,7 +165,6 @@ export default function NotificationsScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch();
-    lastFetchedAt.current = Date.now();
     setRefreshing(false);
   };
 
