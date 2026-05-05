@@ -36,7 +36,7 @@ const TABS = [
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', activeIcon: 'notifications' },
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',    activeIcon: 'shield-half' },
   { key: 'support',     label: 'الدعم',     icon: 'headset-outline',        activeIcon: 'headset' },
-  { key: 'Inventory', label: 'تتبع المخزون',     icon: 'warehouse-outline', activeIcon: 'warehouse' },
+  { key: 'inventory', label: 'تتبع المخزون',     icon: 'warehouse-outline', activeIcon: 'warehouse' },
 ];
 
 export default function AdminScreen() {
@@ -199,7 +199,7 @@ export default function AdminScreen() {
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'admins' && <AdminsTab />}
         {tab === 'support' && <SupportTab />}
-        {tab === 'Inventory' && <InventoryTab />}
+        {tab === 'inventory' && <InventoryTab />}
 
       </ScrollView>
     </SafeAreaView>
