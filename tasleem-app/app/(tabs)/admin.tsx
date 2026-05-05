@@ -19,7 +19,7 @@ import BannersTab     from '../admin-components/BannersTab';
 import AdminsTab      from '../admin-components/AdminsTab';
 import SupportTab     from '../admin-components/SupportTab';
 import CategoriesTab  from '../admin-components/CategoriesTab';
-
+import InventoryTab  from '../admin-components/InventoryTab';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
@@ -199,7 +199,7 @@ export default function AdminScreen() {
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'admins' && <AdminsTab />}
         {tab === 'support' && <SupportTab />}
-        
+        {tab === 'Inventory' && <InventoryTab />}
 
       </ScrollView>
     </SafeAreaView>
