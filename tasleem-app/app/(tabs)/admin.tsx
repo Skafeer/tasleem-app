@@ -27,7 +27,7 @@ const TABS = [
   { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',    activeIcon: 'bag-handle' },
   { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',           activeIcon: 'cube' },
   { key: 'withdrawals', label: 'السحوبات',  icon: 'cash-outline',           activeIcon: 'cash' },
-  { key: 'users',       label: 'التجار',    icon: 'people-outline',         activeIcon: 'people' },
+  { key: 'merchants',   label: 'التجار',    icon: 'people-outline',         activeIcon: 'people' },
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
@@ -119,7 +119,7 @@ export default function AdminScreen() {
     if (key === 'orders') return (orders as any[]).length;
     if (key === 'products') return (products as any[]).length;
     if (key === 'withdrawals') return pendingWithdrawals;
-    if (key === 'users') return merchantCount;
+    if (key === 'merchants') return merchantCount;
     if (key === 'promos') return (promos as any[]).length;
     return 0;
   };
@@ -189,7 +189,7 @@ export default function AdminScreen() {
         {tab === 'orders' && <OrdersTab />}
         {tab === 'products' && <ProductsTab />}
         {tab === 'withdrawals' && <WithdrawalsTab />}
-        {tab === 'users' && <MerchantsTab />}
+        {tab === 'merchants' && <MerchantsTab />}
         {tab === 'promos' && <PromosTab />}
         {tab === 'banners' && <BannersTab />}
         {tab === 'stats' && <StatsTab />}
