@@ -19,7 +19,7 @@ import BannersTab     from '../admin-components/BannersTab';
 import AdminsTab      from '../admin-components/AdminsTab';
 import SupportTab     from '../admin-components/SupportTab';
 import CategoriesTab  from '../admin-components/CategoriesTab';
-import InventoryTab  from '../admin-components/InventoryTab';
+import InventoryTab   from '../admin-components/InventoryTab';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
@@ -32,11 +32,11 @@ const TABS = [
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
   { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
-  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',           activeIcon: 'grid' }, 
+  { key: 'inventory',   label: 'المخزون',   icon: 'layers-outline',         activeIcon: 'layers' },
+  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',           activeIcon: 'grid' },
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', activeIcon: 'notifications' },
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',    activeIcon: 'shield-half' },
   { key: 'support',     label: 'الدعم',     icon: 'headset-outline',        activeIcon: 'headset' },
-  { key: 'inventory', label: 'تتبع المخزون',     icon: 'layers-outline', activeIcon: 'layers' },
 ];
 
 export default function AdminScreen() {
@@ -195,11 +195,11 @@ export default function AdminScreen() {
         {tab === 'promos' && <PromosTab />}
         {tab === 'banners' && <BannersTab />}
         {tab === 'stats' && <StatsTab />}
-        {tab === 'categories' && <CategoriesTab />} 
+        {tab === 'inventory' && <InventoryTab />}
+        {tab === 'categories' && <CategoriesTab />}
         {tab === 'notifications' && <NotificationsTab />}
         {tab === 'admins' && <AdminsTab />}
         {tab === 'support' && <SupportTab />}
-        {tab === 'inventory' && <InventoryTab />}
 
       </ScrollView>
     </SafeAreaView>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, TextInput, Modal, Image,
+  TextInput, Modal, ActivityIndicator, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,314 +9,217 @@ import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
 const PRIMARY  = '#0c6679';
+const BG       = '#f2f6f9';
 const DANGER   = '#ef4444';
 const WARNING  = '#f59e0b';
 const SUCCESS  = '#10b981';
-const BG       = '#f2f6f9';
 
 type Filter = 'all' | 'low' | 'out' | 'stale';
 
-// ── مكوّن سجل تغييرات المخزون ──
-function LogModal({ product, onClose }: { product: any; onClose: () => void }) {
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['inventory-log', product.id],
-    queryFn: async () => {
-      const { data } = await api.get(`/api/inventory/${product.id}/log`);
-      return data;
-    },
-  });
+interface Product {
+  id: number;
+  name: string;
+  imageUrl: string;
+  stock: number;
+  wholesalePrice: number;
+  category: string;
+  isActive: boolean;
+  totalSold: number;
+}
 
-  const reasonLabel = (r: string) => {
-    const map: Record<string, string> = {
-      manual: 'يدوي',
-      order:  'طلب',
-      return: 'إرجاع',
-      damage: 'تالف',
-    };
-    return map[r] || r;
-  };
+interface InventoryStats {
+  total: number;
+  outOfStock: number;
+  lowStock: number;
+  stale: number;
+  totalValue: number;
+}
 
+interface LogEntry {
+  id: number;
+  change: number;
+  reason: string;
+  note: string | null;
+  stock_after: number;
+  created_at: string;
+  admin_name: string | null;
+}
+
+const FILTERS: { key: Filter; label: string; icon: string; color: string }[] = [
+  { key: 'all',   label: 'الكل',         icon: 'cube-outline',         color: PRIMARY   },
+  { key: 'low',   label: 'منخفض',        icon: 'warning-outline',       color: WARNING   },
+  { key: 'out',   label: 'نافد',          icon: 'close-circle-outline',  color: DANGER    },
+  { key: 'stale', label: 'راكد 30 يوم',  icon: 'hourglass-outline',     color: '#8b5cf6' },
+];
+
+const REASON_LABELS: Record<string, string> = {
+  manual:   'تعديل يدوي',
+  order:    'طلب جديد',
+  cancel:   'إلغاء طلب',
+  returned: 'مرتجع',
+};
+
+const timeAgo = (date: string) => {
+  const d = new Date(date.endsWith('Z') ? date : date + 'Z');
+  const diff = Date.now() - d.getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const day = Math.floor(diff / 86400000);
+  if (m < 1) return 'الآن';
+  if (m < 60) return `منذ ${m} د`;
+  if (h < 24) return `منذ ${h} س`;
+  return `منذ ${day} يوم`;
+};
+
+// ── StatCard ─────────────────────────────────────────────────────
+function StatCard({ label, value, icon, color, wide }: {
+  label: string; value: any; icon: string; color: string; wide?: boolean;
+}) {
   return (
-    <Modal visible transparent animationType="slide">
-      <View style={s.modalOverlay}>
-        <View style={s.logCard}>
-          <View style={s.logHeader}>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#6b7280" />
-            </TouchableOpacity>
-            <Text style={s.logTitle} numberOfLines={1}>سجل: {product.name}</Text>
-            <Ionicons name="time-outline" size={20} color={PRIMARY} />
-          </View>
-
-          {isLoading ? (
-            <ActivityIndicator color={PRIMARY} style={{ marginVertical: 30 }} />
-          ) : (logs as any[]).length === 0 ? (
-            <View style={s.empty}>
-              <Ionicons name="document-outline" size={36} color="#d1d5db" />
-              <Text style={s.emptyText}>لا يوجد سجل</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {(logs as any[]).map((log: any) => (
-                <View key={log.id} style={s.logRow}>
-                  <View style={[
-                    s.logChangeChip,
-                    log.change > 0 ? s.logChipPos : s.logChipNeg,
-                  ]}>
-                    <Text style={s.logChangeText}>
-                      {log.change > 0 ? '+' : ''}{log.change}
-                    </Text>
-                  </View>
-                  <View style={s.logInfo}>
-                    <Text style={s.logAfter}>بعد: {log.stock_after} وحدة</Text>
-                    {log.note ? (
-                      <Text style={s.logNote}>{log.note}</Text>
-                    ) : null}
-                    <Text style={s.logMeta}>
-                      {reasonLabel(log.reason)} · {log.admin_name || 'نظام'} · {new Date(log.created_at).toLocaleDateString('ar-IQ')}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+    <View style={[st.card, wide && { minWidth: 160 }]}>
+      <View style={[st.iconBox, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
       </View>
-    </Modal>
+      <Text style={[st.value, { color }]}>{value}</Text>
+      <Text style={st.label}>{label}</Text>
+    </View>
   );
 }
 
-// ── مكوّن تعديل المخزون ──
-function EditModal({
-  product, onClose,
-}: { product: any; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [change, setChange]   = useState('');
-  const [note, setNote]       = useState('');
-  const [reason, setReason]   = useState('manual');
+const st = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 14,
+    alignItems: 'center', gap: 6, minWidth: 110,
+    borderWidth: 1, borderColor: '#e8edf2',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  iconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  value:   { fontSize: 18, fontWeight: '900' },
+  label:   { fontSize: 11, color: '#6b7280', textAlign: 'center' },
+});
 
-  const REASONS = [
-    { key: 'manual', label: 'يدوي' },
-    { key: 'return', label: 'إرجاع' },
-    { key: 'damage', label: 'تالف' },
-  ];
-
-  const mutation = useMutation({
-    mutationFn: async () =>
-      api.patch(`/api/inventory/${product.id}`, {
-        change: Number(change),
-        note: note.trim() || undefined,
-        reason,
-      }),
-    onSuccess: () => {
-      toast.success('تم تحديث المخزون ✅');
-      qc.invalidateQueries({ queryKey: ['inventory'] });
-      qc.invalidateQueries({ queryKey: ['inventory-log', product.id] });
-      onClose();
-    },
-    onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل التحديث'),
-  });
-
-  const preview = product.stock + (Number(change) || 0);
-
-  return (
-    <Modal visible transparent animationType="slide">
-      <View style={s.modalOverlay}>
-        <View style={s.editCard}>
-          <View style={s.logHeader}>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#6b7280" />
-            </TouchableOpacity>
-            <Text style={s.logTitle} numberOfLines={1}>تعديل: {product.name}</Text>
-            <Ionicons name="cube-outline" size={20} color={PRIMARY} />
-          </View>
-
-          {/* المخزون الحالي */}
-          <View style={s.currentStock}>
-            <Text style={s.currentStockLabel}>المخزون الحالي</Text>
-            <Text style={s.currentStockVal}>{product.stock}</Text>
-          </View>
-
-          {/* إدخال التغيير */}
-          <Text style={s.inputLabel}>التغيير (+ إضافة / - خصم)</Text>
-          <TextInput
-            style={s.input}
-            value={change}
-            onChangeText={setChange}
-            keyboardType="numeric"
-            placeholder="مثال: 10 أو -5"
-            placeholderTextColor="#9ca3af"
-            textAlign="right"
-          />
-
-          {/* معاينة */}
-          {change !== '' && (
-            <View style={[
-              s.previewBox,
-              preview < 0 ? s.previewDanger : preview <= 10 ? s.previewWarn : s.previewOk,
-            ]}>
-              <Text style={s.previewText}>
-                النتيجة: {Math.max(0, preview)} وحدة
-              </Text>
-            </View>
-          )}
-
-          {/* السبب */}
-          <Text style={s.inputLabel}>السبب</Text>
-          <View style={s.reasonRow}>
-            {REASONS.map(r => (
-              <TouchableOpacity
-                key={r.key}
-                style={[s.reasonChip, reason === r.key && s.reasonChipOn]}
-                onPress={() => setReason(r.key)}>
-                <Text style={[s.reasonText, reason === r.key && s.reasonTextOn]}>
-                  {r.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ملاحظة */}
-          <Text style={s.inputLabel}>ملاحظة (اختياري)</Text>
-          <TextInput
-            style={[s.input, { height: 70, textAlignVertical: 'top' }]}
-            value={note}
-            onChangeText={setNote}
-            placeholder="أي تفاصيل إضافية..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            textAlign="right"
-          />
-
-          <TouchableOpacity
-            style={[s.saveBtn, (!change || mutation.isPending) && { opacity: 0.6 }]}
-            onPress={() => mutation.mutate()}
-            disabled={!change || mutation.isPending}>
-            {mutation.isPending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                <Text style={s.saveBtnText}>حفظ التغيير</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ══════════════════════════════════════
-// الصفحة الرئيسية
-// ══════════════════════════════════════
+// ── Main Component ────────────────────────────────────────────────
 export default function InventoryTab() {
-  const [filter, setFilter]       = useState<Filter>('all');
-  const [search, setSearch]       = useState('');
-  const [editProduct, setEditProduct] = useState<any>(null);
-  const [logProduct, setLogProduct]   = useState<any>(null);
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
+  const [adjustModal, setAdjustModal] = useState(false);
+  const [logModal, setLogModal] = useState(false);
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [changeVal, setChangeVal] = useState('');
+  const [note, setNote] = useState('');
+  const [reason, setReason] = useState<'manual' | 'cancel' | 'returned'>('manual');
 
-  const { data: stats } = useQuery({
+  // ── الإحصائيات ──────────────────────────────────────────────
+  const { data: stats } = useQuery<InventoryStats>({
     queryKey: ['inventory-stats'],
     queryFn: async () => {
       const { data } = await api.get('/api/inventory/stats');
       return data;
     },
+    refetchInterval: 60000,
   });
 
-  const { data: products = [], isLoading } = useQuery({
+  // ── قائمة المنتجات ──────────────────────────────────────────
+  const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ['inventory', filter],
     queryFn: async () => {
       const { data } = await api.get(`/api/inventory?filter=${filter}`);
       return data;
     },
+    refetchInterval: 60000,
   });
 
-  const filtered = (products as any[]).filter((p: any) =>
-    !search ||
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    String(p.id).includes(search)
+  // ── سجل منتج ────────────────────────────────────────────────
+  const { data: log = [], isLoading: logLoading } = useQuery<LogEntry[]>({
+    queryKey: ['inventory-log', selected?.id],
+    queryFn: async () => {
+      if (!selected) return [];
+      const { data } = await api.get(`/api/inventory/${selected.id}/log`);
+      return data;
+    },
+    enabled: !!selected && logModal,
+  });
+
+  // ── تعديل المخزون ───────────────────────────────────────────
+  const adjustMutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) return;
+      const change = Number(changeVal);
+      if (isNaN(change) || change === 0) throw new Error('أدخل قيمة صحيحة');
+      await api.patch(`/api/inventory/${selected.id}`, {
+        change, note: note || null, reason,
+      });
+    },
+    onSuccess: () => {
+      toast.success('تم تعديل المخزون ✅');
+      setAdjustModal(false);
+      setChangeVal('');
+      setNote('');
+      setReason('manual');
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['inventory-stats'] });
+      qc.invalidateQueries({ queryKey: ['inventory-log', selected?.id] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'فشل التعديل'),
+  });
+
+  const filtered = products.filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const FILTERS: { key: Filter; label: string; icon: string; color: string }[] = [
-    { key: 'all',   label: 'الكل',       icon: 'cube-outline',       color: PRIMARY  },
-    { key: 'low',   label: 'منخفض',      icon: 'warning-outline',    color: WARNING  },
-    { key: 'out',   label: 'نافد',        icon: 'close-circle-outline', color: DANGER },
-    { key: 'stale', label: 'راكد',        icon: 'time-outline',       color: '#8b5cf6' },
-  ];
-
-  const stockColor = (stock: number) => {
-    if (stock === 0) return DANGER;
-    if (stock <= 10) return WARNING;
-    return SUCCESS;
+  const openAdjust = (p: Product) => {
+    setSelected(p);
+    setChangeVal('');
+    setNote('');
+    setReason('manual');
+    setAdjustModal(true);
   };
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={s.container}>
+  const openLog = (p: Product) => {
+    setSelected(p);
+    setLogModal(true);
+  };
 
-      {/* ── هيدر ── */}
-      <View style={s.headerRow}>
-        <View style={s.headerIcon}>
-          <Ionicons name="layers-outline" size={22} color={PRIMARY} />
-        </View>
-        <View style={s.headerCenter}>
-          <Text style={s.pageTitle}>إدارة المخزون</Text>
-          <Text style={s.pageSub}>{(products as any[]).length} منتج</Text>
-        </View>
-      </View>
+  const getStockStatus = (stock: number) => {
+    if (stock === 0) return { color: DANGER,  label: 'نافد',   bg: '#fee2e2' };
+    if (stock <= 10) return { color: WARNING, label: 'منخفض', bg: '#fef3c7' };
+    return               { color: SUCCESS, label: 'متوفر',  bg: '#d1fae5' };
+  };
+
+  const newStock = selected && changeVal !== '' && !isNaN(Number(changeVal))
+    ? Math.max(0, selected.stock + Number(changeVal))
+    : null;
+
+  return (
+    <View style={s.container}>
 
       {/* ── إحصائيات ── */}
       {stats && (
-        <View style={s.statsRow}>
-          <View style={[s.statBox, { borderColor: PRIMARY + '40' }]}>
-            <Text style={[s.statVal, { color: PRIMARY }]}>{stats.total}</Text>
-            <Text style={s.statLabel}>إجمالي</Text>
-          </View>
-          <View style={[s.statBox, { borderColor: DANGER + '40' }]}>
-            <Text style={[s.statVal, { color: DANGER }]}>{stats.outOfStock}</Text>
-            <Text style={s.statLabel}>نافد</Text>
-          </View>
-          <View style={[s.statBox, { borderColor: WARNING + '40' }]}>
-            <Text style={[s.statVal, { color: WARNING }]}>{stats.lowStock}</Text>
-            <Text style={s.statLabel}>منخفض</Text>
-          </View>
-          <View style={[s.statBox, { borderColor: '#8b5cf6' + '40' }]}>
-            <Text style={[s.statVal, { color: '#8b5cf6' }]}>{stats.stale}</Text>
-            <Text style={s.statLabel}>راكد</Text>
-          </View>
-        </View>
-      )}
-
-      {/* ── قيمة المخزون ── */}
-      {stats && (
-        <View style={s.valueBox}>
-          <Ionicons name="wallet-outline" size={18} color={SUCCESS} />
-          <Text style={s.valueText}>
-            قيمة المخزون: <Text style={{ color: SUCCESS, fontWeight: 'bold' }}>
-              {Math.round(stats.totalValue).toLocaleString()} د.ع
-            </Text>
-          </Text>
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.statsRow}>
+          <StatCard label="إجمالي المنتجات" value={stats.total}      icon="cube-outline"         color={PRIMARY}   />
+          <StatCard label="نافد المخزون"     value={stats.outOfStock} icon="close-circle-outline" color={DANGER}    />
+          <StatCard label="مخزون منخفض"     value={stats.lowStock}   icon="warning-outline"       color={WARNING}   />
+          <StatCard label="راكد 30 يوم"      value={stats.stale}      icon="hourglass-outline"     color="#8b5cf6"   />
+          <StatCard
+            label="قيمة المخزون"
+            value={`${stats.totalValue.toLocaleString('ar-IQ')} د.ع`}
+            icon="wallet-outline" color={SUCCESS} wide
+          />
+        </ScrollView>
       )}
 
       {/* ── فلاتر ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.filtersRow}>
         {FILTERS.map(f => (
           <TouchableOpacity
             key={f.key}
-            style={[s.filterChip, filter === f.key && { backgroundColor: f.color, borderColor: f.color }]}
+            style={[s.filterBtn, filter === f.key && { backgroundColor: f.color + '18', borderColor: f.color }]}
             onPress={() => setFilter(f.key)}>
-            <Ionicons
-              name={f.icon as any}
-              size={14}
-              color={filter === f.key ? '#fff' : f.color}
-            />
-            <Text style={[s.filterText, filter === f.key && { color: '#fff' }]}>
+            <Ionicons name={f.icon as any} size={14} color={filter === f.key ? f.color : '#6b7280'} />
+            <Text style={[s.filterText, filter === f.key && { color: f.color, fontWeight: '700' }]}>
               {f.label}
             </Text>
           </TouchableOpacity>
@@ -324,477 +227,320 @@ export default function InventoryTab() {
       </ScrollView>
 
       {/* ── بحث ── */}
-      <View style={s.searchRow}>
-        <Ionicons name="search-outline" size={18} color="#9ca3af" />
+      <View style={s.searchBox}>
+        <Ionicons name="search-outline" size={16} color="#9ca3af" />
         <TextInput
           style={s.searchInput}
+          placeholder="ابحث عن منتج..."
+          placeholderTextColor="#9ca3af"
           value={search}
           onChangeText={setSearch}
-          placeholder="ابحث باسم المنتج أو ID..."
-          placeholderTextColor="#9ca3af"
           textAlign="right"
         />
-        {search ? (
+        {search !== '' && (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={17} color="#9ca3af" />
+            <Ionicons name="close-circle" size={16} color="#9ca3af" />
           </TouchableOpacity>
-        ) : null}
+        )}
       </View>
 
       {/* ── قائمة المنتجات ── */}
       {isLoading ? (
         <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
-      ) : filtered.length === 0 ? (
-        <View style={s.empty}>
-          <Ionicons name="cube-outline" size={40} color="#d1d5db" />
-          <Text style={s.emptyText}>لا توجد منتجات</Text>
-        </View>
       ) : (
-        filtered.map((p: any) => (
-          <View key={p.id} style={[
-            s.productCard,
-            p.stock === 0 && s.cardDanger,
-            p.stock > 0 && p.stock <= 10 && s.cardWarning,
-          ]}>
-            <View style={s.cardTop}>
-              {/* صورة المنتج */}
-              {(p.imageUrl || p.images) ? (
-                <Image
-                  source={{ uri: p.imageUrl || p.images?.split(',')[0] }}
-                  style={s.productImg}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[s.productImg, s.productImgFallback]}>
-                  <Ionicons name="image-outline" size={20} color="#d1d5db" />
+        <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+          {filtered.length === 0 ? (
+            <View style={s.empty}>
+              <Ionicons name="cube-outline" size={48} color="#d1d5db" />
+              <Text style={s.emptyText}>لا توجد منتجات</Text>
+            </View>
+          ) : filtered.map(p => {
+            const { color, label, bg } = getStockStatus(p.stock);
+            return (
+              <View key={p.id} style={s.card}>
+                {/* صورة */}
+                {p.imageUrl ? (
+                  <Image source={{ uri: p.imageUrl }} style={s.img} />
+                ) : (
+                  <View style={[s.img, s.imgPlaceholder]}>
+                    <Ionicons name="image-outline" size={22} color="#d1d5db" />
+                  </View>
+                )}
+
+                {/* معلومات */}
+                <View style={s.cardInfo}>
+                  <Text style={s.cardName} numberOfLines={1}>{p.name}</Text>
+                  <Text style={s.cardCat}>{p.category}</Text>
+                  <View style={s.cardRow}>
+                    <Text style={s.soldText}>مبيع: {p.totalSold}</Text>
+                    <View style={[s.stockBadge, { backgroundColor: bg }]}>
+                      <Text style={[s.stockBadgeText, { color }]}>{label}</Text>
+                      <Text style={[s.stockNum, { color }]}>{p.stock}</Text>
+                    </View>
+                  </View>
                 </View>
-              )}
 
-              {/* معلومات */}
-              <View style={s.productInfo}>
-                <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
-                <Text style={s.productId}>ID: {p.id}</Text>
-                {p.category ? (
-                  <Text style={s.productCat} numberOfLines={1}>{p.category}</Text>
-                ) : null}
+                {/* أزرار */}
+                <View style={s.cardActions}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => openLog(p)}>
+                    <Ionicons name="time-outline" size={17} color={PRIMARY} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.actionBtn, s.actionBtnPrimary]} onPress={() => openAdjust(p)}>
+                    <Ionicons name="create-outline" size={17} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
+            );
+          })}
+        </ScrollView>
+      )}
 
-              {/* المخزون */}
-              <View style={s.stockCol}>
-                <Text style={[s.stockVal, { color: stockColor(p.stock) }]}>
-                  {p.stock}
-                </Text>
-                <Text style={s.stockLabel}>وحدة</Text>
-                {p.stock === 0 && (
-                  <View style={s.outBadge}>
-                    <Text style={s.outBadgeText}>نافد</Text>
-                  </View>
-                )}
-                {p.stock > 0 && p.stock <= 10 && (
-                  <View style={s.lowBadge}>
-                    <Text style={s.lowBadgeText}>منخفض</Text>
-                  </View>
-                )}
-              </View>
+      {/* ── Modal تعديل المخزون ── */}
+      <Modal visible={adjustModal} transparent animationType="slide">
+        <View style={s.overlay}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>تعديل المخزون</Text>
+            {selected && (
+              <Text style={s.sheetSub}>{selected.name} — المخزون الحالي: {selected.stock}</Text>
+            )}
+
+            <Text style={s.label}>السبب</Text>
+            <View style={s.reasonRow}>
+              {(['manual', 'cancel', 'returned'] as const).map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[s.reasonBtn, reason === r && s.reasonBtnActive]}
+                  onPress={() => setReason(r)}>
+                  <Text style={[s.reasonText, reason === r && s.reasonTextActive]}>
+                    {REASON_LABELS[r]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* إحصائيات إضافية */}
-            <View style={s.cardStats}>
-              <View style={s.cardStatItem}>
-                <Ionicons name="trending-up-outline" size={13} color="#9ca3af" />
-                <Text style={s.cardStatText}>مباع: {p.totalSold ?? 0}</Text>
-              </View>
-              <View style={s.cardStatItem}>
-                <Ionicons name="pricetag-outline" size={13} color="#9ca3af" />
-                <Text style={s.cardStatText}>
-                  {Math.round(p.wholesalePrice).toLocaleString()} د.ع
-                </Text>
-              </View>
-              <View style={s.cardStatItem}>
-                <Ionicons name="wallet-outline" size={13} color="#9ca3af" />
-                <Text style={s.cardStatText}>
-                  قيمة: {Math.round(p.wholesalePrice * p.stock).toLocaleString()}
-                </Text>
-              </View>
-            </View>
+            <Text style={s.label}>كمية التغيير</Text>
+            <Text style={s.hint}>موجب للإضافة، سالب للخصم (مثال: 5 أو -3)</Text>
+            <TextInput
+              style={s.input}
+              placeholder="مثال: 5 أو -3"
+              placeholderTextColor="#9ca3af"
+              keyboardType="numeric"
+              value={changeVal}
+              onChangeText={setChangeVal}
+              textAlign="right"
+            />
 
-            {/* أزرار */}
-            <View style={s.cardActions}>
-              <TouchableOpacity
-                style={s.logBtn}
-                onPress={() => setLogProduct(p)}>
-                <Ionicons name="time-outline" size={15} color={PRIMARY} />
-                <Text style={s.logBtnText}>السجل</Text>
+            <Text style={s.label}>ملاحظة (اختياري)</Text>
+            <TextInput
+              style={[s.input, { height: 70 }]}
+              placeholder="سبب التعديل..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              value={note}
+              onChangeText={setNote}
+              textAlign="right"
+            />
+
+            {/* معاينة النتيجة */}
+            {newStock !== null && selected && (
+              <View style={s.preview}>
+                <Text style={s.previewLabel}>المخزون بعد التعديل</Text>
+                <Text style={s.previewVal}>
+                  {selected.stock}  →  {newStock}
+                </Text>
+              </View>
+            )}
+
+            <View style={s.sheetFooter}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => setAdjustModal(false)}>
+                <Text style={s.cancelText}>إلغاء</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={s.editBtn}
-                onPress={() => setEditProduct(p)}>
-                <Ionicons name="create-outline" size={15} color="#fff" />
-                <Text style={s.editBtnText}>تعديل المخزون</Text>
+                style={[s.saveBtn, adjustMutation.isPending && { opacity: 0.7 }]}
+                onPress={() => adjustMutation.mutate()}
+                disabled={adjustMutation.isPending}>
+                {adjustMutation.isPending
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={s.saveText}>حفظ التعديل</Text>}
               </TouchableOpacity>
             </View>
           </View>
-        ))
-      )}
+        </View>
+      </Modal>
 
-      {/* ── Modal السجل ── */}
-      {logProduct && (
-        <LogModal
-          product={logProduct}
-          onClose={() => setLogProduct(null)}
-        />
-      )}
+      {/* ── Modal سجل التغييرات ── */}
+      <Modal visible={logModal} transparent animationType="slide">
+        <View style={s.overlay}>
+          <View style={[s.sheet, { maxHeight: '85%' }]}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>سجل التغييرات</Text>
+            {selected && <Text style={s.sheetSub}>{selected.name}</Text>}
 
-      {/* ── Modal التعديل ── */}
-      {editProduct && (
-        <EditModal
-          product={editProduct}
-          onClose={() => setEditProduct(null)}
-        />
-      )}
-    </ScrollView>
+            {logLoading ? (
+              <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
+            ) : log.length === 0 ? (
+              <View style={s.empty}>
+                <Ionicons name="time-outline" size={36} color="#d1d5db" />
+                <Text style={s.emptyText}>لا يوجد سجل بعد</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 12 }}>
+                {log.map(entry => (
+                  <View key={entry.id} style={s.logEntry}>
+                    <View style={[s.logIcon,
+                      { backgroundColor: entry.change > 0 ? '#d1fae5' : '#fee2e2' }]}>
+                      <Ionicons
+                        name={entry.change > 0 ? 'arrow-up-outline' : 'arrow-down-outline'}
+                        size={16}
+                        color={entry.change > 0 ? SUCCESS : DANGER}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={s.logRow}>
+                        <Text style={s.logTime}>{timeAgo(entry.created_at)}</Text>
+                        <Text style={[s.logChange, { color: entry.change > 0 ? SUCCESS : DANGER }]}>
+                          {entry.change > 0 ? '+' : ''}{entry.change}
+                        </Text>
+                      </View>
+                      <Text style={s.logReason}>{REASON_LABELS[entry.reason] || entry.reason}</Text>
+                      {entry.note && <Text style={s.logNote}>{entry.note}</Text>}
+                      <Text style={s.logAfter}>المخزون بعد: {entry.stock_after}</Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity style={s.closeBtn} onPress={() => setLogModal(false)}>
+              <Text style={s.closeBtnText}>إغلاق</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { padding: 16, paddingBottom: 40, backgroundColor: BG },
+  container:  { flex: 1, backgroundColor: BG },
+  statsRow:   { padding: 14, gap: 10 },
+  filtersRow: { paddingHorizontal: 14, paddingBottom: 12, gap: 8 },
 
-  // هيدر
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 12,
+  filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 20, backgroundColor: '#f3f4f6',
+    borderWidth: 1.5, borderColor: '#e5e7eb',
   },
-  headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
+  filterText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 14, marginBottom: 12,
+    backgroundColor: '#fff', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#e8edf2',
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#0d1b2a' },
+
+  listContent: { padding: 14, gap: 10, paddingBottom: 30 },
+
+  card: {
+    backgroundColor: '#fff', borderRadius: 16, padding: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderWidth: 1, borderColor: '#e8edf2',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  img:            { width: 56, height: 56, borderRadius: 12 },
+  imgPlaceholder: { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' },
+  cardInfo:       { flex: 1, gap: 3 },
+  cardName:       { fontSize: 13, fontWeight: '700', color: '#0d1b2a', textAlign: 'right' },
+  cardCat:        { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
+  cardRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  soldText:       { fontSize: 11, color: '#6b7280' },
+  stockBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  stockBadgeText: { fontSize: 11, fontWeight: '700' },
+  stockNum:       { fontSize: 13, fontWeight: '900' },
+  cardActions:    { gap: 6 },
+  actionBtn: {
+    width: 34, height: 34, borderRadius: 10,
     backgroundColor: PRIMARY + '12',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center',
   },
-  headerCenter: { flex: 1, alignItems: 'flex-end' },
-  pageTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
-  pageSub:   { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  actionBtnPrimary: { backgroundColor: PRIMARY },
 
-  // إحصائيات
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  statVal:   { fontSize: 20, fontWeight: 'bold' },
-  statLabel: { fontSize: 10, color: '#9ca3af', marginTop: 3 },
-
-  // قيمة المخزون
-  valueBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  valueText: { fontSize: 13, color: '#374151' },
-
-  // فلاتر
-  filtersRow: { gap: 8, paddingBottom: 4, marginBottom: 12 },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-  },
-  filterText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
-
-  // بحث
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827' },
-
-  // بطاقة منتج
-  productCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-  },
-  cardDanger:  { borderColor: DANGER + '50',  backgroundColor: '#fff5f5' },
-  cardWarning: { borderColor: WARNING + '50', backgroundColor: '#fffbeb' },
-
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 10,
-  },
-  productImg: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
-  },
-  productImgFallback: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  productInfo: { flex: 1 },
-  productName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#111827',
-    textAlign: 'right',
-    lineHeight: 20,
-  },
-  productId: {
-    fontSize: 11,
-    color: '#9ca3af',
-    textAlign: 'right',
-    marginTop: 3,
-  },
-  productCat: {
-    fontSize: 11,
-    color: PRIMARY,
-    textAlign: 'right',
-    marginTop: 3,
-  },
-
-  // المخزون
-  stockCol: { alignItems: 'center', minWidth: 52 },
-  stockVal:  { fontSize: 24, fontWeight: 'bold' },
-  stockLabel: { fontSize: 10, color: '#9ca3af' },
-  outBadge: {
-    backgroundColor: DANGER + '18',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginTop: 4,
-  },
-  outBadgeText: { fontSize: 10, color: DANGER, fontWeight: 'bold' },
-  lowBadge: {
-    backgroundColor: WARNING + '18',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginTop: 4,
-  },
-  lowBadgeText: { fontSize: 10, color: WARNING, fontWeight: 'bold' },
-
-  // إحصائيات الكارد
-  cardStats: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'flex-end',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    marginBottom: 10,
-    flexWrap: 'wrap',
-  },
-  cardStatItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardStatText: { fontSize: 11, color: '#6b7280' },
-
-  // أزرار الكارد
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  logBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 11,
-    backgroundColor: PRIMARY + '12',
-    borderWidth: 1,
-    borderColor: PRIMARY + '30',
-  },
-  logBtnText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-  editBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 9,
-    borderRadius: 11,
-    backgroundColor: PRIMARY,
-  },
-  editBtnText: { fontSize: 12, color: '#fff', fontWeight: '600' },
-
-  // فارغ
-  empty: { alignItems: 'center', paddingVertical: 50, gap: 10 },
+  empty:     { alignItems: 'center', gap: 10, paddingTop: 40 },
   emptyText: { fontSize: 14, color: '#9ca3af' },
 
-  // modal مشترك
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-
-  // modal السجل
-  logCard: {
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 36,
-    maxHeight: '75%',
+    borderTopLeftRadius: 26, borderTopRightRadius: 26,
+    paddingHorizontal: 20, paddingBottom: 36, paddingTop: 14,
   },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 18,
+  sheetHandle: {
+    width: 38, height: 4, borderRadius: 2,
+    backgroundColor: '#e2e8f0', alignSelf: 'center', marginBottom: 16,
   },
-  logTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    flex: 1,
-    textAlign: 'center',
-  },
-  logRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  logChangeChip: {
-    minWidth: 48,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  logChipPos:    { backgroundColor: SUCCESS + '20' },
-  logChipNeg:    { backgroundColor: DANGER  + '20' },
-  logChangeText: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
-  logInfo:       { flex: 1, alignItems: 'flex-end' },
-  logAfter:      { fontSize: 13, fontWeight: '600', color: '#111827' },
-  logNote:       { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  logMeta:       { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  sheetTitle: { fontSize: 17, fontWeight: '900', color: '#0d1b2a', textAlign: 'right', marginBottom: 4 },
+  sheetSub:   { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 16 },
 
-  // modal التعديل
-  editCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 36,
-  },
-  currentStock: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-  },
-  currentStockLabel: { fontSize: 13, color: '#6b7280' },
-  currentStockVal:   { fontSize: 28, fontWeight: 'bold', color: PRIMARY },
-
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#374151',
-    textAlign: 'right',
-    marginBottom: 7,
-    marginTop: 12,
-  },
+  label: { fontSize: 13, fontWeight: '700', color: '#374151', textAlign: 'right', marginBottom: 6, marginTop: 12 },
+  hint:  { fontSize: 11, color: '#9ca3af', textAlign: 'right', marginBottom: 6 },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e8edf2',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#111827',
-    backgroundColor: '#f8fafc',
+    borderWidth: 1.5, borderColor: '#e8edf2', borderRadius: 12,
+    padding: 12, fontSize: 15, color: '#0d1b2a', backgroundColor: '#f8fafc',
   },
-  previewBox: {
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  previewOk:     { backgroundColor: SUCCESS + '15' },
-  previewWarn:   { backgroundColor: WARNING + '15' },
-  previewDanger: { backgroundColor: DANGER  + '15' },
-  previewText:   { fontSize: 14, fontWeight: 'bold', color: '#111827' },
 
-  reasonRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 4,
-    justifyContent: 'flex-end',
+  reasonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  reasonBtn: {
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 10, backgroundColor: '#f3f4f6',
+    borderWidth: 1.5, borderColor: '#e5e7eb',
   },
-  reasonChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-  },
-  reasonChipOn:  { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  reasonText:    { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  reasonTextOn:  { color: '#fff' },
+  reasonBtnActive:  { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  reasonText:       { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  reasonTextActive: { color: PRIMARY, fontWeight: '700' },
 
+  preview: {
+    marginTop: 12, backgroundColor: '#f0f9fa',
+    borderRadius: 12, padding: 12, alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: PRIMARY + '20',
+  },
+  previewLabel: { fontSize: 11, color: '#6b7280' },
+  previewVal:   { fontSize: 18, fontWeight: '900', color: PRIMARY },
+
+  sheetFooter: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  cancelBtn: {
+    flex: 1, height: 48, borderRadius: 13,
+    backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center',
+  },
+  cancelText: { fontSize: 14, color: '#6b7280', fontWeight: '700' },
   saveBtn: {
-    backgroundColor: PRIMARY,
-    borderRadius: 14,
-    height: 52,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
+    flex: 2, height: 48, borderRadius: 13,
+    backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center',
   },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  saveText: { fontSize: 14, color: '#fff', fontWeight: '800' },
+  closeBtn: {
+    marginTop: 16, height: 48, borderRadius: 13,
+    backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center',
+  },
+  closeBtnText: { fontSize: 14, color: '#fff', fontWeight: '700' },
+
+  logEntry: {
+    flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
+  },
+  logIcon: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  logRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  logChange:  { fontSize: 15, fontWeight: '900' },
+  logTime:    { fontSize: 11, color: '#9ca3af' },
+  logReason:  { fontSize: 12, color: '#374151', fontWeight: '600', textAlign: 'right', marginTop: 2 },
+  logNote:    { fontSize: 11, color: '#6b7280', textAlign: 'right' },
+  logAfter:   { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
 });
