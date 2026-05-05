@@ -7,11 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
+// ✅ مفتاح حفظ الإشعارات المقروءة محلياً
+const READ_IDS_KEY = 'tasleem_read_notif_ids';
 
 interface Notification {
   id: number;
@@ -22,6 +25,32 @@ interface Notification {
   created_at: string;
   user_id: number;
 }
+
+// ── helpers للـ AsyncStorage ───────────────────────────────────
+const getReadIds = async (): Promise<Set<number>> => {
+  try {
+    const raw = await AsyncStorage.getItem(READ_IDS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch { return new Set(); }
+};
+
+const saveReadIds = async (ids: Set<number>) => {
+  try {
+    await AsyncStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+};
+
+const addReadId = async (id: number) => {
+  const ids = await getReadIds();
+  ids.add(id);
+  await saveReadIds(ids);
+};
+
+const addAllReadIds = async (notifs: Notification[]) => {
+  const ids = await getReadIds();
+  notifs.forEach(n => ids.add(n.id));
+  await saveReadIds(ids);
+};
 
 // ── حالات الطلبات ──────────────────────────────────────────────
 const ORDER_STATUS: Record<string, { label: string; color: string; icon: string }> = {
@@ -76,8 +105,7 @@ export default function NotificationsScreen() {
   const [selected, setSelected] = useState<Notification | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // ── جلب الإشعارات ─────────────────────────────────────────────
-  // ✅ نوقف كل auto-refetch لمنع مسح التحديثات المحلية (قراءة/حذف)
+  // ── جلب الإشعارات + تطبيق الـ read state المحلي ──────────────
   const { data: notifications = [], isLoading, refetch, error } = useQuery({
     queryKey: ['user-notifications'],
     queryFn: async () => {
@@ -86,8 +114,17 @@ export default function NotificationsScreen() {
         api.get('/api/auth/me'),
       ]);
       if (!Array.isArray(data)) return [];
+
+      // ✅ جلب IDs المقروءة من AsyncStorage
+      const readIds = await getReadIds();
+
       return data
         .filter((n: any) => !n.user_id || n.user_id === user.id)
+        .map((n: any) => ({
+          ...n,
+          // ✅ إذا موجود في المحلي = مقروء، بغض النظر عن السيرفر
+          is_read: n.is_read || readIds.has(n.id),
+        }))
         .sort((a: Notification, b: Notification) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -99,19 +136,22 @@ export default function NotificationsScreen() {
     staleTime: Infinity,
   });
 
-  // ✅ جلب فقط إذا الكاش فارغ — يمنع مسح التحديثات عند إعادة فتح الصفحة
+  // ✅ جلب فقط إذا الكاش فارغ
   React.useEffect(() => {
     const cached = qc.getQueryData(['user-notifications']);
-    if (!cached || (Array.isArray(cached) && cached.length === 0)) {
+    if (!cached || (Array.isArray(cached) && (cached as any[]).length === 0)) {
       refetch();
     }
   }, []);
 
-  // ✅ لا useFocusEffect — يمنع مسح التحديثات (قراءة/حذف) عند العودة للصفحة
-
   // ── قراءة إشعار واحد ──────────────────────────────────────────
   const markAsRead = useMutation({
-    mutationFn: (id: number) => api.patch(`/api/notifications/${id}/read`),
+    mutationFn: async (id: number) => {
+      // ✅ حفظ محلي أولاً
+      await addReadId(id);
+      // ثم السيرفر (لا نهتم بالنتيجة)
+      api.patch(`/api/notifications/${id}/read`).catch(() => {});
+    },
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prev = qc.getQueryData(['user-notifications']);
@@ -123,15 +163,16 @@ export default function NotificationsScreen() {
     onError: (_e, _v, ctx: any) => {
       if (ctx?.prev) qc.setQueryData(['user-notifications'], ctx.prev);
     },
-    // ✅ بدون invalidate — العداد يُحسب من الكاش مباشرة
   });
 
-  // ── قراءة الكل — نستخدم endpoint الفردي لكل إشعار ────────────
+  // ── قراءة الكل ────────────────────────────────────────────────
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       const notifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
       const unread = notifs.filter(n => !n.is_read);
-      // نرسل الطلبات بالتوازي
+      // ✅ حفظ الكل محلياً أولاً
+      await addAllReadIds(unread);
+      // ثم السيرفر بالتوازي
       await Promise.all(
         unread.map(n => api.patch(`/api/notifications/${n.id}/read`).catch(() => {}))
       );
@@ -139,7 +180,6 @@ export default function NotificationsScreen() {
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prevNotifs = qc.getQueryData(['user-notifications']);
-      // تحديث فوري في الكاش
       qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
         old.map(n => ({ ...n, is_read: true }))
       );
@@ -160,7 +200,6 @@ export default function NotificationsScreen() {
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
       const prev = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
-      // ✅ حذف فوري من الكاش
       qc.setQueryData(['user-notifications'], prev.filter(n => n.id !== id));
       return { prev };
     },
@@ -171,7 +210,6 @@ export default function NotificationsScreen() {
       setModalVisible(false);
       toast.success('تم حذف الإشعار');
     },
-    // ✅ بدون onSettled/invalidate — يمنع إعادة ظهور الإشعار المحذوف
   });
 
   const onRefresh = async () => {
@@ -186,7 +224,6 @@ export default function NotificationsScreen() {
     setModalVisible(true);
   };
 
-  // ✅ العداد محسوب مباشرة من الكاش — يتحدث فوراً مع كل تغيير
   const unreadCount = (notifications as Notification[]).filter(n => !n.is_read).length;
 
   // ── كارد الإشعار ──────────────────────────────────────────────
@@ -202,15 +239,12 @@ export default function NotificationsScreen() {
         onPress={() => handlePress(item)}
         activeOpacity={0.75}>
 
-        {/* خط جانبي ملون للغير مقروء */}
         {isUnread && <View style={[s.unreadBar, { backgroundColor: color }]} />}
 
-        {/* أيقونة */}
         <View style={[s.iconBox, { backgroundColor: bg }]}>
           <Ionicons name={icon as any} size={22} color={color} />
         </View>
 
-        {/* المحتوى */}
         <View style={s.content}>
           <View style={s.topRow}>
             <Text style={s.time}>{timeAgo(item.created_at)}</Text>
@@ -221,7 +255,6 @@ export default function NotificationsScreen() {
           </Text>
           <Text style={s.body} numberOfLines={2}>{item.body}</Text>
 
-          {/* بادج حالة الطلب */}
           {isOrder && d?.status && ORDER_STATUS[d.status] && (
             <View style={[s.badge, { backgroundColor: ORDER_STATUS[d.status].color + '15' }]}>
               <Ionicons name={ORDER_STATUS[d.status].icon as any} size={11} color={ORDER_STATUS[d.status].color} />
@@ -235,7 +268,6 @@ export default function NotificationsScreen() {
           )}
         </View>
 
-        {/* زر حذف */}
         <TouchableOpacity
           style={s.delBtn}
           onPress={() => deleteNotif.mutate(item.id)}
@@ -388,7 +420,6 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 60 },
 
-  // ── Header ──
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
@@ -413,10 +444,8 @@ const s = StyleSheet.create({
   },
   markAllText: { fontSize: 12, color: PRIMARY, fontWeight: '700' },
 
-  // ── List ──
   list: { padding: 14, paddingBottom: 30 },
 
-  // ── Card ──
   card: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff', borderRadius: 16,
@@ -442,7 +471,6 @@ const s = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   delBtn:    { padding: 4 },
 
-  // ── Empty / Error ──
   emptyIconBox: {
     width: 90, height: 90, borderRadius: 45,
     backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center',
@@ -453,7 +481,6 @@ const s = StyleSheet.create({
   retryText:   { color: '#fff', fontWeight: '700' },
   loadingText: { fontSize: 13, color: '#9ca3af' },
 
-  // ── Bottom Sheet ──
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26,

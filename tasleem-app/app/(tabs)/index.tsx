@@ -213,17 +213,20 @@ export default function HomeScreen() {
           api.get('/api/auth/me'),
         ]);
         if (!Array.isArray(data)) return [];
+        // ✅ تطبيق الـ read state المحلي المحفوظ في AsyncStorage
+        const raw = await AsyncStorage.getItem('tasleem_read_notif_ids');
+        const readIds: Set<number> = new Set(raw ? JSON.parse(raw) : []);
         return data
           .filter((n: any) => !n.user_id || n.user_id === user.id)
+          .map((n: any) => ({ ...n, is_read: n.is_read || readIds.has(n.id) }))
           .sort((a: any, b: any) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
       } catch { return []; }
     },
-    // ✅ نوقف كل auto-refetch — يمنع مسح التحديثات المحلية
     refetchInterval: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: true,   // جلب مرة واحدة عند أول تحميل فقط
+    refetchOnMount: true,
     refetchOnReconnect: false,
     staleTime: Infinity,
   });
