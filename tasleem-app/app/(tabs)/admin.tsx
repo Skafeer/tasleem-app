@@ -36,7 +36,7 @@ const TABS = [
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', activeIcon: 'notifications' },
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',    activeIcon: 'shield-half' },
   { key: 'support',     label: 'الدعم',     icon: 'headset-outline',        activeIcon: 'headset' },
-  { key: 'inventory', label: 'تتبع المخزون',     icon: 'warehouse-outline', activeIcon: 'warehouse' },
+  { key: 'inventory', label: 'تتبع المخزون',     icon: 'layers-outline', activeIcon: 'layers' },
 ];
 
 export default function AdminScreen() {
