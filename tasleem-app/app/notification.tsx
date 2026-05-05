@@ -46,12 +46,6 @@ const addReadId = async (id: number) => {
   await saveReadIds(ids);
 };
 
-const addAllReadIds = async (notifs: Notification[]) => {
-  const ids = await getReadIds();
-  notifs.forEach(n => ids.add(n.id));
-  await saveReadIds(ids);
-};
-
 // ── حالات الطلبات ──────────────────────────────────────────────
 const ORDER_STATUS: Record<string, { label: string; color: string; icon: string }> = {
   pending:    { label: 'قيد الانتظار',  color: '#f59e0b', icon: 'time-outline' },
@@ -167,23 +161,24 @@ export default function NotificationsScreen() {
 
   // ── قراءة الكل ────────────────────────────────────────────────
   const markAllAsRead = useMutation({
-    mutationFn: async () => {
-      const notifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
-      const unread = notifs.filter(n => !n.is_read);
-      // ✅ حفظ الكل محلياً أولاً
-      await addAllReadIds(unread);
-      // ثم السيرفر بالتوازي
+    mutationFn: async (unreadIds: number[]) => {
+      // ✅ نستلم الـ IDs من onMutate ونحفظها في AsyncStorage
+      const ids = await getReadIds();
+      unreadIds.forEach(id => ids.add(id));
+      await saveReadIds(ids);
+      // ثم السيرفر
       await Promise.all(
-        unread.map(n => api.patch(`/api/notifications/${n.id}/read`).catch(() => {}))
+        unreadIds.map(id => api.patch(`/api/notifications/${id}/read`).catch(() => {}))
       );
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['user-notifications'] });
-      const prevNotifs = qc.getQueryData(['user-notifications']);
-      qc.setQueryData(['user-notifications'], (old: Notification[] = []) =>
-        old.map(n => ({ ...n, is_read: true }))
-      );
-      return { prevNotifs };
+      const prevNotifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
+      // ✅ نأخذ الـ unread IDs قبل التحديث
+      const unreadIds = prevNotifs.filter(n => !n.is_read).map(n => n.id);
+      // تحديث الكاش فوراً
+      qc.setQueryData(['user-notifications'], prevNotifs.map(n => ({ ...n, is_read: true })));
+      return { prevNotifs, unreadIds };
     },
     onError: (_e, _v, ctx: any) => {
       if (ctx?.prevNotifs) qc.setQueryData(['user-notifications'], ctx.prevNotifs);
@@ -360,7 +355,11 @@ export default function NotificationsScreen() {
         {unreadCount > 0 ? (
           <TouchableOpacity
             style={s.markAllBtn}
-            onPress={() => markAllAsRead.mutate()}
+            onPress={() => {
+              const notifs = qc.getQueryData<Notification[]>(['user-notifications']) ?? [];
+              const unreadIds = notifs.filter(n => !n.is_read).map(n => n.id);
+              markAllAsRead.mutate(unreadIds);
+            }}
             disabled={markAllAsRead.isPending}>
             <Text style={s.markAllText}>
               {markAllAsRead.isPending ? '...' : 'قراءة الكل'}
