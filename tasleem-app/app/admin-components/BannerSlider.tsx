@@ -13,10 +13,9 @@ type Banner = { id: number; imageUrl: string; title?: string; link?: string; isA
 
 export default function BannerSlider({ banners, containerWidth }: { banners: Banner[]; containerWidth?: number }) {
   const { width: screenWidth } = useWindowDimensions();
-  // حساب العرض ليكون متجاوباً مع ترك مسافة جانبية
-  const width = (containerWidth ?? screenWidth) - 24;
-  // ✅ نسبة 16:9 ثابتة على كل الأجهزة
-  const BANNER_H = Math.round(width * 9 / 16);
+  // ✅ عرض كامل بدون padding جانبي — نسبة 3:1
+  const width = containerWidth ?? screenWidth;
+  const BANNER_H = Math.round(width / 3);
   
   const scrollRef  = useRef<ScrollView>(null);
   const idxRef     = useRef(0);
@@ -142,18 +141,10 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
 const s = StyleSheet.create({
   container: { 
     marginBottom: 10,
-    alignItems: 'center',
   },
   slide: { 
     overflow: 'hidden', 
-    borderRadius: 16, // انحناء الأطراف الأربعة
     backgroundColor: '#eee',
-    // إضافة ظل خفيف لإبراز الانحناء
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   img: { 
     width: '100%', 
