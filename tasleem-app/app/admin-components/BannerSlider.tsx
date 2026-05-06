@@ -1,4 +1,4 @@
-// ========================== BannerSlider.tsx ==========================
+// ========================== BannerSlider.tsx (المعدل) ==========================
 import { useEffect, useRef, useState } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Image,
@@ -14,7 +14,6 @@ type Banner = { id: number; imageUrl: string; title?: string; link?: string; isA
 
 export default function BannerSlider({ banners, containerWidth }: { banners: Banner[]; containerWidth?: number }) {
   const { width: screenWidth } = useWindowDimensions();
-  // العرض الكامل بدون padding جانبي — نسبة 3:1
   const width = containerWidth ?? screenWidth;
   const BANNER_H = Math.round(width / 3); // 3:1 ratio
   
@@ -23,7 +22,6 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
   const isManual   = useRef(false);
   const [activeIdx, setActiveIdx] = useState(0);
   
-  // قيمة متحركة لعرض النقطة النشطة بسلاسة
   const dotWidthAnim = useRef(new Animated.Value(6)).current;
 
   // فلترة البنرات النشطة فقط وترتيبها حسب sortOrder
@@ -45,7 +43,6 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
     return () => clearInterval(timer);
   }, [activeBanners.length, width]);
 
-  // تحريك عرض النقطة النشطة عند تغيير الفهرس
   useEffect(() => {
     Animated.spring(dotWidthAnim, {
       toValue: 20,
@@ -92,7 +89,6 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
               source={{ uri: b.imageUrl }} 
               style={s.img} 
               resizeMode="cover"
-              defaultSource={require('../../assets/placeholder-banner.png')}
             />
             {b.title ? (
               <View style={s.titleBox}>
@@ -105,7 +101,6 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
               </View>
             ) : null}
             
-            {/* ترقيم الصور - يظهر فقط لو أكثر من بنر */}
             {activeBanners.length > 1 && (
               <View style={s.counter}>
                 <Text style={s.counterTxt}>{activeIdx + 1} / {activeBanners.length}</Text>
