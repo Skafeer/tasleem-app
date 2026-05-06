@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 
 const PRIMARY       = '#0c6679';
-const AUTO_INTERVAL = 7000; // تم التغيير من 4000 إلى 7000 لتقليل السرعة
+const AUTO_INTERVAL = 4000;
 
 type Banner = {
   id: number;
@@ -25,10 +25,9 @@ export default function BannerSlider({
   containerWidth?: number;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  // نسبة العرض إلى الارتفاع 12:5 = 2.4
-  const ASPECT_RATIO = 12 / 5;
+  // ✅ عرض كامل — نسبة 3:1
   const W        = containerWidth ?? screenWidth;
-  const BANNER_H = Math.round(W / ASPECT_RATIO);
+  const BANNER_H = Math.round(W / 3);
 
   const flatRef    = useRef<FlatList>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,15 +64,6 @@ export default function BannerSlider({
 
   // ── Dot animation ─────────────────────────────────────────────
   useEffect(() => {
-    const listener = dotAnim.addListener(({ value }) => {
-      const idx = Math.round(value / W);
-      const clamped = Math.max(0, Math.min(active.length - 1, idx));
-      setActiveIdx(clamped);
-    });
-    return () => dotAnim.removeListener(listener);
-  }, [active.length, W]);
-
-  useEffect(() => {
     dotAnim.setValue(0);
     Animated.spring(dotAnim, {
       toValue: 1,
@@ -98,7 +88,7 @@ export default function BannerSlider({
   };
 
   return (
-    <View style={[s.container, { width: W, height: BANNER_H + 28, alignSelf: 'center' }]}>
+    <View style={[s.container, { height: BANNER_H + 28 }]}>
 
       {/* ── الصور ── */}
       <FlatList
@@ -106,22 +96,16 @@ export default function BannerSlider({
         data={active}
         keyExtractor={item => String(item.id)}
         horizontal
-        pagingEnabled={false}
-        snapToInterval={W}
-        snapToAlignment="start"
-        decelerationRate="normal"
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
+        decelerationRate="fast"
         bounces={false}
         getItemLayout={(_, index) => ({
           length: W,
           offset: W * index,
           index,
         })}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: dotAnim } } }],
-          { useNativeDriver: false }
-        )}
         onScrollBeginDrag={() => {
           isManual.current = true;
           stopTimer();
@@ -142,7 +126,7 @@ export default function BannerSlider({
           >
             <Image
               source={{ uri: item.imageUrl }}
-              style={[s.image, { width: W, height: BANNER_H }]}
+              style={{ width: W, height: BANNER_H }}
               resizeMode="cover"
             />
             {/* عنوان اختياري */}
@@ -165,18 +149,18 @@ export default function BannerSlider({
       {active.length > 1 && (
         <View style={s.dots}>
           {active.map((_, i) => {
-            const inputRange = active.map((_, idx) => idx * W);
-            const outputRange = active.map((_, idx) => idx === i ? 22 : 6);
-            const dotW = dotAnim.interpolate({
-              inputRange,
-              outputRange,
-              extrapolate: 'clamp',
+            const isAct = activeIdx === i;
+            const dotW  = dotAnim.interpolate({
+              inputRange:  [0, 1],
+              outputRange: isAct ? [6, 22] : [22, 6],
             });
             return (
               <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Animated.View style={[
                   s.dot,
-                  { width: dotW, backgroundColor: i === activeIdx ? PRIMARY : '#d1d5db' },
+                  isAct
+                    ? { width: isAct ? 22 : 6, backgroundColor: PRIMARY }
+                    : { width: 6, backgroundColor: '#d1d5db' },
                 ]} />
               </TouchableOpacity>
             );
@@ -189,14 +173,11 @@ export default function BannerSlider({
 
 const s = StyleSheet.create({
   container: { marginBottom: 8 },
-  image: { borderRadius: 20, overflow: 'hidden' }, // جعل البانر منحني الأطراف
 
   titleBox: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: 14, paddingVertical: 8,
-    borderBottomLeftRadius: 20,  // لمطابقة انحناء الصورة
-    borderBottomRightRadius: 20,
   },
   titleTxt: { color: '#fff', fontWeight: '700', fontSize: 13, textAlign: 'right' },
 

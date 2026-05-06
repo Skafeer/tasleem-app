@@ -8,7 +8,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -16,11 +15,6 @@ const PRIMARY = '#0c6679';
 const DANGER  = '#ef4444';
 const SUCCESS = '#10b981';
 const BG      = '#f2f6f9';
-// الحجم المطلوب للبانر: 1536px عرض * 990px ارتفاع
-const TARGET_WIDTH = 1536;
-const TARGET_HEIGHT = 990;
-const ASPECT_RATIO = 12 / 5; // تغيير النسبة إلى 12:5
-
 const ITEM_H  = 110; // ارتفاع كارد البنر في القائمة
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -46,7 +40,7 @@ type BannerForm = {
 const EMPTY_FORM: BannerForm = { title: '', imageUrl: '', link: '', isActive: true };
 
 // ─────────────────────────────────────────────────────────────────
-//  DragHandle
+//  DragHandle — نفس النمط المستخدم في CategoriesTab
 // ─────────────────────────────────────────────────────────────────
 function DragHandle({ index, isActive, onDragStart, onDragMove, onDragEnd }: {
   index: number; isActive: boolean;
@@ -91,7 +85,7 @@ function DragHandle({ index, isActive, onDragStart, onDragMove, onDragEnd }: {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  DraggableList
+//  DraggableList للبنرات
 // ─────────────────────────────────────────────────────────────────
 function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
   items: Banner[];
@@ -218,6 +212,7 @@ function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
               isDraggingThis && s.cardDragging,
               isTarget && s.cardTarget,
             ]}>
+              {/* صورة البنر بنسبة 16:9 */}
               <View style={s.imgWrap}>
                 <Image source={{ uri: item.imageUrl }} style={s.img} resizeMode="cover" />
                 {!item.isActive && (
@@ -227,7 +222,9 @@ function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
                 )}
               </View>
 
+              {/* صف المعلومات والأزرار */}
               <View style={s.cardBottom}>
+                {/* مقبض السحب */}
                 <DragHandle
                   index={index}
                   isActive={isDraggingThis}
@@ -236,6 +233,7 @@ function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
                   onDragEnd={handleDragEnd}
                 />
 
+                {/* معلومات */}
                 <View style={s.cardInfo}>
                   <Text style={s.cardTitle} numberOfLines={1}>
                     {item.title || 'بدون عنوان'}
@@ -245,6 +243,7 @@ function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
                   ) : null}
                 </View>
 
+                {/* أزرار */}
                 <View style={s.cardActions}>
                   <TouchableOpacity
                     style={[s.toggleBtn, item.isActive && s.toggleOn]}
@@ -292,12 +291,6 @@ export default function BannersTab() {
     },
   });
 
-  useEffect(() => {
-    if (banners.length > 0 && !isSavingOrder) {
-      setLocalList(banners as Banner[]);
-    }
-  }, [banners, isSavingOrder]);
-
   const saveBanner = useMutation({
     mutationFn: async (d: any) => {
       if (editBanner) {
@@ -338,112 +331,32 @@ export default function BannersTab() {
     onError: () => toast.error('فشل الحذف'),
   });
 
-  // ── دالة قص الصورة من المركز تلقائياً ──────────────────────────────────
-  const cropImageToTarget = async (uri: string): Promise<string> => {
-    try {
-      // أولاً: نحصل على أبعاد الصورة الأصلية
-      const imageInfo = await ImageManipulator.manipulateAsync(uri, [], { format: ImageManipulator.SaveFormat.JPEG });
-      
-      const originalWidth = imageInfo.width;
-      const originalHeight = imageInfo.height;
-      const targetRatio = TARGET_WIDTH / TARGET_HEIGHT;
-      const originalRatio = originalWidth / originalHeight;
-
-      let cropRegion;
-
-      if (originalRatio > targetRatio) {
-        // الصورة أعرض من المطلوب - نقص من الجوانب
-        const cropWidth = originalHeight * targetRatio;
-        const offsetX = (originalWidth - cropWidth) / 2;
-        cropRegion = {
-          originX: offsetX,
-          originY: 0,
-          width: cropWidth,
-          height: originalHeight,
-        };
-      } else {
-        // الصورة أطول من المطلوب - نقص من الأعلى والأسفل
-        const cropHeight = originalWidth / targetRatio;
-        const offsetY = (originalHeight - cropHeight) / 2;
-        cropRegion = {
-          originX: 0,
-          originY: offsetY,
-          width: originalWidth,
-          height: cropHeight,
-        };
-      }
-
-      // قص الصورة ثم تغيير حجمها إلى الأبعاد المطلوبة
-      const cropped = await ImageManipulator.manipulateAsync(
-        uri,
-        [
-          { crop: cropRegion },
-          { resize: { width: TARGET_WIDTH, height: TARGET_HEIGHT } }
-        ],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-
-      return `data:image/jpeg;base64,${cropped.base64}`;
-    } catch (error) {
-      console.error('خطأ في قص الصورة:', error);
-      // إذا فشل القص، نغير الحجم فقط
-      const resized = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: TARGET_WIDTH, height: TARGET_HEIGHT } }],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      return `data:image/jpeg;base64,${resized.base64}`;
-    }
-  };
-
-  // ── رفع الصورة مع قص تلقائي إذا كانت أكبر ──────────────────────────────────
+  // ── رفع الصورة بجودة عالية ──────────────────────────────────
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { toast.error('يرجى السماح بالوصول للصور'); return; }
-    
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      base64: false,
+      quality: 1,       // ✅ أعلى جودة
+      base64: true,
       allowsEditing: false,
     });
-    
     if (result.canceled) return;
-    
-    const asset = result.assets[0];
-    const { width, height, uri } = asset;
-    
     setUploading(true);
-    
     try {
-      let finalBase64: string;
-      
-      // إذا كانت الصورة أكبر من الحجم المطلوب أو بنسبة مختلفة، نقوم بقصها
-      if (width > TARGET_WIDTH || height > TARGET_HEIGHT || Math.abs((width/height) - ASPECT_RATIO) > 0.05) {
-        toast.info('جاري قص الصورة لتتناسب مع الأبعاد المطلوبة...');
-        finalBase64 = await cropImageToTarget(uri);
-        toast.success('تم قص الصورة بنجاح ✅');
-      } else {
-        // الصورة مناسبة، فقط نغير الحجم إذا لزم الأمر
-        const manipulated = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: TARGET_WIDTH, height: TARGET_HEIGHT } }],
-          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-        );
-        finalBase64 = `data:image/jpeg;base64,${manipulated.base64}`;
-      }
-      
-      const { data } = await api.post('/api/upload', { image: finalBase64 });
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || 'image/jpeg';
+      const base64 = `data:${mimeType};base64,${asset.base64}`;
+      const { data } = await api.post('/api/upload', { image: base64 });
       setForm(p => ({ ...p, imageUrl: data.url }));
       toast.success('تم رفع الصورة ✅');
-    } catch (error) {
-      console.error(error);
+    } catch {
       toast.error('فشل رفع الصورة');
-    } finally {
-      setUploading(false);
     }
+    setUploading(false);
   };
 
+  // ── إعادة الترتيب ───────────────────────────────────────────
   const handleReorder = async (from: number, to: number) => {
     const updated    = [...localList];
     const [moved]    = updated.splice(from, 1);
@@ -505,11 +418,14 @@ export default function BannersTab() {
   );
 
   const displayList = localList.length > 0 ? localList : (banners as Banner[]);
-  const previewH = Math.round((screenWidth - 80) / ASPECT_RATIO);
+
+  // نسبة 16:9 لمعاينة الصورة في الـ modal
+  const previewH = Math.round((screenWidth - 80) * 9 / 16);
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
+      {/* Header */}
       <View style={s.topRow}>
         <View style={s.topLeft}>
           <Text style={s.count}>{displayList.length} بنر</Text>
@@ -526,6 +442,7 @@ export default function BannersTab() {
         </TouchableOpacity>
       </View>
 
+      {/* تعليمة السحب */}
       <View style={s.hint}>
         <Ionicons name="information-circle-outline" size={14} color="#64748b" />
         <Text style={s.hintText}>اضغط مطولاً على ☰ واسحب لتغيير الترتيب</Text>
@@ -546,6 +463,7 @@ export default function BannersTab() {
         />
       )}
 
+      {/* Modal الإضافة/التعديل */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={closeModal}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.overlay}>
@@ -556,7 +474,8 @@ export default function BannersTab() {
 
               <ScrollView contentContainerStyle={s.sheetBody} showsVerticalScrollIndicator={false}>
 
-                <Text style={s.label}>صورة البنر * <Text style={s.labelSub}>(1536 × 990 — نسبة محددة)</Text></Text>
+                {/* معاينة / رفع الصورة بنسبة 16:9 */}
+                <Text style={s.label}>صورة البنر * <Text style={s.labelSub}>(1920 × 1080 — نسبة 16:9)</Text></Text>
                 <TouchableOpacity
                   style={[s.uploadBox, { height: previewH }]}
                   onPress={pickImage}
@@ -569,7 +488,7 @@ export default function BannersTab() {
                     <View style={s.uploadPlaceholder}>
                       <Ionicons name="image-outline" size={40} color={PRIMARY + '60'} />
                       <Text style={s.uploadTxt}>اضغط لرفع صورة البنر</Text>
-                      <Text style={s.uploadSub}>1536 × 990 — سيتم قص الصور الكبيرة تلقائياً من المركز</Text>
+                      <Text style={s.uploadSub}>1920 × 1080 — 16:9</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -601,6 +520,7 @@ export default function BannersTab() {
                   autoCapitalize="none"
                 />
 
+                {/* مفتاح التفعيل */}
                 <TouchableOpacity
                   style={[s.activeToggle, { borderColor: form.isActive ? SUCCESS : '#e5e7eb' }]}
                   onPress={() => setForm(p => ({ ...p, isActive: !p.isActive }))}>
@@ -650,6 +570,7 @@ const s = StyleSheet.create({
   hint:     { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   hintText: { fontSize: 11, color: '#64748b', textAlign: 'right' },
 
+  // ── كارد البنر ──
   card: {
     backgroundColor: '#fff', borderRadius: 16,
     borderWidth: 1, borderColor: '#e8edf2',
@@ -660,7 +581,8 @@ const s = StyleSheet.create({
   cardDragging: { borderColor: PRIMARY, borderWidth: 2 },
   cardTarget:   { borderColor: '#f59e0b', borderWidth: 2, borderStyle: 'dashed' },
 
-  imgWrap: { width: '100%', aspectRatio: ASPECT_RATIO, position: 'relative' },
+  // صورة 16:9
+  imgWrap: { width: '100%', aspectRatio: 16 / 9, position: 'relative' },
   img:     { width: '100%', height: '100%' },
   offOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -702,6 +624,7 @@ const s = StyleSheet.create({
     backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center',
   },
 
+  // ── Modal ──
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
