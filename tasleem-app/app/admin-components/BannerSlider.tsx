@@ -25,8 +25,8 @@ export default function BannerSlider({
   containerWidth?: number;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  // نسبة العرض إلى الارتفاع 1536/990 = 1.5515
-  const ASPECT_RATIO = 1536 / 990;
+  // نسبة العرض إلى الارتفاع 12:5 = 2.4
+  const ASPECT_RATIO = 12 / 5;
   const W        = containerWidth ?? screenWidth;
   const BANNER_H = Math.round(W / ASPECT_RATIO);
 
@@ -65,6 +65,15 @@ export default function BannerSlider({
 
   // ── Dot animation ─────────────────────────────────────────────
   useEffect(() => {
+    const listener = dotAnim.addListener(({ value }) => {
+      const idx = Math.round(value / W);
+      const clamped = Math.max(0, Math.min(active.length - 1, idx));
+      setActiveIdx(clamped);
+    });
+    return () => dotAnim.removeListener(listener);
+  }, [active.length, W]);
+
+  useEffect(() => {
     dotAnim.setValue(0);
     Animated.spring(dotAnim, {
       toValue: 1,
@@ -97,16 +106,22 @@ export default function BannerSlider({
         data={active}
         keyExtractor={item => String(item.id)}
         horizontal
-        pagingEnabled
+        pagingEnabled={false}
+        snapToInterval={W}
+        snapToAlignment="start"
+        decelerationRate="normal"
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
-        decelerationRate="fast"
         bounces={false}
         getItemLayout={(_, index) => ({
           length: W,
           offset: W * index,
           index,
         })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: dotAnim } } }],
+          { useNativeDriver: false }
+        )}
         onScrollBeginDrag={() => {
           isManual.current = true;
           stopTimer();
@@ -150,14 +165,18 @@ export default function BannerSlider({
       {active.length > 1 && (
         <View style={s.dots}>
           {active.map((_, i) => {
-            const isAct = activeIdx === i;
+            const inputRange = active.map((_, idx) => idx * W);
+            const outputRange = active.map((_, idx) => idx === i ? 22 : 6);
+            const dotW = dotAnim.interpolate({
+              inputRange,
+              outputRange,
+              extrapolate: 'clamp',
+            });
             return (
               <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Animated.View style={[
                   s.dot,
-                  isAct
-                    ? { width: isAct ? 22 : 6, backgroundColor: PRIMARY }
-                    : { width: 6, backgroundColor: '#d1d5db' },
+                  { width: dotW, backgroundColor: i === activeIdx ? PRIMARY : '#d1d5db' },
                 ]} />
               </TouchableOpacity>
             );

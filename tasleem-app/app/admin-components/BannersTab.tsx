@@ -19,7 +19,7 @@ const BG      = '#f2f6f9';
 // الحجم المطلوب للبانر: 1536px عرض * 990px ارتفاع
 const TARGET_WIDTH = 1536;
 const TARGET_HEIGHT = 990;
-const ASPECT_RATIO = TARGET_WIDTH / TARGET_HEIGHT; // ~1.55
+const ASPECT_RATIO = 12 / 5; // تغيير النسبة إلى 12:5
 
 const ITEM_H  = 110; // ارتفاع كارد البنر في القائمة
 
