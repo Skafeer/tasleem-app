@@ -1,3 +1,4 @@
+// ========================== BannerSlider.tsx ==========================
 import { useEffect, useRef, useState } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Image,
@@ -13,9 +14,9 @@ type Banner = { id: number; imageUrl: string; title?: string; link?: string; isA
 
 export default function BannerSlider({ banners, containerWidth }: { banners: Banner[]; containerWidth?: number }) {
   const { width: screenWidth } = useWindowDimensions();
-  // ✅ عرض كامل بدون padding جانبي — نسبة 3:1
+  // العرض الكامل بدون padding جانبي — نسبة 3:1
   const width = containerWidth ?? screenWidth;
-  const BANNER_H = Math.round(width / 3);
+  const BANNER_H = Math.round(width / 3); // 3:1 ratio
   
   const scrollRef  = useRef<ScrollView>(null);
   const idxRef     = useRef(0);
@@ -25,19 +26,24 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
   // قيمة متحركة لعرض النقطة النشطة بسلاسة
   const dotWidthAnim = useRef(new Animated.Value(6)).current;
 
+  // فلترة البنرات النشطة فقط وترتيبها حسب sortOrder
+  const activeBanners = banners
+    .filter(b => b.isActive === true)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
   useEffect(() => {
-    if (banners.length <= 1) return;
+    if (activeBanners.length <= 1) return;
     
     const timer = setInterval(() => {
       if (isManual.current) return;
-      const next = (idxRef.current + 1) % banners.length;
+      const next = (idxRef.current + 1) % activeBanners.length;
       scrollRef.current?.scrollTo({ x: next * width, animated: true });
       idxRef.current = next;
       setActiveIdx(next);
     }, AUTO_INTERVAL);
     
     return () => clearInterval(timer);
-  }, [banners.length, width]);
+  }, [activeBanners.length, width]);
 
   // تحريك عرض النقطة النشطة عند تغيير الفهرس
   useEffect(() => {
@@ -47,16 +53,14 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
       friction: 8,
       tension: 40,
     }).start();
-    
-    // إعادة النقاط الأخرى لحجمها الطبيعي (يتم التعامل معه عبر الشرط في الـ JSX)
   }, [activeIdx]);
 
-  if (!banners.length) return null;
+  if (!activeBanners.length) return null;
 
   const handleScroll = (e: any) => {
     const x = e.nativeEvent.contentOffset.x;
     const idx = Math.round(x / width);
-    if (idx !== activeIdx && idx >= 0 && idx < banners.length) {
+    if (idx !== activeIdx && idx >= 0 && idx < activeBanners.length) {
       idxRef.current = idx;
       setActiveIdx(idx);
     }
@@ -75,23 +79,21 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
           handleScroll(e);
           isManual.current = false;
         }}
-        onScroll={(e) => {
-          // تحديث الفهرس أثناء السحب أيضاً لتفاعل أسرع
-          const x = e.nativeEvent.contentOffset.x;
-          const idx = Math.round(x / width);
-          if (idx !== activeIdx && idx >= 0 && idx < banners.length) {
-            setActiveIdx(idx);
-            idxRef.current = idx;
-          }
-        }}
+        onScroll={handleScroll}
       >
-        {banners.map((b) => (
-          <TouchableOpacity key={b.id}
+        {activeBanners.map((b) => (
+          <TouchableOpacity 
+            key={b.id}
             activeOpacity={b.link ? 0.9 : 1}
             onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
             style={[s.slide, { width, height: BANNER_H }]}
           >
-            <Image source={{ uri: b.imageUrl }} style={s.img} resizeMode="contain" />
+            <Image 
+              source={{ uri: b.imageUrl }} 
+              style={s.img} 
+              resizeMode="cover"
+              defaultSource={require('../../assets/placeholder-banner.png')}
+            />
             {b.title ? (
               <View style={s.titleBox}>
                 <Text style={s.titleTxt} numberOfLines={1}>{b.title}</Text>
@@ -103,26 +105,31 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
               </View>
             ) : null}
             
-            {/* ترقيم الصور */}
-            <View style={s.counter}>
-              <Text style={s.counterTxt}>{activeIdx + 1} / {banners.length}</Text>
-            </View>
+            {/* ترقيم الصور - يظهر فقط لو أكثر من بنر */}
+            {activeBanners.length > 1 && (
+              <View style={s.counter}>
+                <Text style={s.counterTxt}>{activeIdx + 1} / {activeBanners.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {banners.length > 1 && (
+      {activeBanners.length > 1 && (
         <View style={s.dots}>
-          {banners.map((_, i) => {
+          {activeBanners.map((_, i) => {
             const isActive = activeIdx === i;
             return (
-              <TouchableOpacity key={i} onPress={() => {
-                isManual.current = true;
-                scrollRef.current?.scrollTo({ x: i * width, animated: true });
-                idxRef.current = i;
-                setActiveIdx(i);
-                setTimeout(() => { isManual.current = false; }, 1000);
-              }}>
+              <TouchableOpacity 
+                key={i} 
+                onPress={() => {
+                  isManual.current = true;
+                  scrollRef.current?.scrollTo({ x: i * width, animated: true });
+                  idxRef.current = i;
+                  setActiveIdx(i);
+                  setTimeout(() => { isManual.current = false; }, 1000);
+                }}
+              >
                 <Animated.View 
                   style={[
                     s.dot, 
@@ -144,7 +151,7 @@ const s = StyleSheet.create({
   },
   slide: { 
     overflow: 'hidden', 
-    backgroundColor: '#eee',
+    backgroundColor: '#f0f0f0',
   },
   img: { 
     width: '100%', 
@@ -155,47 +162,48 @@ const s = StyleSheet.create({
     bottom: 0, 
     left: 0, 
     right: 0, 
-    backgroundColor: 'rgba(0,0,0,0.4)', 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
     paddingHorizontal: 12, 
-    paddingVertical: 6 
+    paddingVertical: 8 
   },
   titleTxt: { 
     color: '#fff', 
     fontWeight: '600', 
-    fontSize: 13, 
+    fontSize: 14, 
     textAlign: 'right' 
   },
   linkBadge: { 
     position: 'absolute', 
-    top: 10, 
-    left: 10, 
-    backgroundColor: 'rgba(12, 102, 121, 0.8)', 
-    borderRadius: 12, 
-    width: 24,
-    height: 24,
+    top: 12, 
+    left: 12, 
+    backgroundColor: 'rgba(12, 102, 121, 0.85)', 
+    borderRadius: 20, 
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
   counter: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   counterTxt: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   dots: { 
     flexDirection: 'row', 
     justifyContent: 'center', 
     alignItems: 'center',
-    gap: 6, 
-    marginTop: 8 
+    gap: 8, 
+    marginTop: 12,
+    marginBottom: 4,
   },
   dot: { 
     height: 6, 

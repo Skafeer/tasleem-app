@@ -1,3 +1,4 @@
+// ========================== BannersTab.tsx ==========================
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
@@ -212,7 +213,7 @@ function DraggableList({ items, onReorder, onEdit, onDelete, onToggle }: {
               isDraggingThis && s.cardDragging,
               isTarget && s.cardTarget,
             ]}>
-              {/* صورة البنر بنسبة 16:9 */}
+              {/* صورة البنر بنسبة 3:1 */}
               <View style={s.imgWrap}>
                 <Image source={{ uri: item.imageUrl }} style={s.img} resizeMode="cover" />
                 {!item.isActive && (
@@ -337,7 +338,7 @@ export default function BannersTab() {
     if (status !== 'granted') { toast.error('يرجى السماح بالوصول للصور'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,       // ✅ أعلى جودة
+      quality: 1,
       base64: true,
       allowsEditing: false,
     });
@@ -356,7 +357,7 @@ export default function BannersTab() {
     setUploading(false);
   };
 
-  // ── إعادة الترتيب ───────────────────────────────────────────
+  // ── إعادة الترتيب ── تحسين: إرسال تحديث واحد فقط ───────────
   const handleReorder = async (from: number, to: number) => {
     const updated    = [...localList];
     const [moved]    = updated.splice(from, 1);
@@ -366,14 +367,19 @@ export default function BannersTab() {
 
     setIsSavingOrder(true);
     try {
-      await Promise.all(
-        reindexed.map(b => api.patch(`/api/banners/${b.id}`, {
-          title: b.title, imageUrl: b.imageUrl, link: b.link,
-          isActive: b.isActive, sortOrder: b.sortOrder,
-        }))
-      );
+      // إرسال جميع التحديثات دفعة واحدة
+      const updates = reindexed.map((b, i) => ({
+        id: b.id,
+        sortOrder: i,
+        title: b.title,
+        imageUrl: b.imageUrl,
+        link: b.link,
+        isActive: b.isActive,
+      }));
+      await api.patch('/api/banners/reorder', { banners: updates });
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
       qc.invalidateQueries({ queryKey: ['banners'] });
+      toast.success('تم حفظ الترتيب ✅');
     } catch {
       toast.error('فشل حفظ الترتيب');
       setLocalList([...(banners as Banner[])]);
@@ -419,8 +425,8 @@ export default function BannersTab() {
 
   const displayList = localList.length > 0 ? localList : (banners as Banner[]);
 
-  // نسبة 16:9 لمعاينة الصورة في الـ modal
-  const previewH = Math.round((screenWidth - 80) * 9 / 16);
+  // نسبة 3:1 لمعاينة الصورة في الـ modal
+  const previewH = Math.round((screenWidth - 80) / 3);
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
@@ -474,8 +480,8 @@ export default function BannersTab() {
 
               <ScrollView contentContainerStyle={s.sheetBody} showsVerticalScrollIndicator={false}>
 
-                {/* معاينة / رفع الصورة بنسبة 16:9 */}
-                <Text style={s.label}>صورة البنر * <Text style={s.labelSub}>(1920 × 1080 — نسبة 16:9)</Text></Text>
+                {/* معاينة / رفع الصورة بنسبة 3:1 */}
+                <Text style={s.label}>صورة البنر * <Text style={s.labelSub}>(نسبة 3:1 — مثلاً 1200×400)</Text></Text>
                 <TouchableOpacity
                   style={[s.uploadBox, { height: previewH }]}
                   onPress={pickImage}
@@ -488,7 +494,7 @@ export default function BannersTab() {
                     <View style={s.uploadPlaceholder}>
                       <Ionicons name="image-outline" size={40} color={PRIMARY + '60'} />
                       <Text style={s.uploadTxt}>اضغط لرفع صورة البنر</Text>
-                      <Text style={s.uploadSub}>1920 × 1080 — 16:9</Text>
+                      <Text style={s.uploadSub}>نسبة 3:1 — عرض 1200px × ارتفاع 400px</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -581,8 +587,8 @@ const s = StyleSheet.create({
   cardDragging: { borderColor: PRIMARY, borderWidth: 2 },
   cardTarget:   { borderColor: '#f59e0b', borderWidth: 2, borderStyle: 'dashed' },
 
-  // صورة 16:9
-  imgWrap: { width: '100%', aspectRatio: 16 / 9, position: 'relative' },
+  // صورة 3:1
+  imgWrap: { width: '100%', aspectRatio: 3 / 1, position: 'relative' },
   img:     { width: '100%', height: '100%' },
   offOverlay: {
     ...StyleSheet.absoluteFillObject,
