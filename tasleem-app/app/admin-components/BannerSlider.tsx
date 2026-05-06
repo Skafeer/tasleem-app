@@ -15,8 +15,10 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
   const { width: screenWidth } = useWindowDimensions();
   // حساب العرض ليكون متجاوباً مع ترك مسافة جانبية
   const width = (containerWidth ?? screenWidth) - 24;
-  // جعل الارتفاع متناسباً مع العرض (نسبة 16:9 تقريباً) بحد أقصى 180 للموبايل
-  const BANNER_H = Math.min(width * 0.45, 180);
+  // ✅ نسبة ثابتة 2:1 — تضمن الصورة كاملة على كل الأجهزة
+  // موبايل 390px عرض → ارتفاع 183px
+  // آيباد  820px عرض → ارتفاع 398px
+  const BANNER_H = Math.round(width / 2);
   
   const scrollRef  = useRef<ScrollView>(null);
   const idxRef     = useRef(0);
