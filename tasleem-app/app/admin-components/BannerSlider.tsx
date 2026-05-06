@@ -91,7 +91,7 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
             onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
             style={[s.slide, { width, height: BANNER_H }]}
           >
-            <Image source={{ uri: b.imageUrl }} style={s.img} resizeMode="cover" />
+            <Image source={{ uri: b.imageUrl }} style={s.img} resizeMode="contain" />
             {b.title ? (
               <View style={s.titleBox}>
                 <Text style={s.titleTxt} numberOfLines={1}>{b.title}</Text>
