@@ -1,136 +1,152 @@
-// ========================== BannerSlider.tsx (المعدل) ==========================
 import { useEffect, useRef, useState } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, Image,
-  Text, Linking, useWindowDimensions, ScrollView,
-  Animated,
+  Text, Linking, useWindowDimensions, FlatList, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const PRIMARY       = '#0c6679';
 const AUTO_INTERVAL = 4000;
+const RATIO         = 3; // نسبة 3:1
 
-type Banner = { id: number; imageUrl: string; title?: string; link?: string; isActive: boolean; sortOrder: number; };
+type Banner = {
+  id: number;
+  imageUrl: string;
+  title?: string;
+  link?: string;
+  isActive: boolean;
+  sortOrder: number;
+};
 
-export default function BannerSlider({ banners, containerWidth }: { banners: Banner[]; containerWidth?: number }) {
+export default function BannerSlider({
+  banners,
+  containerWidth,
+}: {
+  banners: Banner[];
+  containerWidth?: number;
+}) {
   const { width: screenWidth } = useWindowDimensions();
-  const width = containerWidth ?? screenWidth;
-  const BANNER_H = Math.round(width / 3); // 3:1 ratio
-  
-  const scrollRef  = useRef<ScrollView>(null);
-  const idxRef     = useRef(0);
-  const isManual   = useRef(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  
-  const dotWidthAnim = useRef(new Animated.Value(6)).current;
+  const W = containerWidth ?? screenWidth;
+  const H = Math.round(W / RATIO);
 
-  // فلترة البنرات النشطة فقط وترتيبها حسب sortOrder
-  const activeBanners = banners
-    .filter(b => b.isActive === true)
+  const flatRef   = useRef<FlatList>(null);
+  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const idxRef    = useRef(0);
+  const isManual  = useRef(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const dotAnim   = useRef(new Animated.Value(6)).current;
+
+  // فقط البنرات النشطة مرتبة
+  const list = banners
+    .filter(b => b.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  useEffect(() => {
-    if (activeBanners.length <= 1) return;
-    
-    const timer = setInterval(() => {
+  // ── Auto scroll ──────────────────────────────────────────────
+  const startTimer = () => {
+    if (list.length <= 1) return;
+    timerRef.current = setInterval(() => {
       if (isManual.current) return;
-      const next = (idxRef.current + 1) % activeBanners.length;
-      scrollRef.current?.scrollTo({ x: next * width, animated: true });
+      const next = (idxRef.current + 1) % list.length;
+      flatRef.current?.scrollToIndex({ index: next, animated: true });
       idxRef.current = next;
       setActiveIdx(next);
     }, AUTO_INTERVAL);
-    
-    return () => clearInterval(timer);
-  }, [activeBanners.length, width]);
+  };
 
   useEffect(() => {
-    Animated.spring(dotWidthAnim, {
-      toValue: 20,
-      useNativeDriver: false,
-      friction: 8,
-      tension: 40,
+    startTimer();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [list.length]);
+
+  // ── Dot animation ────────────────────────────────────────────
+  useEffect(() => {
+    dotAnim.setValue(6);
+    Animated.spring(dotAnim, {
+      toValue: 20, useNativeDriver: false, speed: 20, bounciness: 6,
     }).start();
   }, [activeIdx]);
 
-  if (!activeBanners.length) return null;
+  if (!list.length) return null;
 
-  const handleScroll = (e: any) => {
-    const x = e.nativeEvent.contentOffset.x;
-    const idx = Math.round(x / width);
-    if (idx !== activeIdx && idx >= 0 && idx < activeBanners.length) {
-      idxRef.current = idx;
-      setActiveIdx(idx);
-    }
+  const goTo = (i: number) => {
+    isManual.current = true;
+    flatRef.current?.scrollToIndex({ index: i, animated: true });
+    idxRef.current = i;
+    setActiveIdx(i);
+    setTimeout(() => { isManual.current = false; }, 800);
   };
 
   return (
-    <View style={s.container}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal 
-        pagingEnabled 
-        scrollEventThrottle={16}
+    <View style={s.wrapper}>
+      <FlatList
+        ref={flatRef}
+        data={list}
+        keyExtractor={b => String(b.id)}
+        horizontal
+        pagingEnabled={false}
+        snapToInterval={W}
+        snapToAlignment="start"
+        decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        getItemLayout={(_, i) => ({ length: W, offset: W * i, index: i })}
         onScrollBeginDrag={() => { isManual.current = true; }}
-        onMomentumScrollEnd={(e) => {
-          handleScroll(e);
+        onMomentumScrollEnd={e => {
+          const i = Math.round(e.nativeEvent.contentOffset.x / W);
+          const clamped = Math.max(0, Math.min(list.length - 1, i));
+          idxRef.current = clamped;
+          setActiveIdx(clamped);
           isManual.current = false;
         }}
-        onScroll={handleScroll}
-      >
-        {activeBanners.map((b) => (
-          <TouchableOpacity 
-            key={b.id}
-            activeOpacity={b.link ? 0.9 : 1}
+        renderItem={({ item: b }) => (
+          <TouchableOpacity
+            activeOpacity={b.link ? 0.85 : 1}
             onPress={() => b.link && Linking.openURL(b.link).catch(() => {})}
-            style={[s.slide, { width, height: BANNER_H }]}
-          >
-            <Image 
-              source={{ uri: b.imageUrl }} 
-              style={s.img} 
+            style={{ width: W, height: H }}>
+
+            <Image
+              source={{ uri: b.imageUrl }}
+              style={s.img}
               resizeMode="cover"
             />
+
+            {/* عنوان */}
             {b.title ? (
               <View style={s.titleBox}>
                 <Text style={s.titleTxt} numberOfLines={1}>{b.title}</Text>
               </View>
             ) : null}
+
+            {/* أيقونة رابط */}
             {b.link ? (
               <View style={s.linkBadge}>
                 <Ionicons name="link" size={12} color="#fff" />
               </View>
             ) : null}
-            
-            {activeBanners.length > 1 && (
+
+            {/* عداد */}
+            {list.length > 1 && (
               <View style={s.counter}>
-                <Text style={s.counterTxt}>{activeIdx + 1} / {activeBanners.length}</Text>
+                <Text style={s.counterTxt}>{activeIdx + 1} / {list.length}</Text>
               </View>
             )}
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+      />
 
-      {activeBanners.length > 1 && (
+      {/* نقاط التنقل */}
+      {list.length > 1 && (
         <View style={s.dots}>
-          {activeBanners.map((_, i) => {
+          {list.map((_, i) => {
             const isActive = activeIdx === i;
             return (
-              <TouchableOpacity 
-                key={i} 
-                onPress={() => {
-                  isManual.current = true;
-                  scrollRef.current?.scrollTo({ x: i * width, animated: true });
-                  idxRef.current = i;
-                  setActiveIdx(i);
-                  setTimeout(() => { isManual.current = false; }, 1000);
-                }}
-              >
-                <Animated.View 
-                  style={[
-                    s.dot, 
-                    isActive ? { width: dotWidthAnim, backgroundColor: PRIMARY } : { width: 6, backgroundColor: '#d1d5db' }
-                  ]} 
-                />
+              <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Animated.View style={[
+                  s.dot,
+                  isActive
+                    ? { width: dotAnim, backgroundColor: PRIMARY }
+                    : { width: 6, backgroundColor: '#d1d5db' },
+                ]} />
               </TouchableOpacity>
             );
           })}
@@ -141,67 +157,32 @@ export default function BannerSlider({ banners, containerWidth }: { banners: Ban
 }
 
 const s = StyleSheet.create({
-  container: { 
-    marginBottom: 10,
+  wrapper: { marginBottom: 10 },
+  img:     { width: '100%', height: '100%' },
+
+  titleBox: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12, paddingVertical: 8,
   },
-  slide: { 
-    overflow: 'hidden', 
-    backgroundColor: '#f0f0f0',
-  },
-  img: { 
-    width: '100%', 
-    height: '100%',
-  },
-  titleBox: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    paddingHorizontal: 12, 
-    paddingVertical: 8 
-  },
-  titleTxt: { 
-    color: '#fff', 
-    fontWeight: '600', 
-    fontSize: 14, 
-    textAlign: 'right' 
-  },
-  linkBadge: { 
-    position: 'absolute', 
-    top: 12, 
-    left: 12, 
-    backgroundColor: 'rgba(12, 102, 121, 0.85)', 
-    borderRadius: 20, 
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+  titleTxt: { color: '#fff', fontWeight: '600', fontSize: 14, textAlign: 'right' },
+
+  linkBadge: {
+    position: 'absolute', top: 12, left: 12,
+    backgroundColor: 'rgba(12,102,121,0.85)',
+    borderRadius: 20, width: 28, height: 28,
+    justifyContent: 'center', alignItems: 'center',
   },
   counter: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
+    position: 'absolute', top: 12, right: 12,
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
   },
-  counterTxt: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
+  counterTxt: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+
+  dots: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 8, marginTop: 10, marginBottom: 2,
   },
-  dots: { 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    gap: 8, 
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  dot: { 
-    height: 6, 
-    borderRadius: 3, 
-  },
+  dot: { height: 6, borderRadius: 3 },
 });
