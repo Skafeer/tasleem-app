@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 
 const PRIMARY       = '#0c6679';
-const AUTO_INTERVAL = 4000;
+const AUTO_INTERVAL = 7000; // تم التغيير من 4000 إلى 7000 لتقليل السرعة
 
 type Banner = {
   id: number;
@@ -25,9 +25,10 @@ export default function BannerSlider({
   containerWidth?: number;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  // ✅ عرض كامل — نسبة 3:1
+  // نسبة العرض إلى الارتفاع 1536/990 = 1.5515
+  const ASPECT_RATIO = 1536 / 990;
   const W        = containerWidth ?? screenWidth;
-  const BANNER_H = Math.round(W / 3);
+  const BANNER_H = Math.round(W / ASPECT_RATIO);
 
   const flatRef    = useRef<FlatList>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -126,7 +127,7 @@ export default function BannerSlider({
           >
             <Image
               source={{ uri: item.imageUrl }}
-              style={{ width: W, height: BANNER_H }}
+              style={[s.image, { width: W, height: BANNER_H }]}
               resizeMode="cover"
             />
             {/* عنوان اختياري */}
@@ -173,11 +174,14 @@ export default function BannerSlider({
 
 const s = StyleSheet.create({
   container: { marginBottom: 8 },
+  image: { borderRadius: 20, overflow: 'hidden' }, // جعل البانر منحني الأطراف
 
   titleBox: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: 14, paddingVertical: 8,
+    borderBottomLeftRadius: 20,  // لمطابقة انحناء الصورة
+    borderBottomRightRadius: 20,
   },
   titleTxt: { color: '#fff', fontWeight: '700', fontSize: 13, textAlign: 'right' },
 
