@@ -523,7 +523,7 @@ export default function HomeScreen() {
                 )}
                 
                 <View style={s.bannerWrapper}>
-                  <BannerSlider banners={banners} containerWidth={width} />
+                  <BannerSlider banners={banners} containerWidth={Math.max(0, width - 32)} />
                 </View>
                 
                 <View style={s.resultHeader}>
@@ -771,6 +771,7 @@ const s = StyleSheet.create({
     marginHorizontal: 0,
     marginBottom: 16,
     overflow: 'visible',
+    alignItems: 'center',
   },
   resultHeader: {
     flexDirection: 'row',

@@ -89,7 +89,7 @@ export default function BannerSlider({
   };
 
   return (
-    <View style={[s.container, { height: BANNER_H + 28 }]}>
+    <View style={[s.container, { width: W, height: BANNER_H + 28, alignSelf: 'center' }]}>
 
       {/* ── الصور ── */}
       <FlatList
@@ -151,10 +151,6 @@ export default function BannerSlider({
         <View style={s.dots}>
           {active.map((_, i) => {
             const isAct = activeIdx === i;
-            const dotW  = dotAnim.interpolate({
-              inputRange:  [0, 1],
-              outputRange: isAct ? [6, 22] : [22, 6],
-            });
             return (
               <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Animated.View style={[
