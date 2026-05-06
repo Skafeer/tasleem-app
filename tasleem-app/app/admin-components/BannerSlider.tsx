@@ -5,8 +5,8 @@ import {
   FlatList, Animated,
 } from 'react-native';
 
-const PRIMARY       = '#0c6679';
-const AUTO_INTERVAL = 7000; // تم التغيير من 4000 إلى 7000 لتقليل السرعة
+const PRIMARY = '#0c6679';
+const AUTO_INTERVAL = 5000; // تم تقليل الوقت قليلاً لجعل التصفح أكثر حيوية
 
 type Banner = {
   id: number;
@@ -25,26 +25,26 @@ export default function BannerSlider({
   containerWidth?: number;
 }) {
   const { width: screenWidth } = useWindowDimensions();
-  // نسبة العرض إلى الارتفاع 12:5 = 2.4
-  const ASPECT_RATIO = 12 / 5;
-  const W        = containerWidth ?? screenWidth;
+  
+  // النسبة المطلوبة 18:7 (1440x560)
+  const ASPECT_RATIO = 18 / 7; 
+  const W = containerWidth ?? screenWidth;
   const BANNER_H = Math.round(W / ASPECT_RATIO);
 
-  const flatRef    = useRef<FlatList>(null);
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isManual   = useRef(false);
+  const flatRef = useRef<FlatList>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isManual = useRef(false);
   const currentIdx = useRef(0);
   const [activeIdx, setActiveIdx] = useState(0);
-  const dotAnim    = useRef(new Animated.Value(0)).current;
+  const scrollX = useRef(new Animated.Value(0)).current;
 
-  // فلترة وترتيب البنرات
   const active = banners
     .filter(b => b.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // ── Auto-scroll ───────────────────────────────────────────────
   const startTimer = () => {
     if (active.length <= 1) return;
+    stopTimer();
     timerRef.current = setInterval(() => {
       if (isManual.current) return;
       const next = (currentIdx.current + 1) % active.length;
@@ -63,122 +63,69 @@ export default function BannerSlider({
     return stopTimer;
   }, [active.length]);
 
-  // ── Dot animation ─────────────────────────────────────────────
-  useEffect(() => {
-    const listener = dotAnim.addListener(({ value }) => {
-      const idx = Math.round(value / W);
-      const clamped = Math.max(0, Math.min(active.length - 1, idx));
-      setActiveIdx(clamped);
-    });
-    return () => dotAnim.removeListener(listener);
-  }, [active.length, W]);
-
-  useEffect(() => {
-    dotAnim.setValue(0);
-    Animated.spring(dotAnim, {
-      toValue: 1,
-      useNativeDriver: false,
-      friction: 7,
-      tension: 50,
-    }).start();
-  }, [activeIdx]);
-
-  if (!active.length) return null;
-
-  const goTo = (idx: number) => {
-    isManual.current = true;
-    stopTimer();
-    flatRef.current?.scrollToIndex({ index: idx, animated: true });
-    currentIdx.current = idx;
-    setActiveIdx(idx);
-    setTimeout(() => {
-      isManual.current = false;
-      startTimer();
-    }, 1000);
+  const handlePress = (link?: string) => {
+    if (link) Linking.openURL(link).catch(() => {});
   };
 
-  return (
-    <View style={[s.container, { width: W, height: BANNER_H + 28, alignSelf: 'center' }]}>
+  if (active.length === 0) return null;
 
-      {/* ── الصور ── */}
+  return (
+    <View style={[styles.container, { height: BANNER_H }]}>
       <FlatList
         ref={flatRef}
         data={active}
-        keyExtractor={item => String(item.id)}
+        keyExtractor={(item) => item.id.toString()}
         horizontal
-        pagingEnabled={false}
-        snapToInterval={W}
-        snapToAlignment="start"
-        decelerationRate="normal"
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        bounces={false}
-        getItemLayout={(_, index) => ({
-          length: W,
-          offset: W * index,
-          index,
-        })}
         onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: dotAnim } } }],
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false }
         )}
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+          currentIdx.current = idx;
+          setActiveIdx(idx);
+          isManual.current = false;
+          startTimer();
+        }}
         onScrollBeginDrag={() => {
           isManual.current = true;
           stopTimer();
         }}
-        onMomentumScrollEnd={e => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / W);
-          const clamped = Math.max(0, Math.min(active.length - 1, idx));
-          currentIdx.current = clamped;
-          setActiveIdx(clamped);
-          isManual.current = false;
-          startTimer();
-        }}
         renderItem={({ item }) => (
           <TouchableOpacity
-            activeOpacity={item.link ? 0.85 : 1}
-            onPress={() => item.link && Linking.openURL(item.link).catch(() => {})}
+            activeOpacity={0.9}
+            onPress={() => handlePress(item.link)}
             style={{ width: W, height: BANNER_H }}
           >
             <Image
               source={{ uri: item.imageUrl }}
-              style={[s.image, { width: W, height: BANNER_H }]}
+              style={styles.image}
               resizeMode="cover"
             />
-            {/* عنوان اختياري */}
-            {!!item.title && (
-              <View style={s.titleBox}>
-                <Text style={s.titleTxt} numberOfLines={1}>{item.title}</Text>
-              </View>
-            )}
-            {/* عداد */}
-            {active.length > 1 && (
-              <View style={s.counter}>
-                <Text style={s.counterTxt}>{activeIdx + 1} / {active.length}</Text>
-              </View>
-            )}
           </TouchableOpacity>
         )}
       />
 
-      {/* ── نقاط التنقل ── */}
       {active.length > 1 && (
-        <View style={s.dots}>
+        <View style={styles.dots}>
           {active.map((_, i) => {
-            const inputRange = active.map((_, idx) => idx * W);
-            const outputRange = active.map((_, idx) => idx === i ? 22 : 6);
-            const dotW = dotAnim.interpolate({
-              inputRange,
-              outputRange,
+            const width = scrollX.interpolate({
+              inputRange: [(i - 1) * W, i * W, (i + 1) * W],
+              outputRange: [8, 20, 8],
+              extrapolate: 'clamp',
+            });
+            const opacity = scrollX.interpolate({
+              inputRange: [(i - 1) * W, i * W, (i + 1) * W],
+              outputRange: [0.4, 1, 0.4],
               extrapolate: 'clamp',
             });
             return (
-              <TouchableOpacity key={i} onPress={() => goTo(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Animated.View style={[
-                  s.dot,
-                  { width: dotW, backgroundColor: i === activeIdx ? PRIMARY : '#d1d5db' },
-                ]} />
-              </TouchableOpacity>
+              <Animated.View
+                key={i}
+                style={[styles.dot, { width, opacity, backgroundColor: i === activeIdx ? PRIMARY : '#ccc' }]}
+              />
             );
           })}
         </View>
@@ -187,29 +134,27 @@ export default function BannerSlider({
   );
 }
 
-const s = StyleSheet.create({
-  container: { marginBottom: 8 },
-  image: { borderRadius: 20, overflow: 'hidden' }, // جعل البانر منحني الأطراف
-
-  titleBox: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderBottomLeftRadius: 20,  // لمطابقة انحناء الصورة
-    borderBottomRightRadius: 20,
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#f0f0f0',
+    overflow: 'hidden',
   },
-  titleTxt: { color: '#fff', fontWeight: '700', fontSize: 13, textAlign: 'right' },
-
-  counter: {
-    position: 'absolute', top: 10, right: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+  image: {
+    width: '100%',
+    height: '100%',
   },
-  counterTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
-
   dots: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: 6, marginTop: 8,
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
   },
-  dot: { height: 6, borderRadius: 3 },
+  dot: {
+    height: 8,
+    borderRadius: 4,
+  },
 });
