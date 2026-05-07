@@ -67,26 +67,59 @@ export default function StatsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [revenueTab, setRevenueTab] = useState<'day' | 'week' | 'month' | 'year'>('month');
 
-  const { data: statsData, isLoading } = useQuery({
+  const { data: statsData, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-stats-data'],
     queryFn: async () => {
-      const { data } = await api.get('/api/admin/stats-data');
-      return data;
+      try {
+        const { data } = await api.get('/api/admin/stats-data');
+        return data;
+      } catch {
+        // fallback — نجمع البيانات من endpoints منفصلة
+        const [orders, products, users, withdrawals] = await Promise.allSettled([
+          api.get('/api/admin/orders'),
+          api.get('/api/products'),
+          api.get('/api/admin/users'),
+          api.get('/api/admin/withdrawals'),
+        ]);
+        return {
+          orders:      orders.status      === 'fulfilled' ? orders.value.data      : [],
+          products:    products.status    === 'fulfilled' ? products.value.data    : [],
+          users:       users.status       === 'fulfilled' ? users.value.data       : [],
+          withdrawals: withdrawals.status === 'fulfilled' ? withdrawals.value.data : [],
+          _fallback: true,
+        };
+      }
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    retry: 1,
+    retryDelay: 2000,
   });
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await qc.invalidateQueries();
+    await refetch();
     setRefreshing(false);
   };
 
-  if (isLoading || !statsData) {
+  if (isLoading) {
     return (
       <View style={s.center}>
         <ActivityIndicator size="large" color={PRIMARY} />
         <Text style={s.loadingTxt}>جاري تحميل الإحصائيات...</Text>
+      </View>
+    );
+  }
+
+  if (error && !statsData) {
+    return (
+      <View style={s.center}>
+        <Ionicons name="alert-circle-outline" size={52} color={DANGER} />
+        <Text style={s.errorTxt}>تعذر تحميل الإحصائيات</Text>
+        <Text style={s.errorSub}>تحقق من الاتصال بالسيرفر</Text>
+        <TouchableOpacity style={s.retryBtn} onPress={() => refetch()}>
+          <Ionicons name="refresh-outline" size={16} color="#fff" />
+          <Text style={s.retryTxt}>إعادة المحاولة</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -563,4 +596,13 @@ const s = StyleSheet.create({
   wCount: { fontSize: 22, fontWeight: 'bold' },
   wLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600' },
   wAmount: { fontSize: 11, fontWeight: '700' },
+
+  errorTxt: { fontSize: 16, fontWeight: '800', color: '#374151', marginTop: 8 },
+  errorSub: { fontSize: 13, color: '#9ca3af' },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: PRIMARY, paddingHorizontal: 20, paddingVertical: 10,
+    borderRadius: 12, marginTop: 12,
+  },
+  retryTxt: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
