@@ -100,30 +100,30 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── صقر AI ── للجميع (تاجر وأدمن) ── */}
+        {/* ── طارق AI ── للجميع (تاجر وأدمن) ── */}
         <TouchableOpacity
-          style={s.saqrSection}
-          onPress={() => router.push('/saqr')}
+          style={s.tariqSection}
+          onPress={() => router.push('/tariq')}
           activeOpacity={0.85}
         >
           <LinearGradient
             colors={['#1e3a5f', '#0c6679']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={s.saqrToggleGradient}
+            style={s.tariqToggleGradient}
           >
-            <View style={s.saqrToggleLeft}>
-              <View style={s.saqrIconBox}>
-                <Text style={s.saqrEmoji}>🦅</Text>
+            <View style={s.tariqToggleLeft}>
+              <View style={s.tariqIconBox}>
+                <Text style={s.tariqEmoji}>🤝</Text>
               </View>
               <View>
                 <View style={s.titleRow}>
-                  <Text style={s.saqrToggleTitle}>صقر AI</Text>
+                  <Text style={s.tariqToggleTitle}>طارق AI</Text>
                   <View style={s.betaBadge}>
                     <Text style={s.betaText}>Beta</Text>
                   </View>
                 </View>
-                <Text style={s.saqrToggleSub}>محلل المنتجات الذكي</Text>
+                <Text style={s.tariqToggleSub}>مساعدك الشخصي الذكي</Text>
               </View>
             </View>
             <Ionicons
@@ -201,8 +201,8 @@ const s = StyleSheet.create({
   statValue:       { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   statCurrency:    { fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' },
 
-  // ── صقر ──
-  saqrSection: {
+  // ── طارق ──
+  tariqSection: {
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 20,
@@ -214,19 +214,19 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  saqrToggleGradient: {
+  tariqToggleGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  saqrToggleLeft: {
+  tariqToggleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  saqrIconBox: {
+  tariqIconBox: {
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -234,7 +234,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  saqrEmoji: {
+  tariqEmoji: {
     fontSize: 20,
   },
   titleRow: {
@@ -242,7 +242,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  saqrToggleTitle: {
+  tariqToggleTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#fff',
@@ -260,7 +260,7 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     letterSpacing: 0.5,
   },
-  saqrToggleSub: {
+  tariqToggleSub: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.65)',
     marginTop: 1,
