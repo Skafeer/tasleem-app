@@ -21,9 +21,11 @@ type Filter = 'all' | 'low' | 'out' | 'stale';
 interface Product {
   id: number;
   name: string;
-  imageUrl: string;
+  imageUrl:  string;   // camelCase
+  image_url: string;   // snake_case fallback
   stock: number;
-  wholesalePrice: number;
+  wholesalePrice:        number;
+  companyWholesalePrice: number;
   category: string;
   isActive: boolean;
   totalSold: number;
@@ -145,16 +147,35 @@ export default function InventoryTab() {
   // ── الإحصائيات ──────────────────────────────────────────────
   const { data: stats } = useQuery<InventoryStats>({
     queryKey: ['inventory-stats'],
-    queryFn:  async () => { const { data } = await api.get('/api/inventory/stats'); return data; },
+    queryFn: async () => {
+      const { data } = await api.get('/api/inventory/stats');
+      return data;
+    },
     refetchInterval: 60000,
   });
 
   // ── قائمة المنتجات ──────────────────────────────────────────
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ['inventory', filter],
-    queryFn:  async () => { const { data } = await api.get(`/api/inventory?filter=${filter}`); return data; },
+    queryFn: async () => {
+      const { data } = await api.get(`/api/inventory?filter=${filter}`);
+      // ✅ نوحّد camelCase و snake_case
+      return (data as any[]).map(p => ({
+        ...p,
+        imageUrl:              p.imageUrl              || p.image_url               || '',
+        wholesalePrice:        p.wholesalePrice        || p.wholesale_price         || 0,
+        companyWholesalePrice: p.companyWholesalePrice || p.company_wholesale_price || 0,
+        totalSold:             p.totalSold             || p.total_sold              || 0,
+      }));
+    },
     refetchInterval: 60000,
   });
+
+  // ✅ حساب قيمة المخزون محلياً بنفس طريقة StatsTab (companyWholesalePrice)
+  // تم نقله إلى هنا بعد تعريف products
+  const computedTotalValue = products.reduce(
+    (sum, p) => sum + ((p.companyWholesalePrice || p.wholesalePrice || 0) * p.stock), 0
+  );
 
   // ── سجل منتج ────────────────────────────────────────────────
   const { data: log = [], isLoading: logLoading } = useQuery<LogEntry[]>({
@@ -248,7 +269,7 @@ export default function InventoryTab() {
           <View style={s.valueCard}>
             <Ionicons name="wallet-outline" size={16} color={SUCCESS} />
             <Text style={s.valueLabel}>قيمة المخزون الكلية</Text>
-            <Text style={s.valueNum}>{stats.totalValue.toLocaleString('ar-IQ')} د.ع</Text>
+            <Text style={s.valueNum}>{computedTotalValue.toLocaleString('ar-IQ')} د.ع</Text>
           </View>
         </View>
       )}
