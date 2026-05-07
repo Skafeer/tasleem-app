@@ -26,7 +26,7 @@ export default function BannerSlider({
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const W        = (containerWidth ?? screenWidth) - 24;
-  const BANNER_H = Math.round(W * 990 / 1536);
+  const BANNER_H = Math.round(W / 2); // ✅ نسبة 2:1
 
   const scrollRef  = useRef<ScrollView>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
