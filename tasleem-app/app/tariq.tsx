@@ -35,14 +35,6 @@ type GeminiMessage = {
   parts: [{ text: string }];
 };
 
-const extractProductId = (text: string): number | null => {
-  const trimmed = text.trim();
-  if (/^\d+$/.test(trimmed)) return Number(trimmed);
-  const match = trimmed.match(/(?:id|ايدي|آيدي|منتج|product)\s*#?\s*(\d+)/i);
-  if (match) return Number(match[1]);
-  return null;
-};
-
 const extractAd = (text: string): string | null => {
   const markers = ['البوست الإعلاني 📱', 'البوست الإعلاني', '📱 البوست الإعلاني'];
   for (const marker of markers) {
@@ -131,12 +123,9 @@ export default function TariqScreen() {
     setInput('');
     setLoading(true);
 
-    const productId = extractProductId(text);
-    const msgToSend = productId ? `حلل لي المنتج رقم ${productId} من قاعدة البيانات` : text;
-
     const newGeminiHistory: GeminiMessage[] = [
       ...geminiHistory,
-      { role: 'user', parts: [{ text: msgToSend }] },
+      { role: 'user', parts: [{ text }] },
     ];
 
     try {
