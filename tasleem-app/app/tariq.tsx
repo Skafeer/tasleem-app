@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
-  Clipboard, Alert, RefreshControl, Linking
+  Clipboard, Alert, RefreshControl, Linking, Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,16 +13,16 @@ import Markdown from 'react-native-markdown-display';
 import api from '../src/lib/api';
 
 const PRIMARY     = '#0c6679';
-const BG          = '#f2f6f9';
-const STORAGE_KEY = 'tariq_messages';
-const HISTORY_KEY = 'tariq_chat_history'; // تاريخ Gemini
+const PRIMARY2    = '#0e7d96';
+const BG          = '#f0f4f8';
+const STORAGE_KEY = 'tariq_messages_v2';
+const HISTORY_KEY = 'tariq_chat_history_v2';
 
 const formatTime = (date?: Date | string) => {
   if (!date) return '';
   return new Date(date).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
 };
 
-// ── نوع رسالة الواجهة ──
 type Message = {
   id: string;
   role: 'user' | 'tariq';
@@ -29,13 +30,19 @@ type Message = {
   timestamp: string;
 };
 
-// ── نوع رسالة Gemini ──
 type GeminiMessage = {
   role: 'user' | 'model';
   parts: [{ text: string }];
 };
 
-// ── استخراج البوست الإعلاني ──
+const extractProductId = (text: string): number | null => {
+  const trimmed = text.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  const match = trimmed.match(/(?:id|ايدي|آيدي|منتج|product)\s*#?\s*(\d+)/i);
+  if (match) return Number(match[1]);
+  return null;
+};
+
 const extractAd = (text: string): string | null => {
   const markers = ['البوست الإعلاني 📱', 'البوست الإعلاني', '📱 البوست الإعلاني'];
   for (const marker of markers) {
@@ -46,29 +53,38 @@ const extractAd = (text: string): string | null => {
 };
 
 const WELCOME: Message = {
-  id: '1',
+  id: 'welcome',
   role: 'tariq',
-  text: 'هلا وغلا! 👋 أنا طارق، مساعدك الشخصي في تسليم.\n\nأقدر أساعدك بـ:\n- تحليل مبيعاتك وأرباحك\n- اقتراح منتجات تناسبك\n- كتابة بوستات إعلانية\n- نصايح البيع والتسويق\n\nگول شنو تريد 😄',
+  text: 'هلا وغلا! 🤝 أنا طارق، مساعدك الشخصي في تسليم.\n\nأقدر أساعدك بـ:\n- تحليل مبيعاتك وأرباحك\n- اقتراح منتجات تناسبك\n- تحليل منتج بالاسم أو الـ ID\n- كتابة بوستات إعلانية\n- نصايح البيع والتسويق\n\nگول شنو تريد 😄',
   timestamp: new Date().toISOString(),
 };
 
-const QUICK_REPLIES = [
-  'شلون مبيعاتي؟',
-  'اقترح علي منتج',
-  'شنو رصيدي؟',
-  'اكتب بوست إعلاني',
-];
+const QUICK_REPLIES = ['شلون مبيعاتي؟', 'اقترح علي منتج', 'شنو رصيدي؟', 'اكتب بوست إعلاني'];
 
 export default function TariqScreen() {
-  const router       = useRouter();
-  const flatListRef  = useRef<FlatList>(null);
-  const [input, setInput]           = useState('');
-  const [loading, setLoading]       = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [messages, setMessages]     = useState<Message[]>([WELCOME]);
-  const [geminiHistory, setGeminiHistory] = useState<GeminiMessage[]>([]);
+  const router      = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+  const inputRef    = useRef<TextInput>(null);
 
-  // ── تحميل المحادثة المحفوظة ──
+  const [input, setInput]                 = useState('');
+  const [loading, setLoading]             = useState(false);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [messages, setMessages]           = useState<Message[]>([WELCOME]);
+  const [geminiHistory, setGeminiHistory] = useState<GeminiMessage[]>([]);
+  const [keyboardH, setKeyboardH]         = useState(0);
+
+  // مستمع الكيبورد للأندرويد
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const show = Keyboard.addListener('keyboardDidShow', (e: KeyboardEvent) => {
+        setKeyboardH(e.endCoordinates.height);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
+      });
+      const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardH(0));
+      return () => { show.remove(); hide.remove(); };
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -76,7 +92,6 @@ export default function TariqScreen() {
           AsyncStorage.getItem(STORAGE_KEY),
           AsyncStorage.getItem(HISTORY_KEY),
         ]);
-
         if (savedMsgs) {
           const parsed = JSON.parse(savedMsgs);
           if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
@@ -89,7 +104,6 @@ export default function TariqScreen() {
     })();
   }, []);
 
-  // ── حفظ المحادثة عند كل تغيير ──
   useEffect(() => {
     if (messages.length > 0) {
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(messages)).catch(() => {});
@@ -104,11 +118,7 @@ export default function TariqScreen() {
   }, [geminiHistory]);
 
   const addMessage = useCallback((msg: Omit<Message, 'id' | 'timestamp'>) => {
-    const newMsg: Message = {
-      ...msg,
-      id: Date.now().toString() + Math.random(),
-      timestamp: new Date().toISOString(),
-    };
+    const newMsg: Message = { ...msg, id: Date.now().toString() + Math.random(), timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, newMsg]);
     return newMsg;
   }, []);
@@ -121,162 +131,143 @@ export default function TariqScreen() {
     setInput('');
     setLoading(true);
 
-    // بناء تاريخ Gemini الجديد
+    const productId = extractProductId(text);
+    const msgToSend = productId ? `حلل لي المنتج رقم ${productId} من قاعدة البيانات` : text;
+
     const newGeminiHistory: GeminiMessage[] = [
       ...geminiHistory,
-      { role: 'user', parts: [{ text }] },
+      { role: 'user', parts: [{ text: msgToSend }] },
     ];
 
     try {
-      const { data } = await api.post('/api/tariq/chat', {
-        messages: newGeminiHistory,
-      });
-
+      const { data } = await api.post('/api/tariq/chat', { messages: newGeminiHistory });
       const reply = data?.reply || 'تم الاستلام.';
       addMessage({ role: 'tariq', text: reply });
-
-      // حفظ تاريخ المحادثة كاملاً (user + model)
-      setGeminiHistory([
-        ...newGeminiHistory,
-        { role: 'model', parts: [{ text: reply }] },
-      ]);
-
-    } catch {
-      addMessage({ role: 'tariq', text: '😅 صار عندي خلل فني بسيط، حاول مرة ثانية عيوني.' });
+      setGeminiHistory([...newGeminiHistory, { role: 'model', parts: [{ text: reply }] }]);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 429)      addMessage({ role: 'tariq', text: 'طارق مشغول هسه، انتظر دقيقة وحاول مرة ثانية 😄' });
+      else if (status === 400) addMessage({ role: 'tariq', text: 'ما فهمت الطلب، ممكن تعيد بشكل ثاني؟ 🙂' });
+      else                     addMessage({ role: 'tariq', text: 'السيرفر مشغول هسه، حاول بعد ثواني 🙏' });
     } finally {
       setLoading(false);
     }
   };
 
-  const copyAll = (text: string) => {
-    Clipboard.setString(text);
-    Alert.alert('', '✅ تم نسخ الرد بالكامل');
-  };
-
-  const copyAd = (text: string) => {
+  const copyAll = (text: string) => { Clipboard.setString(text); Alert.alert('', '✅ تم نسخ الرد بالكامل'); };
+  const copyAd  = (text: string) => {
     const ad = extractAd(text);
-    if (ad) {
-      Clipboard.setString(ad);
-      Alert.alert('', '✅ تم نسخ البوست الإعلاني');
-    } else {
-      copyAll(text);
-    }
+    if (ad) { Clipboard.setString(ad); Alert.alert('', '✅ تم نسخ البوست الإعلاني'); } else copyAll(text);
   };
 
   const clearChat = () => {
     Alert.alert('مسح المحادثة', 'هل أنت متأكد؟', [
       { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'مسح', style: 'destructive',
-        onPress: async () => {
-          const fresh = [{ ...WELCOME, id: Date.now().toString(), timestamp: new Date().toISOString() }];
-          setMessages(fresh);
-          setGeminiHistory([]);
-          await Promise.all([
-            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)),
-            AsyncStorage.removeItem(HISTORY_KEY),
-          ]);
-        },
-      },
+      { text: 'مسح', style: 'destructive', onPress: async () => {
+        const fresh = [{ ...WELCOME, id: Date.now().toString(), timestamp: new Date().toISOString() }];
+        setMessages(fresh);
+        setGeminiHistory([]);
+        await Promise.all([AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)), AsyncStorage.removeItem(HISTORY_KEY)]);
+      }},
     ]);
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => { flatListRef.current?.scrollToEnd({ animated: true }); setRefreshing(false); }, 800);
+  const UserBubble = ({ item }: { item: Message }) => (
+    <View style={s.rowUser}>
+      <View style={s.bubbleUser}>
+        <Text style={s.textUser}>{item.text}</Text>
+        <Text style={s.timeUser}>{formatTime(item.timestamp)}</Text>
+      </View>
+    </View>
+  );
+
+  const TariqBubble = ({ item }: { item: Message }) => {
+    const hasAd     = item.text.includes('البوست الإعلاني') || item.text.includes('📱');
+    const isWelcome = item.id === 'welcome';
+    return (
+      <View style={s.rowTariq}>
+        <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
+        <View style={s.tariqBubbleWrap}>
+          <View style={s.bubbleTariq}>
+            <Markdown style={md} onLinkPress={(url: string) => { Linking.openURL(url); return false; }}>
+              {item.text}
+            </Markdown>
+            <View style={s.bubbleFooter}>
+              <View style={s.actionsRow}>
+                {hasAd && (
+                  <TouchableOpacity style={s.btnAd} onPress={() => copyAd(item.text)}>
+                    <Ionicons name="megaphone-outline" size={11} color="#fff" />
+                    <Text style={s.btnAdText}>نسخ الإعلان</Text>
+                  </TouchableOpacity>
+                )}
+                {!isWelcome && (
+                  <TouchableOpacity style={s.btnCopy} onPress={() => copyAll(item.text)}>
+                    <Ionicons name="copy-outline" size={11} color={PRIMARY} />
+                    <Text style={s.btnCopyText}>نسخ</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={s.timeTariq}>{formatTime(item.timestamp)}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <View style={s.header}>
-        <View style={s.headerRow}>
-          <View style={s.onlineChip}>
-            <View style={s.onlineDot} />
-            <Text style={s.onlineText}>متصل</Text>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color="#111827" />
+        </TouchableOpacity>
+        <View style={s.headerCenter}>
+          <View style={s.headerTitleRow}>
+            <Text style={s.headerTitle}>طارق AI</Text>
+            <Text style={s.headerEmoji}>🤝</Text>
           </View>
-          <Text style={s.headerTitle}>طارق AI 🤝</Text>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={22} color="#111827" />
-          </TouchableOpacity>
+          <View style={s.onlineRow}>
+            <View style={s.onlineDot} />
+            <Text style={s.onlineTxt}>متصل الحين</Text>
+          </View>
         </View>
-        <Text style={s.headerSub}>مساعدك الشخصي الذكي — تسليم</Text>
+        <TouchableOpacity style={s.trashBtn} onPress={clearChat} disabled={loading}>
+          <Ionicons name="trash-outline" size={18} color="#ef4444" />
+        </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-
+      {/* Chat */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={item => item.id}
           contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
-          renderItem={({ item }) => {
-            const isTariq = item.role === 'tariq';
-            const hasAd   = isTariq && (item.text.includes('البوست الإعلاني') || item.text.includes('📱'));
-            return (
-              <View style={[s.msgRow, isTariq ? s.rowTariq : s.rowUser]}>
-                {isTariq && (
-                  <View style={s.avatar}>
-                    <Text style={s.avatarEmoji}>🤝</Text>
-                  </View>
-                )}
-                <View style={[s.bubbleWrap, isTariq ? s.wrapTariq : s.wrapUser]}>
-                  <View style={[s.bubble, isTariq ? s.bubbleTariq : s.bubbleUser]}>
-                    {isTariq ? (
-                      <Markdown
-                        style={md}
-                        onLinkPress={(url: string) => { Linking.openURL(url); return false; }}>
-                        {item.text}
-                      </Markdown>
-                    ) : (
-                      <Text style={s.textUser}>{item.text}</Text>
-                    )}
-
-                    <View style={s.footer}>
-                      <Text style={[s.time, isTariq ? s.timeTariq : s.timeUser]}>
-                        {formatTime(item.timestamp)}
-                      </Text>
-                      {isTariq && item.id !== '1' && (
-                        <View style={s.actions}>
-                          {hasAd && (
-                            <TouchableOpacity style={s.btnAd} onPress={() => copyAd(item.text)}>
-                              <Ionicons name="megaphone-outline" size={11} color="#fff" />
-                              <Text style={s.btnAdText}>نسخ الإعلان</Text>
-                            </TouchableOpacity>
-                          )}
-                          <TouchableOpacity style={s.btnCopy} onPress={() => copyAll(item.text)}>
-                            <Ionicons name="copy-outline" size={11} color={PRIMARY} />
-                            <Text style={s.btnCopyText}>نسخ الكل</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          }}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 800); }} tintColor={PRIMARY} />}
+          renderItem={({ item }) => item.role === 'tariq' ? <TariqBubble item={item} /> : <UserBubble item={item} />}
           ListFooterComponent={
             <View>
               {loading && (
-                <View style={s.typingRow}>
-                  <View style={s.avatar}><Text style={s.avatarEmoji}>🤝</Text></View>
+                <View style={s.rowTariq}>
+                  <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
                   <View style={s.typingBubble}>
                     <ActivityIndicator size="small" color={PRIMARY} />
                     <Text style={s.typingText}>طارق يفكر...</Text>
                   </View>
                 </View>
               )}
-              {!loading && messages.length > 1 && messages[messages.length - 1].role === 'tariq' && (
+              {!loading && messages[messages.length - 1]?.role === 'tariq' && (
                 <FlatList
-                  horizontal
-                  data={QUICK_REPLIES}
-                  keyExtractor={(_, i) => String(i)}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={s.quickList}
+                  horizontal data={QUICK_REPLIES} keyExtractor={(_, i) => String(i)}
+                  showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickList}
                   renderItem={({ item }) => (
                     <TouchableOpacity style={s.quickBtn} onPress={() => sendToTariq(item)}>
                       <Text style={s.quickText}>{item}</Text>
@@ -288,12 +279,10 @@ export default function TariqScreen() {
           }
         />
 
-        {/* ── Input ── */}
+        {/* Input */}
         <View style={s.inputRow}>
-          <TouchableOpacity style={s.trashBtn} onPress={clearChat} disabled={loading}>
-            <Ionicons name="trash-outline" size={18} color={PRIMARY} />
-          </TouchableOpacity>
           <TextInput
+            ref={inputRef}
             style={s.input}
             value={input}
             onChangeText={setInput}
@@ -302,14 +291,14 @@ export default function TariqScreen() {
             textAlign="right"
             multiline
             maxLength={500}
+            onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 350)}
           />
           <TouchableOpacity
             style={[s.sendBtn, (!input.trim() || loading) && s.sendOff]}
             onPress={() => sendToTariq()}
-            disabled={!input.trim() || loading}>
-            {loading
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Ionicons name="send" size={18} color="#fff" />}
+            disabled={!input.trim() || loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send" size={18} color="#fff" />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -318,68 +307,113 @@ export default function TariqScreen() {
 }
 
 const md = StyleSheet.create({
-  body:        { fontSize: 14, lineHeight: 22, color: '#111827', textAlign: 'right' },
+  body:        { fontSize: 14, lineHeight: 22, color: '#1e293b', textAlign: 'right' },
   heading1:    { fontSize: 16, fontWeight: 'bold', color: PRIMARY, marginTop: 8, marginBottom: 4, textAlign: 'right' },
-  heading2:    { fontSize: 15, fontWeight: 'bold', color: PRIMARY, marginTop: 6, marginBottom: 3, textAlign: 'right' },
+  heading2:    { fontSize: 15, fontWeight: '700', color: PRIMARY2, marginTop: 6, marginBottom: 3, textAlign: 'right' },
   strong:      { fontWeight: 'bold', color: '#111827' },
   bullet_list: { textAlign: 'right' },
-  list_item:   { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 3 },
+  list_item:   { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 },
   link:        { color: '#2563eb', textDecorationLine: 'underline' },
+  code_inline: { backgroundColor: '#f1f5f9', paddingHorizontal: 4, borderRadius: 4, fontSize: 12 },
 });
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: '#f0f4f8' },
 
-  header:      { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e8edf2', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
-  headerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  headerTitle: { fontSize: 17, fontWeight: '900', color: '#111827' },
-  headerSub:   { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
-  backBtn:     { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f9fa', borderWidth: 1.5, borderColor: '#d4eef3', justifyContent: 'center', alignItems: 'center' },
-  onlineChip:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: PRIMARY + '12', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4 },
-  onlineDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-  onlineText:  { fontSize: 11, color: PRIMARY, fontWeight: '600' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 14, paddingVertical: 12,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f9fa',
+    borderWidth: 1.5, borderColor: '#d4eef3', justifyContent: 'center', alignItems: 'center',
+  },
+  headerCenter:   { alignItems: 'center', flex: 1 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerTitle:    { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+  headerEmoji:    { fontSize: 18 },
+  onlineRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  onlineDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e' },
+  onlineTxt:      { fontSize: 11, color: '#64748b' },
+  trashBtn: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: '#fef2f2',
+    borderWidth: 1.5, borderColor: '#fecaca', justifyContent: 'center', alignItems: 'center',
+  },
 
-  list: { padding: 16, paddingBottom: 8, flexGrow: 1 },
+  list: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12, flexGrow: 1 },
 
-  msgRow:    { marginBottom: 14, flexDirection: 'row', alignItems: 'flex-end' },
-  rowTariq:  { justifyContent: 'flex-start' },
-  rowUser:   { justifyContent: 'flex-end' },
+  rowUser:    { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14 },
+  bubbleUser: {
+    backgroundColor: '#0c6679', borderRadius: 18, borderBottomRightRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 10, maxWidth: '80%',
+    shadowColor: '#0c6679', shadowOpacity: 0.2, shadowRadius: 6, elevation: 2,
+  },
+  textUser: { fontSize: 14, color: '#fff', textAlign: 'right', lineHeight: 21 },
+  timeUser: { fontSize: 10, color: 'rgba(255,255,255,0.6)', textAlign: 'left', marginTop: 5 },
 
-  avatar:      { width: 32, height: 32, borderRadius: 16, backgroundColor: PRIMARY + '15', justifyContent: 'center', alignItems: 'center', marginRight: 8, borderWidth: 1, borderColor: PRIMARY + '30', flexShrink: 0 },
-  avatarEmoji: { fontSize: 17 },
+  rowTariq: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14, gap: 8 },
+  avatarWrap: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#0c667918', borderWidth: 1.5, borderColor: '#0c667935',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  avatarEmoji:     { fontSize: 17 },
+  tariqBubbleWrap: { flex: 1, maxWidth: '88%' },
+  bubbleTariq: {
+    backgroundColor: '#fff', borderRadius: 18, borderBottomLeftRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: '#e2e8f0',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  },
+  bubbleFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  actionsRow:   { flexDirection: 'row', gap: 6 },
+  timeTariq:    { fontSize: 10, color: '#94a3b8' },
 
-  bubbleWrap: { maxWidth: '85%' },
-  wrapTariq:  { alignItems: 'flex-start' },
-  wrapUser:   { alignItems: 'flex-end' },
+  btnCopy: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#0c667912', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10,
+  },
+  btnCopyText: { fontSize: 10, color: '#0c6679', fontWeight: '600' },
+  btnAd: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#f59e0b', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10,
+  },
+  btnAdText: { fontSize: 10, color: '#fff', fontWeight: '700' },
 
-  bubble:      { borderRadius: 18, padding: 12 },
-  bubbleTariq: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e8edf2', borderBottomLeftRadius: 4 },
-  bubbleUser:  { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
+  typingBubble: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#fff', borderRadius: 18, borderBottomLeftRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: '#e2e8f0',
+  },
+  typingText: { fontSize: 12, color: '#64748b' },
 
-  textUser: { fontSize: 14, color: '#fff', textAlign: 'right', lineHeight: 20 },
+  quickList: { paddingHorizontal: 2, paddingBottom: 14, paddingTop: 4, gap: 8 },
+  quickBtn: {
+    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#0c667950',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
+  },
+  quickText: { color: '#0c6679', fontSize: 12, fontWeight: '600' },
 
-  footer:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 6 },
-  time:      { fontSize: 10 },
-  timeTariq: { color: '#9ca3af' },
-  timeUser:  { color: 'rgba(255,255,255,0.65)' },
-
-  actions:     { flexDirection: 'row', gap: 6 },
-  btnCopy:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: PRIMARY + '10', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  btnCopyText: { fontSize: 10, color: PRIMARY, fontWeight: '600' },
-  btnAd:       { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#f5a006', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  btnAdText:   { fontSize: 10, color: '#fff', fontWeight: '700' },
-
-  typingRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  typingBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#e8edf2' },
-  typingText:   { fontSize: 12, color: '#64748b' },
-
-  quickList: { paddingHorizontal: 2, paddingBottom: 12, gap: 8 },
-  quickBtn:  { backgroundColor: '#fff', borderWidth: 1, borderColor: PRIMARY + '40', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  quickText: { color: PRIMARY, fontSize: 12, fontWeight: '500' },
-
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e8edf2' },
-  input:    { flex: 1, backgroundColor: '#f8fafc', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#111827', maxHeight: 100, borderWidth: 1.5, borderColor: '#e8edf2', textAlign: 'right' },
-  trashBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: PRIMARY + '10', justifyContent: 'center', alignItems: 'center' },
-  sendBtn:  { width: 42, height: 42, borderRadius: 21, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center', shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 },
-  sendOff:  { backgroundColor: '#d1d5db', shadowOpacity: 0 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0',
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 3,
+  },
+  input: {
+    flex: 1, backgroundColor: '#f8fafc', borderRadius: 24,
+    paddingHorizontal: 16, paddingVertical: 10, fontSize: 14,
+    color: '#1e293b', maxHeight: 110, borderWidth: 1.5, borderColor: '#e2e8f0',
+    textAlign: 'right', lineHeight: 20,
+  },
+  sendBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#0c6679',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#0c6679', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  },
+  sendOff: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
 });
