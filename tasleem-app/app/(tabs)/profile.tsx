@@ -122,7 +122,7 @@ export default function ProfileScreen() {
               </View>
               <View>
                 <View style={s.titleRow}>
-                  <Text style={s.tariqToggleTitle}>طارق AI</Text>
+                  <Text style={s.tariqToggleTitle}>اسأل طارق</Text>
                   <View style={s.betaBadge}>
                     <Text style={s.betaText}>Beta</Text>
                   </View>
