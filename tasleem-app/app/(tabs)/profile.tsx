@@ -1,7 +1,7 @@
 // /workspaces/tasleem-app/tasleem-app/app/(tabs)/profile.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +14,11 @@ import api from '../../src/lib/api';
 const PRIMARY = '#0c6679';
 const BG      = '#f2f6f9';
 
+// ── صورة طارق ──
+const TARIQ_IMG = require('/workspaces/tasleem-app/tasleem-app/assets/tariq.png');
+
 export default function ProfileScreen() {
-  const router      = useRouter();
+  const router = useRouter();
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -100,7 +103,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── طارق AI ── للجميع (تاجر وأدمن) ── */}
+        {/* ── طارق AI ── */}
         <TouchableOpacity
           style={s.tariqSection}
           onPress={() => router.push('/tariq')}
@@ -114,7 +117,8 @@ export default function ProfileScreen() {
           >
             <View style={s.tariqToggleLeft}>
               <View style={s.tariqIconBox}>
-                <Text style={s.tariqEmoji}>🤝</Text>
+                {/* ── صورة طارق بدل الإيموجي ── */}
+                <Image source={TARIQ_IMG} style={s.tariqImg} />
               </View>
               <View>
                 <View style={s.titleRow}>
@@ -203,68 +207,28 @@ const s = StyleSheet.create({
 
   // ── طارق ──
   tariqSection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#1e3a5f22',
-    shadowColor: '#0c6679',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginHorizontal: 16, marginBottom: 16, borderRadius: 20, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#1e3a5f22',
+    shadowColor: '#0c6679', shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
   },
   tariqToggleGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
   },
-  tariqToggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
+  tariqToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   tariqIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 40, height: 40, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
   },
-  tariqEmoji: {
-    fontSize: 20,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tariqToggleTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  betaBadge: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  betaText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
-    letterSpacing: 0.5,
-  },
-  tariqToggleSub: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
-    marginTop: 1,
-  },
+  // ── صورة طارق داخل الأيقونة ──
+  tariqImg: { width: 40, height: 40, borderRadius: 12 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tariqToggleTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  betaBadge: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  betaText:  { fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.9)', letterSpacing: 0.5 },
+  tariqToggleSub: { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 1 },
 
   menuSection:      { backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e8edf2', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   menuSectionTitle: { fontSize: 13, fontWeight: '600', color: '#9ca3af', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, textAlign: 'right' },

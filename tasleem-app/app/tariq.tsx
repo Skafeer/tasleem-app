@@ -19,7 +19,7 @@ const STORAGE_KEY = 'tariq_messages_v2';
 const HISTORY_KEY = 'tariq_chat_history_v2';
 
 // ── صورة طارق ──
-const TARIQ_IMG = require('../assets/tariq.png');
+const TARIQ_IMG = require('/workspaces/tasleem-app/tasleem-app/assets/tariq.png');
 
 const formatTime = (date?: Date | string) => {
   if (!date) return '';
@@ -55,18 +55,6 @@ const WELCOME: Message = {
 };
 
 const QUICK_REPLIES = ['شلون مبيعاتي؟', 'اقترح علي منتج', 'شنو رصيدي؟', 'اكتب بوست إعلاني'];
-
-// ── مكون Avatar طارق ──
-const TariqAvatar = ({ size = 34 }: { size?: number }) => (
-  <View style={[s.avatarWrap, { width: size, height: size, borderRadius: size / 2 }]}>
-    <Image
-      source={TARIQ_IMG}
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-      resizeMode="cover"
-    />
-    <View style={s.avatarOnline} />
-  </View>
-);
 
 export default function TariqScreen() {
   const router      = useRouter();
@@ -175,6 +163,13 @@ export default function TariqScreen() {
     ]);
   };
 
+  // ── مكوّن الأفاتار المشترك ──
+  const TariqAvatar = () => (
+    <View style={s.avatarWrap}>
+      <Image source={TARIQ_IMG} style={s.avatarImg} />
+    </View>
+  );
+
   const UserBubble = ({ item }: { item: Message }) => (
     <View style={s.rowUser}>
       <View style={s.bubbleUser}>
@@ -189,7 +184,7 @@ export default function TariqScreen() {
     const isWelcome = item.id === 'welcome';
     return (
       <View style={s.rowTariq}>
-        <TariqAvatar size={36} />
+        <TariqAvatar />
         <View style={s.tariqBubbleWrap}>
           <View style={s.bubbleTariq}>
             <Markdown style={md} onLinkPress={(url: string) => { Linking.openURL(url); return false; }}>
@@ -221,30 +216,28 @@ export default function TariqScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </TouchableOpacity>
-
         <View style={s.headerCenter}>
-          {/* صورة طارق بالهيدر */}
-          <TariqAvatar size={38} />
-          <View style={s.headerInfo}>
+          <View style={s.headerTitleRow}>
             <Text style={s.headerTitle}>طارق AI</Text>
-            <View style={s.onlineRow}>
-              <View style={s.onlineDot} />
-              <Text style={s.onlineTxt}>متصل الحين</Text>
-            </View>
+            {/* ── صورة طارق في الهيدر ── */}
+            <Image source={TARIQ_IMG} style={s.headerImg} />
+          </View>
+          <View style={s.onlineRow}>
+            <View style={s.onlineDot} />
+            <Text style={s.onlineTxt}>متصل الحين</Text>
           </View>
         </View>
-
         <TouchableOpacity style={s.trashBtn} onPress={clearChat} disabled={loading}>
           <Ionicons name="trash-outline" size={18} color="#ef4444" />
         </TouchableOpacity>
       </View>
 
-      {/* ── Chat ── */}
+      {/* Chat */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -263,7 +256,7 @@ export default function TariqScreen() {
             <View>
               {loading && (
                 <View style={s.rowTariq}>
-                  <TariqAvatar size={36} />
+                  <TariqAvatar />
                   <View style={s.typingBubble}>
                     <ActivityIndicator size="small" color={PRIMARY} />
                     <Text style={s.typingText}>طارق يفكر...</Text>
@@ -285,7 +278,7 @@ export default function TariqScreen() {
           }
         />
 
-        {/* ── Input ── */}
+        {/* Input */}
         <View style={s.inputRow}>
           <TextInput
             ref={inputRef}
@@ -326,53 +319,29 @@ const md = StyleSheet.create({
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f4f8' },
 
-  // ── Header ──
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0',
-    paddingHorizontal: 14, paddingVertical: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
   backBtn: {
     width: 40, height: 40, borderRadius: 12, backgroundColor: '#f0f9fa',
     borderWidth: 1.5, borderColor: '#d4eef3', justifyContent: 'center', alignItems: 'center',
   },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
-  headerInfo:   { alignItems: 'flex-start' },
-  headerTitle:  { fontSize: 16, fontWeight: '900', color: '#0f172a' },
-  onlineRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
-  onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e' },
-  onlineTxt:    { fontSize: 11, color: '#64748b' },
+  headerCenter:   { alignItems: 'center', flex: 1 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerTitle:    { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+  // ── صورة طارق في الهيدر ──
+  headerImg: { width: 28, height: 28, borderRadius: 14 },
+  onlineRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  onlineDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e' },
+  onlineTxt:      { fontSize: 11, color: '#64748b' },
   trashBtn: {
     width: 40, height: 40, borderRadius: 12, backgroundColor: '#fef2f2',
     borderWidth: 1.5, borderColor: '#fecaca', justifyContent: 'center', alignItems: 'center',
   },
 
-  // ── Avatar ──
-  avatarWrap: {
-    position: 'relative',
-    borderWidth: 2,
-    borderColor: '#fff',
-    borderRadius: 18,
-    flexShrink: 0,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  avatarOnline: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#22c55e',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-
-  // ── Messages ──
   list: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 12, flexGrow: 1 },
 
   rowUser:    { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14 },
@@ -384,8 +353,17 @@ const s = StyleSheet.create({
   textUser: { fontSize: 14, color: '#fff', textAlign: 'right', lineHeight: 21 },
   timeUser: { fontSize: 10, color: 'rgba(255,255,255,0.6)', textAlign: 'left', marginTop: 5 },
 
-  rowTariq:        { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14, gap: 8 },
-  tariqBubbleWrap: { flex: 1, maxWidth: '85%' },
+  rowTariq: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14, gap: 8 },
+  avatarWrap: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#0c667918', borderWidth: 1.5, borderColor: '#0c667935',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+    overflow: 'hidden',
+  },
+  // ── صورة طارق في الفقاعة ──
+  avatarImg: { width: 34, height: 34, borderRadius: 17 },
+
+  tariqBubbleWrap: { flex: 1, maxWidth: '88%' },
   bubbleTariq: {
     backgroundColor: '#fff', borderRadius: 18, borderBottomLeftRadius: 4,
     paddingHorizontal: 14, paddingVertical: 12,
