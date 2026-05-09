@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { I18nManager, Platform, StatusBar } from 'react-native';
+import { I18nManager, Platform, StatusBar, Text, TextInput } from 'react-native';
 import { ToastProvider } from '../src/lib/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { useNotifications } from './hooks/useNotifications';
+import { useFonts } from 'expo-font';
+import {
+  Cairo_400Regular,
+  Cairo_500Medium,
+  Cairo_600SemiBold,
+  Cairo_700Bold,
+  Cairo_800ExtraBold,
+  Cairo_900Black,
+} from '@expo-google-fonts/cairo';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,6 +22,22 @@ if (Platform.OS !== 'web') {
   I18nManager.allowRTL(true);
   I18nManager.forceRTL(true);
 }
+
+// ✅ تطبيق Cairo على كل النصوص تلقائياً
+const DEFAULT_FONT = 'Cairo_400Regular';
+const OLD_TEXT_RENDER = (Text as any).render;
+if (OLD_TEXT_RENDER) {
+  const applyDefaultProps = (props: any) => ({
+    ...props,
+    style: [{ fontFamily: DEFAULT_FONT }, ...(Array.isArray(props.style) ? props.style : [props.style])],
+  });
+  // نستخدم defaultProps بدلاً من override
+}
+// الطريقة الأضمن في React Native:
+(Text as any).defaultProps = (Text as any).defaultProps || {};
+(Text as any).defaultProps.style = { fontFamily: 'Cairo_400Regular' };
+(TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
+(TextInput as any).defaultProps.style = { fontFamily: 'Cairo_400Regular' };
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
@@ -61,6 +86,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Cairo_400Regular,
+    Cairo_500Medium,
+    Cairo_600SemiBold,
+    Cairo_700Bold,
+    Cairo_800ExtraBold,
+    Cairo_900Black,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      // لا نخفي الـ splash هنا — AuthGuard يتكفل بذلك
+    }
+  }, [fontsLoaded, fontError]);
+
+  // انتظر تحميل الخط قبل عرض أي شيء
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
