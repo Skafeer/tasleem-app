@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
   Clipboard, Alert, RefreshControl, Linking, Keyboard,
-  KeyboardEvent, Image,
+  KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,14 +12,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Markdown from 'react-native-markdown-display';
 import api from '../src/lib/api';
 
+// ── صورة طارق ──
+const TARIQ_IMG = require('../assets/tariq.png');
+
 const PRIMARY     = '#0c6679';
 const PRIMARY2    = '#0e7d96';
 const BG          = '#f0f4f8';
 const STORAGE_KEY = 'tariq_messages_v2';
 const HISTORY_KEY = 'tariq_chat_history_v2';
-
-// ── صورة طارق ──
-const TARIQ_IMG = require('/workspaces/tasleem-app/tasleem-app/assets/tariq.png');
 
 const formatTime = (date?: Date | string) => {
   if (!date) return '';
@@ -35,7 +35,7 @@ type Message = {
 
 type GeminiMessage = {
   role: 'user' | 'model';
-  parts: [{ text: string }];
+  parts: [{ text: string }] | { text: string }[];
 };
 
 const extractAd = (text: string): string | null => {
@@ -54,7 +54,9 @@ const WELCOME: Message = {
   timestamp: new Date().toISOString(),
 };
 
-const QUICK_REPLIES = ['شلون مبيعاتي؟', 'اقترح علي منتج', 'شنو رصيدي؟', 'اكتب بوست إعلاني'];
+const QUICK_REPLIES  = ['شلون مبيعاتي؟', 'اقترح علي منتج', 'شنو رصيدي؟', 'اكتب بوست إعلاني'];
+const MAX_MESSAGES   = 20; // حد المحادثة
+const WARN_MESSAGES  = 16; // بداية التحذير
 
 export default function TariqScreen() {
   const router      = useRouter();
@@ -68,6 +70,7 @@ export default function TariqScreen() {
   const [geminiHistory, setGeminiHistory] = useState<GeminiMessage[]>([]);
   const [keyboardH, setKeyboardH]         = useState(0);
 
+  // مستمع الكيبورد للأندرويد
   useEffect(() => {
     if (Platform.OS === 'android') {
       const show = Keyboard.addListener('keyboardDidShow', (e: KeyboardEvent) => {
@@ -121,12 +124,47 @@ export default function TariqScreen() {
     const text = (textToSend || input).trim();
     if (!text || loading) return;
 
+    // ── تحقق من حد المحادثة ──
+    const userMsgCount = messages.filter(m => m.role === 'user').length;
+    if (userMsgCount >= MAX_MESSAGES) {
+      Alert.alert(
+        'المحادثة وصلت حدها 🔒',
+        'عشان تكمل تحتاج تمسح المحادثة وتبدأ من جديد.',
+        [
+          { text: 'إلغاء', style: 'cancel' },
+          { text: 'مسح وابدأ من جديد', style: 'destructive', onPress: () => clearChat() },
+        ]
+      );
+      return;
+    }
+
     addMessage({ role: 'user', text });
     setInput('');
     setLoading(true);
 
+    // ── تنظيف الـ history: validation كامل قبل الإرسال ──
+    const cleanHistory = geminiHistory
+      .slice(-10)
+      .filter(m =>
+        m && typeof m === 'object' &&
+        (m.role === 'user' || m.role === 'model') &&
+        Array.isArray(m.parts) &&
+        m.parts.length > 0 &&
+        typeof m.parts[0]?.text === 'string' &&
+        m.parts[0].text.trim().length > 0
+      )
+      .map(m => ({
+        role: m.role,
+        parts: [{ text: m.parts[0].text.slice(0, 1500) }],
+      }));
+
+    // ضمان أول رسالة دائماً user
+    while (cleanHistory.length > 0 && cleanHistory[0].role !== 'user') {
+      cleanHistory.shift();
+    }
+
     const newGeminiHistory: GeminiMessage[] = [
-      ...geminiHistory,
+      ...cleanHistory,
       { role: 'user', parts: [{ text }] },
     ];
 
@@ -135,6 +173,14 @@ export default function TariqScreen() {
       const reply = data?.reply || 'تم الاستلام.';
       addMessage({ role: 'tariq', text: reply });
       setGeminiHistory([...newGeminiHistory, { role: 'model', parts: [{ text: reply }] }]);
+
+      // ── تحذير اقتراب نهاية المحادثة ──
+      const newCount = messages.filter(m => m.role === 'user').length + 1;
+      if (newCount === WARN_MESSAGES) {
+        setTimeout(() => {
+          addMessage({ role: 'tariq', text: '⚠️ يا غالي، وصلنا قريب لنهاية هالمحادثة. بعد 4 رسائل راح تحتاج تمسح وتبدأ من جديد 😊' });
+        }, 500);
+      }
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 429)      addMessage({ role: 'tariq', text: 'طارق مشغول هسه، انتظر دقيقة وحاول مرة ثانية 😄' });
@@ -163,13 +209,6 @@ export default function TariqScreen() {
     ]);
   };
 
-  // ── مكوّن الأفاتار المشترك ──
-  const TariqAvatar = () => (
-    <View style={s.avatarWrap}>
-      <Image source={TARIQ_IMG} style={s.avatarImg} />
-    </View>
-  );
-
   const UserBubble = ({ item }: { item: Message }) => (
     <View style={s.rowUser}>
       <View style={s.bubbleUser}>
@@ -184,7 +223,7 @@ export default function TariqScreen() {
     const isWelcome = item.id === 'welcome';
     return (
       <View style={s.rowTariq}>
-        <TariqAvatar />
+        <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
         <View style={s.tariqBubbleWrap}>
           <View style={s.bubbleTariq}>
             <Markdown style={md} onLinkPress={(url: string) => { Linking.openURL(url); return false; }}>
@@ -224,8 +263,7 @@ export default function TariqScreen() {
         <View style={s.headerCenter}>
           <View style={s.headerTitleRow}>
             <Text style={s.headerTitle}>طارق AI</Text>
-            {/* ── صورة طارق في الهيدر ── */}
-            <Image source={TARIQ_IMG} style={s.headerImg} />
+            <Text style={s.headerEmoji}>🤝</Text>
           </View>
           <View style={s.onlineRow}>
             <View style={s.onlineDot} />
@@ -256,7 +294,7 @@ export default function TariqScreen() {
             <View>
               {loading && (
                 <View style={s.rowTariq}>
-                  <TariqAvatar />
+                  <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
                   <View style={s.typingBubble}>
                     <ActivityIndicator size="small" color={PRIMARY} />
                     <Text style={s.typingText}>طارق يفكر...</Text>
@@ -332,8 +370,7 @@ const s = StyleSheet.create({
   headerCenter:   { alignItems: 'center', flex: 1 },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerTitle:    { fontSize: 18, fontWeight: '900', color: '#0f172a' },
-  // ── صورة طارق في الهيدر ──
-  headerImg: { width: 28, height: 28, borderRadius: 14 },
+  headerEmoji:    { fontSize: 18 },
   onlineRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   onlineDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e' },
   onlineTxt:      { fontSize: 11, color: '#64748b' },
@@ -358,11 +395,8 @@ const s = StyleSheet.create({
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: '#0c667918', borderWidth: 1.5, borderColor: '#0c667935',
     justifyContent: 'center', alignItems: 'center', flexShrink: 0,
-    overflow: 'hidden',
   },
-  // ── صورة طارق في الفقاعة ──
-  avatarImg: { width: 34, height: 34, borderRadius: 17 },
-
+  avatarEmoji:     { fontSize: 17 },
   tariqBubbleWrap: { flex: 1, maxWidth: '88%' },
   bubbleTariq: {
     backgroundColor: '#fff', borderRadius: 18, borderBottomLeftRadius: 4,
