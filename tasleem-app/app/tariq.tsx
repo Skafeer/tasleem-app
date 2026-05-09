@@ -16,6 +16,7 @@ import api from '../src/lib/api';
 const TARIQ_IMG = require('../assets/tariq.png');
 
 const PRIMARY     = '#0c6679';
+const ACCENT      = '#f5a006'; // برتقالي تسليم
 const PRIMARY2    = '#0e7d96';
 const BG          = '#f0f4f8';
 const STORAGE_KEY = 'tariq_messages_v2';
@@ -474,11 +475,11 @@ const s = StyleSheet.create({
 
   quickList: { paddingHorizontal: 2, paddingBottom: 14, paddingTop: 4, gap: 8 },
   quickBtn: {
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#0c667950',
+    backgroundColor: '#f5a006', borderWidth: 0,
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
+    shadowColor: '#f5a006', shadowOpacity: 0.25, shadowRadius: 4, elevation: 2,
   },
-  quickText: { color: '#0c6679', fontSize: 12, fontWeight: '600' },
+  quickText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
@@ -493,9 +494,9 @@ const s = StyleSheet.create({
     textAlign: 'right', lineHeight: 20,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#0c6679',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#f5a006',
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#0c6679', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    shadowColor: '#f5a006', shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
   },
   sendOff: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
 
