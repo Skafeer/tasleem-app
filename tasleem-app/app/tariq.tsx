@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ActivityIndicator, KeyboardAvoidingView, Platform,
   Clipboard, Alert, RefreshControl, Linking, Keyboard,
-  KeyboardEvent,
+  KeyboardEvent, Modal, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +69,7 @@ export default function TariqScreen() {
   const [messages, setMessages]           = useState<Message[]>([WELCOME]);
   const [geminiHistory, setGeminiHistory] = useState<GeminiMessage[]>([]);
   const [keyboardH, setKeyboardH]         = useState(0);
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   // مستمع الكيبورد للأندرويد
   useEffect(() => {
@@ -127,14 +128,7 @@ export default function TariqScreen() {
     // ── تحقق من حد المحادثة ──
     const userMsgCount = messages.filter(m => m.role === 'user').length;
     if (userMsgCount >= MAX_MESSAGES) {
-      Alert.alert(
-        'المحادثة وصلت حدها 🔒',
-        'عشان تكمل تحتاج تمسح المحادثة وتبدأ من جديد.',
-        [
-          { text: 'إلغاء', style: 'cancel' },
-          { text: 'مسح وابدأ من جديد', style: 'destructive', onPress: () => clearChat() },
-        ]
-      );
+      setShowLimitModal(true);
       return;
     }
 
@@ -232,7 +226,9 @@ export default function TariqScreen() {
     const isWelcome = item.id === 'welcome';
     return (
       <View style={s.rowTariq}>
-        <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
+        <View style={s.avatarWrap}>
+    <Image source={TARIQ_IMG} style={s.avatarImg} />
+  </View>
         <View style={s.tariqBubbleWrap}>
           <View style={s.bubbleTariq}>
             <Markdown style={md} onLinkPress={(url: string) => { Linking.openURL(url); return false; }}>
@@ -272,7 +268,9 @@ export default function TariqScreen() {
         <View style={s.headerCenter}>
           <View style={s.headerTitleRow}>
             <Text style={s.headerTitle}>طارق AI</Text>
-            <Text style={s.headerEmoji}>🤝</Text>
+            <View style={s.headerAvatarWrap}>
+              <Image source={TARIQ_IMG} style={s.headerAvatarImg} />
+            </View>
           </View>
           <View style={s.onlineRow}>
             <View style={s.onlineDot} />
@@ -303,7 +301,9 @@ export default function TariqScreen() {
             <View>
               {loading && (
                 <View style={s.rowTariq}>
-                  <View style={s.avatarWrap}><Text style={s.avatarEmoji}>🤝</Text></View>
+                  <View style={s.avatarWrap}>
+    <Image source={TARIQ_IMG} style={s.avatarImg} />
+  </View>
                   <View style={s.typingBubble}>
                     <ActivityIndicator size="small" color={PRIMARY} />
                     <Text style={s.typingText}>طارق يفكر...</Text>
@@ -324,12 +324,15 @@ export default function TariqScreen() {
 
               {/* ── زر المسح عند الوصول للحد ── */}
               {messages.filter(m => m.role === 'user').length >= MAX_MESSAGES && (
-                <TouchableOpacity style={s.clearLimitBtn} onPress={clearChat}>
-                  <Text style={s.clearLimitIcon}>🔒</Text>
-                  <View>
-                    <Text style={s.clearLimitTitle}>المحادثة وصلت حدها</Text>
-                    <Text style={s.clearLimitSub}>اضغط هنا لمسح المحادثة والبدء من جديد</Text>
+                <TouchableOpacity style={s.clearLimitBtn} onPress={() => setShowLimitModal(true)}>
+                  <View style={s.clearLimitIconWrap}>
+                    <Ionicons name="lock-closed" size={18} color="#92400e" />
                   </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.clearLimitTitle}>المحادثة وصلت حدها</Text>
+                    <Text style={s.clearLimitSub}>اضغط هنا للمسح والبدء من جديد</Text>
+                  </View>
+                  <Ionicons name="chevron-back" size={16} color="#b45309" />
                 </TouchableOpacity>
               )}
             </View>
@@ -359,6 +362,28 @@ export default function TariqScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      {/* ── Modal حد المحادثة ── */}
+      <Modal visible={showLimitModal} transparent animationType="fade" onRequestClose={() => setShowLimitModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalBox}>
+            <View style={s.modalIconWrap}>
+              <Ionicons name="lock-closed" size={32} color="#92400e" />
+            </View>
+            <Text style={s.modalTitle}>المحادثة وصلت حدها</Text>
+            <Text style={s.modalBody}>حتى تكمل تحتاج تمسح المحادثة وتبدأ من جديد</Text>
+            <TouchableOpacity
+              style={s.modalBtnPrimary}
+              onPress={() => { setShowLimitModal(false); clearChat(); }}>
+              <Ionicons name="refresh" size={16} color="#fff" />
+              <Text style={s.modalBtnPrimaryText}>مسح وابدأ من جديد</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.modalBtnSecondary} onPress={() => setShowLimitModal(false)}>
+              <Text style={s.modalBtnSecondaryText}>إلغاء</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -475,12 +500,55 @@ const s = StyleSheet.create({
   sendOff: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
 
   clearLimitBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff3cd', borderWidth: 1.5, borderColor: '#f59e0b',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#fffbeb', borderWidth: 1.5, borderColor: '#f59e0b',
     borderRadius: 16, marginHorizontal: 2, marginBottom: 14, marginTop: 4,
-    paddingHorizontal: 16, paddingVertical: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
   },
-  clearLimitIcon:  { fontSize: 22 },
-  clearLimitTitle: { fontSize: 14, fontWeight: '700', color: '#92400e', textAlign: 'right' },
+  clearLimitIconWrap: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center',
+  },
+  clearLimitTitle: { fontSize: 13, fontWeight: '700', color: '#92400e', textAlign: 'right' },
   clearLimitSub:   { fontSize: 11, color: '#b45309', marginTop: 2, textAlign: 'right' },
+
+  // ── Header avatar ──
+  headerAvatarWrap: {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 2, borderColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, elevation: 2,
+  },
+  headerAvatarImg: { width: 30, height: 30, borderRadius: 15 },
+
+  // ── Avatar في الرسائل ──
+  avatarImg: { width: 34, height: 34, borderRadius: 17 },
+
+  // ── Modal ──
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
+  },
+  modalBox: {
+    backgroundColor: '#fff', borderRadius: 24, padding: 24,
+    alignItems: 'center', width: '100%',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, elevation: 8,
+  },
+  modalIconWrap: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#fef3c7', justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 8, textAlign: 'center' },
+  modalBody:  { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  modalBtnPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#0c6679', borderRadius: 14,
+    paddingHorizontal: 24, paddingVertical: 13, width: '100%',
+    justifyContent: 'center', marginBottom: 10,
+  },
+  modalBtnPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  modalBtnSecondary: {
+    paddingVertical: 10, paddingHorizontal: 24, width: '100%', alignItems: 'center',
+  },
+  modalBtnSecondaryText: { color: '#64748b', fontSize: 14, fontWeight: '500' },
 });
