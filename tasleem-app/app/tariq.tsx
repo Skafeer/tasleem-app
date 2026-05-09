@@ -142,6 +142,9 @@ export default function TariqScreen() {
     setInput('');
     setLoading(true);
 
+    // حساب عدد رسائل المستخدم بعد الإضافة
+    const userCountAfter = messages.filter(m => m.role === 'user').length + 1;
+
     // ── تنظيف الـ history: validation كامل قبل الإرسال ──
     const cleanHistory = geminiHistory
       .slice(-10)
@@ -175,11 +178,17 @@ export default function TariqScreen() {
       setGeminiHistory([...newGeminiHistory, { role: 'model', parts: [{ text: reply }] }]);
 
       // ── تحذير اقتراب نهاية المحادثة ──
-      const newCount = messages.filter(m => m.role === 'user').length + 1;
-      if (newCount === WARN_MESSAGES) {
+      if (userCountAfter === WARN_MESSAGES) {
         setTimeout(() => {
-          addMessage({ role: 'tariq', text: '⚠️ يا غالي، وصلنا قريب لنهاية هالمحادثة. بعد 4 رسائل راح تحتاج تمسح وتبدأ من جديد 😊' });
-        }, 500);
+          addMessage({ role: 'tariq', text: '⚠️ يا غالي، وصلنا قريب لنهاية هالمحادثة — بعد 4 رسائل لازم تمسح وتبدأ من جديد 😊' });
+        }, 800);
+      }
+
+      // ── وصل للحد الأقصى ── يبلغه بعد آخر رد
+      if (userCountAfter >= MAX_MESSAGES) {
+        setTimeout(() => {
+          addMessage({ role: 'tariq', text: '🔒 يا غالي، المحادثة وصلت حدها الأقصى. عشان تكمل لازم تمسح وتبدأ من جديد.' });
+        }, 1200);
       }
     } catch (err: any) {
       const status = err?.response?.status;
@@ -311,6 +320,17 @@ export default function TariqScreen() {
                     </TouchableOpacity>
                   )}
                 />
+              )}
+
+              {/* ── زر المسح عند الوصول للحد ── */}
+              {messages.filter(m => m.role === 'user').length >= MAX_MESSAGES && (
+                <TouchableOpacity style={s.clearLimitBtn} onPress={clearChat}>
+                  <Text style={s.clearLimitIcon}>🔒</Text>
+                  <View>
+                    <Text style={s.clearLimitTitle}>المحادثة وصلت حدها</Text>
+                    <Text style={s.clearLimitSub}>اضغط هنا لمسح المحادثة والبدء من جديد</Text>
+                  </View>
+                </TouchableOpacity>
               )}
             </View>
           }
@@ -453,4 +473,14 @@ const s = StyleSheet.create({
     shadowColor: '#0c6679', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
   sendOff: { backgroundColor: '#cbd5e1', shadowOpacity: 0, elevation: 0 },
+
+  clearLimitBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#fff3cd', borderWidth: 1.5, borderColor: '#f59e0b',
+    borderRadius: 16, marginHorizontal: 2, marginBottom: 14, marginTop: 4,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  clearLimitIcon:  { fontSize: 22 },
+  clearLimitTitle: { fontSize: 14, fontWeight: '700', color: '#92400e', textAlign: 'right' },
+  clearLimitSub:   { fontSize: 11, color: '#b45309', marginTop: 2, textAlign: 'right' },
 });
