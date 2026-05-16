@@ -8,10 +8,10 @@ const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
 const CONTACTS = [
-  { label: 'واتساب', desc: 'تواصل معنا عبر واتساب', icon: 'logo-whatsapp', color: '#25d366', bg: '#f0fdf4', url: 'https://wa.me/9647800000000' },
-  { label: 'تيليغرام', desc: 'راسلنا على تيليغرام', icon: 'paper-plane-outline', color: '#0088cc', bg: '#eff6ff', url: 'https://t.me/tasleem' },
-  { label: 'البريد الإلكتروني', desc: 'support@tasleem.iq', icon: 'mail-outline', color: '#8b5cf6', bg: '#f5f3ff', url: 'mailto:support@tasleem.iq' },
-  { label: 'الهاتف', desc: '07800000000', icon: 'call-outline', color: '#f97316', bg: '#fff7ed', url: 'tel:07800000000' },
+  { label: 'واتساب', desc: 'تواصل معنا عبر واتساب', icon: 'logo-whatsapp', color: '#25d366', bg: '#f0fdf4', url: 'https://wa.me/9647782784995' },
+  { label: 'تيليغرام', desc: 'راسلنا على تيليغرام', icon: 'paper-plane-outline', color: '#0088cc', bg: '#eff6ff', url: 'https://t.me/tasleemcotmer' },
+  { label: 'البريد الإلكتروني', desc: 'support@tasleem.iq', icon: 'mail-outline', color: '#8b5cf6', bg: '#f5f3ff', url: 'mailto:tasleem.dropshipping@gmail.com' },
+  { label: 'الهاتف', desc: '07800000000', icon: 'call-outline', color: '#f97316', bg: '#fff7ed', url: 'tel:07782784995' },
 ];
 
 const FAQS = [
@@ -75,7 +75,7 @@ export default function ContactScreen() {
           </View>
           {[
             { day: 'السبت - الخميس', time: '9 صباحاً - 10 مساءً' },
-            { day: 'الجمعة', time: '10 صباحاً - 6 مساءً' },
+            { day: 'الجمعة', time: '10 صباحاً - 9 مساءً' },
           ].map((r, i) => (
             <View key={i} style={[s.hoursRow, i === 1 && { borderBottomWidth: 0 }]}>
               <Text style={s.hoursDay}>{r.day}</Text>
