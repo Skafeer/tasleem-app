@@ -47,8 +47,9 @@ export default function StatsScreen() {
 
   const totalOrders = all.length;
   const delivered = all.filter(o => o.status === 'delivered');
-  const pending = all.filter(o => o.status === 'pending').length;
-  const processing = all.filter(o => ['processing', 'preparing', 'shipping'].includes(o.status)).length;
+  
+  // ✅ تعديل الحالات النشطة: processing و shipping فقط
+  const processing = all.filter(o => ['processing', 'shipping'].includes(o.status)).length;
   const returned = all.filter(o => o.status === 'returned').length;
   const cancelled = all.filter(o => o.status === 'cancelled').length;
   const totalRevenue = delivered.reduce((s, o) => s + (o.totalAmount || 0), 0);
@@ -57,13 +58,13 @@ export default function StatsScreen() {
   const deliveryRate = totalOrders > 0 ? Math.round((delivered.length / totalOrders) * 100) : 0;
   const returnRate = totalOrders > 0 ? Math.round((returned / totalOrders) * 100) : 0;
 
+  // ✅ إحصائيات الطلبات الجديدة
   const orderStats = [
     { icon: 'cube-outline', label: 'إجمالي الطلبات', value: totalOrders, color: '#6b7280', bg: '#f3f4f6' },
     { icon: 'checkmark-circle-outline', label: 'تم التوصيل', value: delivered.length, color: '#059669', bg: '#ecfdf5' },
-    { icon: 'time-outline', label: 'قيد الانتظار', value: pending, color: '#d97706', bg: '#fffbeb' },
-    { icon: 'refresh-outline', label: 'قيد التجهيز', value: processing, color: '#3b82f6', bg: '#eff6ff' },
-    { icon: 'arrow-undo-outline', label: 'راجع', value: returned, color: '#dc2626', bg: '#fef2f2' },
-    { icon: 'close-circle-outline', label: 'ملغي', value: cancelled, color: '#9ca3af', bg: '#f9fafb' },
+    { icon: 'refresh-outline', label: 'قيد المعالجة', value: processing, color: '#3b82f6', bg: '#eff6ff' },
+    { icon: 'arrow-undo-outline', label: 'تم الرفض', value: returned, color: '#dc2626', bg: '#fef2f2' },
+    { icon: 'close-circle-outline', label: 'تم الإلغاء', value: cancelled, color: '#9ca3af', bg: '#f9fafb' },
   ];
 
   const financialStats = [

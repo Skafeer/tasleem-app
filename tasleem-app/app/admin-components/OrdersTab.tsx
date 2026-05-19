@@ -14,26 +14,24 @@ const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
+// ✅ حالات الطلب الجديدة (تم حذف pending و preparing)
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  pending: { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
-  preparing: { label: 'قيد التجهيز', color: '#8b5cf6', bg: '#f5f3ff', icon: 'cube-outline' },
   shipping: { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
   delivered: { label: 'تم التوصيل', color: '#10b981', bg: '#ecfdf5', icon: 'checkmark-circle-outline' },
-  cancelled: { label: 'ملغي', color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
-  returned: { label: 'راجع', color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
+  cancelled: { label: 'تم الإلغاء', color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
+  returned: { label: 'تم الرفض', color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
   postponed: { label: 'مؤجل', color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
 };
 
+// ✅ الفلاتر الجديدة (تم حذف pending و preparing)
 const FILTERS = [
   { key: 'all', label: 'الكل' },
-  { key: 'pending', label: 'انتظار' },
   { key: 'processing', label: 'معالجة' },
-  { key: 'preparing', label: 'تجهيز' },
   { key: 'shipping', label: 'توصيل' },
   { key: 'delivered', label: 'مُسلَّم' },
   { key: 'cancelled', label: 'ملغي' },
-  { key: 'returned', label: 'راجع' },
+  { key: 'returned', label: 'رفض' },
   { key: 'postponed', label: 'مؤجل' },
 ];
 
@@ -131,6 +129,7 @@ export default function OrdersTab() {
     toast.success(`تم نسخ ${label}`);
   };
 
+  // ✅ دالة formatDate المصححة
   const formatDate = (d: string) => {
     if (!d) return '';
     const dt = new Date(d);
@@ -253,7 +252,7 @@ export default function OrdersTab() {
           </View>
         }
         renderItem={({ item: o }) => {
-          const st = STATUS[o.status] || STATUS.pending;
+          const st = STATUS[o.status] || STATUS.processing;
           const merchant = getMerchant(o.merchantId);
           const isOpen = expanded === o.id;
           const items = o.items || [];

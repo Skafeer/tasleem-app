@@ -14,24 +14,23 @@ import { toast } from '../../src/lib/toast';
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-// ── حالات الطلب ──
+// ✅ حالات الطلب الجديدة (تم حذف pending و preparing)
 const STATUS: any = {
-  pending:    { label: 'قيد الانتظار', color: '#f59e0b', bg: '#fffbeb', icon: 'time-outline' },
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
-  preparing:  { label: 'قيد التجهيز',  color: '#8b5cf6', bg: '#f5f3ff', icon: 'cube-outline' },
-  shipping:   { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
-  delivered:  { label: 'تم التوصيل',  color: '#10b981', bg: '#ecfdf5', icon: 'checkmark-circle-outline' },
-  cancelled:  { label: 'ملغي',         color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
-  returned:   { label: 'راجع',          color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
-  postponed:  { label: 'مؤجل',         color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
+  shipping: { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
+  delivered: { label: 'تم التوصيل', color: '#10b981', bg: '#ecfdf5', icon: 'checkmark-circle-outline' },
+  cancelled: { label: 'تم الإلغاء', color: '#ef4444', bg: '#fef2f2', icon: 'close-circle-outline' },
+  returned: { label: 'تم الرفض', color: '#f97316', bg: '#fff7ed', icon: 'arrow-undo-outline' },
+  postponed: { label: 'مؤجل', color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
 };
 
+// ✅ التبويبات الجديدة
 const TABS = [
   { key: 'active',    label: 'نشط',    icon: 'flash-outline' },
   { key: 'delivered', label: 'مكتمل',  icon: 'checkmark-circle-outline' },
   { key: 'cancelled', label: 'ملغي',   icon: 'close-circle-outline' },
   { key: 'postponed', label: 'مؤجل',   icon: 'pause-circle-outline' },
-  { key: 'returned',  label: 'راجع',   icon: 'arrow-undo-outline' },
+  { key: 'returned',  label: 'مرفوض',  icon: 'arrow-undo-outline' },
 ];
 
 const TAB_COLORS: any = {
@@ -42,7 +41,8 @@ const TAB_COLORS: any = {
   returned:  { bg: '#fff7ed', text: '#f97316', border: '#f97316' },
 };
 
-const CANCELLABLE = ['pending', 'processing'];
+// ✅ الحالات التي يمكن إلغاؤها (تم تعديلها)
+const CANCELLABLE = ['processing'];
 
 // ── Skeleton Order Card ──
 function SkeletonOrderCard() {
@@ -162,7 +162,8 @@ export default function OrdersScreen() {
         o.customerName?.toLowerCase().includes(search.toLowerCase()) ||
         o.customerPhone?.includes(search);
       if (tab === 'active') {
-        return matchSearch && ['pending', 'processing', 'preparing', 'shipping'].includes(o.status);
+        // ✅ الحالات النشطة الجديدة
+        return matchSearch && ['processing', 'shipping'].includes(o.status);
       }
       return matchSearch && o.status === tab;
     });
@@ -178,7 +179,7 @@ export default function OrdersScreen() {
   };
 
   const renderOrder = ({ item: o }: any) => {
-    const status = STATUS[o.status] || STATUS.pending;
+    const status = STATUS[o.status] || STATUS.processing;
     const canCancel = CANCELLABLE.includes(o.status);
 
     return (
