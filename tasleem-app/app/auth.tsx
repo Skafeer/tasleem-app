@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  ScrollView, Image, Animated,
+  ScrollView, Image, Animated, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,9 @@ export default function AuthScreen() {
   const [showPass,   setShowPass]   = useState(false);
   const [otpDigits,  setOtpDigits]  = useState(['', '', '', '', '', '']);
   const [countdown,  setCountdown]  = useState(0);
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
+  const [policiesModalVisible, setPoliciesModalVisible] = useState(false); // ✅ Modal السياسات
+  
   const slideAnim = useRef(new Animated.Value(0)).current;
   const otpRefs   = useRef<(TextInput | null)[]>([]);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,6 +63,7 @@ export default function AuthScreen() {
     setStep('form');
     setPhone(''); setPassword(''); setStoreName(''); setAddress('');
     setOtpDigits(['', '', '', '', '', '']);
+    setAgreedToPolicies(false);
   };
 
   // ── إرسال OTP ────────────────────────────────────────────────
@@ -124,7 +128,6 @@ export default function AuthScreen() {
     const newDigits = [...otpDigits];
 
     if (cleaned.length > 1) {
-      // لصق 6 أرقام دفعة واحدة
       const pasted = cleaned.slice(0, 6).split('');
       const filled  = [...pasted, ...Array(6).fill('')].slice(0, 6);
       setOtpDigits(filled);
@@ -137,7 +140,6 @@ export default function AuthScreen() {
     setOtpDigits(newDigits);
     if (cleaned && idx < 5) otpRefs.current[idx + 1]?.focus();
 
-    // تحقق تلقائي لما تكتمل الـ 6 أرقام
     const fullCode = newDigits.join('');
     if (fullCode.length === 6 && !fullCode.includes('')) {
       handleVerify(fullCode);
@@ -165,9 +167,18 @@ export default function AuthScreen() {
     if (isLogin) {
       loginMutation.mutate({ phone, password });
     } else {
+      if (!agreedToPolicies) {
+        toast.warning('يجب الموافقة على شروط الاستخدام وسياسة الخصوصية');
+        return;
+      }
       if (!storeName.trim()) { toast.warning('يرجى إدخال اسم المتجر'); return; }
       sendOtpMutation.mutate();
     }
+  };
+
+  // ✅ عرض Modal السياسات
+  const showPoliciesModal = () => {
+    setPoliciesModalVisible(true);
   };
 
   const isPending = loginMutation.isPending || registerMutation.isPending || sendOtpMutation.isPending;
@@ -217,7 +228,6 @@ export default function AuthScreen() {
               {/* ── شاشة OTP ── */}
               {!isLogin && step === 'otp' ? (
                 <View style={s.otpContainer}>
-                  {/* أيقونة */}
                   <View style={s.otpIconWrap}>
                     <Ionicons name="logo-whatsapp" size={36} color="#25D366" />
                   </View>
@@ -227,7 +237,6 @@ export default function AuthScreen() {
                     <Text style={s.otpPhone}>{phone}</Text>
                   </Text>
 
-                  {/* خانات OTP */}
                   <View style={s.otpBoxes}>
                     {otpDigits.map((d, i) => (
                       <TextInput
@@ -245,7 +254,6 @@ export default function AuthScreen() {
                     ))}
                   </View>
 
-                  {/* زر التحقق */}
                   <TouchableOpacity
                     style={[s.submitBtn, (registerMutation.isPending) && { opacity: 0.7 }]}
                     onPress={() => handleVerify()}
@@ -262,7 +270,6 @@ export default function AuthScreen() {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {/* إعادة الإرسال */}
                   <View style={s.resendRow}>
                     {countdown > 0 ? (
                       <Text style={s.countdownText}>
@@ -277,7 +284,6 @@ export default function AuthScreen() {
                     )}
                   </View>
 
-                  {/* رجوع */}
                   <TouchableOpacity style={s.backRow} onPress={() => setStep('form')}>
                     <Ionicons name="arrow-back-outline" size={16} color="#9ca3af" />
                     <Text style={s.backText}>تعديل البيانات</Text>
@@ -341,6 +347,36 @@ export default function AuthScreen() {
                             placeholderTextColor="#9ca3af"
                           />
                         </View>
+
+                        {/* ✅ حقل الموافقة على السياسات مع Modal داخلي */}
+                        <TouchableOpacity 
+                          style={s.checkboxRow}
+                          onPress={() => setAgreedToPolicies(!agreedToPolicies)}
+                          activeOpacity={0.8}>
+                          <View style={[s.checkbox, agreedToPolicies && s.checkboxChecked]}>
+                            {agreedToPolicies && <Ionicons name="checkmark" size={14} color="#fff" />}
+                          </View>
+                          <Text style={s.checkboxText}>
+                            أوافق على{' '}
+                            <Text 
+                              style={s.linkText} 
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                showPoliciesModal();
+                              }}>
+                              شروط الاستخدام
+                            </Text>
+                            {' '}و{' '}
+                            <Text 
+                              style={s.linkText} 
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                showPoliciesModal();
+                              }}>
+                              سياسة الخصوصية
+                            </Text>
+                          </Text>
+                        </TouchableOpacity>
                       </>
                     )}
                   </View>
@@ -384,6 +420,114 @@ export default function AuthScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* ✅ Modal لعرض سياسات تسليم (بدون روابط خارجية) */}
+      <Modal
+        visible={policiesModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setPoliciesModalVisible(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContainer}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>سياسات تسليم</Text>
+              <TouchableOpacity onPress={() => setPoliciesModalVisible(false)}>
+                <Ionicons name="close-circle" size={28} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={s.modalContent}>
+              
+              {/* شروط الاستخدام */}
+              <Text style={s.modalSectionTitle}>📋 شروط الاستخدام</Text>
+              <Text style={s.modalText}>
+                <Text style={s.modalBold}>مقدمة:</Text>{"\n"}
+                باستخدامك لتطبيق "تسليم"، فأنت توافق على الالتزام بهذه الشروط. المنصة عراقية متخصصة بنظام الدروب شيبينج، وتوفر بيئة آمنة للتجار والزبائن.
+                {"\n\n"}
+                <Text style={s.modalBold}>التسجيل والحساب:</Text>{"\n"}
+                • يجب أن يكون عمر التاجر 18 سنة فأكثر.{"\n"}
+                • التاجر مسؤول عن الحفاظ على سرية بيانات حسابه.{"\n"}
+                • تسليم تحتفظ بالحق في تعليق أو إلغاء الحساب المخالف.
+                {"\n\n"}
+                <Text style={s.modalBold}>الخدمة والرسوم:</Text>{"\n"}
+                الاشتراك في منصة تسليم مجاني بالكامل بدون أي رسوم شهرية أو سنوية. ربح التاجر هو الفرق بين سعر الجملة وسعر البيع الذي يحدده التاجر بنفسه.
+              </Text>
+
+              <View style={s.modalDivider} />
+
+              {/* سياسة الخصوصية */}
+              <Text style={s.modalSectionTitle}>🔒 سياسة الخصوصية</Text>
+              <Text style={s.modalText}>
+                <Text style={s.modalBold}>البيانات التي نجمعها:</Text>{"\n"}
+                • الاسم الكامل ورقم الهاتف.{"\n"}
+                • معلومات الماستر كارد المخصصة لاستلام الأرباح.{"\n"}
+                • بيانات الطلبات والمبيعات.{"\n\n"}
+                <Text style={s.modalBold}>كيف نستخدم بياناتك:</Text>{"\n"}
+                إدارة حسابك ومعالجة طلبات السحب، إرسال إشعارات الطلبات، تحسين خدماتنا. نحن لا نبيع بياناتك لأي طرف ثالث.
+              </Text>
+
+              <View style={s.modalDivider} />
+
+              {/* سياسة الاسترجاع والاستبدال */}
+              <Text style={s.modalSectionTitle}>📦 سياسة الاسترجاع والاستبدال</Text>
+              <Text style={s.modalText}>
+                <Text style={s.modalBold}>شروط الاسترجاع:</Text>{"\n"}
+                يحق للزبون استرجاع المنتج خلال 3 أيام من تاريخ الاستلام، بشرط أن يكون بحالته الأصلية غير مستخدم. في حال وجود عيب مصنعي، يُستبدل المنتج أو يُعاد المبلغ مجاناً.
+                {"\n\n"}
+                <Text style={s.modalBold}>شروط الاستبدال:</Text>{"\n"}
+                يمكن استبدال المنتج خلال 7 أيام من تاريخ الاستلام إذا كان بحالته الأصلية. إذا كان سبب الاستبدال تغيير الرأي، يتحمل الزبون تكاليف التوصيل.
+              </Text>
+
+              <View style={s.modalDivider} />
+
+              {/* سياسة التوصيل */}
+              <Text style={s.modalSectionTitle}>🚚 سياسة التوصيل</Text>
+              <Text style={s.modalText}>
+                <Text style={s.modalBold}>مناطق التوصيل:</Text> جميع محافظات العراق{"\n"}
+                <Text style={s.modalBold}>مدة التوصيل:</Text>{"\n"}
+                • داخل محافظة البصرة: 1-2 يوم عمل{"\n"}
+                • باقي المحافظات: 2-4 أيام عمل{"\n\n"}
+                <Text style={s.modalBold}>أجور التوصيل:</Text>{"\n"}
+                • داخل البصرة: 3,000 د.ع{"\n"}
+                • باقي المحافظات: 5,000 د.ع
+              </Text>
+
+              <View style={s.modalDivider} />
+
+              {/* سياسة السحوبات */}
+              <Text style={s.modalSectionTitle}>💰 سياسة السحوبات</Text>
+              <Text style={s.modalText}>
+                <Text style={s.modalBold}>شروط السحب:</Text>{"\n"}
+                يتم سحب الأرباح عبر الماستر كارد فقط. يجب إضافة بيانات الماستر كارد الصحيحة قبل طلب السحب.
+                {"\n\n"}
+                <Text style={s.modalBold}>معالجة طلبات السحب:</Text>{"\n"}
+                يتم مراجعة الطلب وتحويل المبلغ خلال 1-3 أيام عمل من تاريخ الموافقة.
+              </Text>
+
+              <View style={s.modalDivider} />
+
+              {/* جهات الاتصال */}
+              <Text style={s.modalSectionTitle}>📞 التواصل معنا</Text>
+              <Text style={s.modalText}>
+                رقم خدمة الزبائن: <Text style={s.modalBold}>07782784995</Text>{"\n"}
+                الدعم الفني: متاح داخل التطبيق من قسم "الدعم الفني"
+              </Text>
+
+              <Text style={s.modalFooter}>
+                آخر تحديث: مايو 2026 {"\n"}
+                جميع الحقوق محفوظة © تسليم 2026
+              </Text>
+
+              <TouchableOpacity 
+                style={s.modalCloseBtn}
+                onPress={() => setPoliciesModalVisible(false)}>
+                <Text style={s.modalCloseBtnText}>أوافق وأغلق</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -418,6 +562,41 @@ const s = StyleSheet.create({
   fieldInput:{ flex: 1, fontSize: 15, color: '#111827' },
   phoneHint: { fontSize: 12, color: '#ef4444', marginTop: -10, marginBottom: 10, textAlign: 'right', paddingHorizontal: 8 },
 
+  // أنماط الموافقة على السياسات
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  checkboxText: {
+    fontSize: 13,
+    color: '#374151',
+    flex: 1,
+    textAlign: 'right',
+  },
+  linkText: {
+    color: PRIMARY,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+
   submitBtn:  { borderRadius: 18, overflow: 'hidden', marginBottom: 22, shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 14, elevation: 7 },
   submitGrad: { height: 56, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10 },
   submitText: { fontSize: 16, fontWeight: 'bold', color: '#fff', letterSpacing: 0.8 },
@@ -429,7 +608,7 @@ const s = StyleSheet.create({
   switchText:  { fontSize: 13, color: '#9ca3af' },
   switchAccent:{ fontSize: 14, fontWeight: 'bold', color: PRIMARY },
 
-  // ── OTP ──
+  // OTP
   otpContainer: { alignItems: 'center', paddingVertical: 8 },
   otpIconWrap:  { width: 72, height: 72, borderRadius: 24, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   otpTitle:     { fontSize: 20, fontWeight: '900', color: '#0d1b2a', marginBottom: 10 },
@@ -451,4 +630,85 @@ const s = StyleSheet.create({
   backText:      { fontSize: 13, color: '#9ca3af' },
 
   footer: { textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 26, paddingHorizontal: 20 },
+
+  // أنماط Modal السياسات
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    width: '100%',
+    maxHeight: '85%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+    backgroundColor: '#fff',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: PRIMARY,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: PRIMARY,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  modalText: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 20,
+    textAlign: 'justify',
+  },
+  modalBold: {
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#e8edf2',
+    marginVertical: 16,
+  },
+  modalFooter: {
+    fontSize: 11,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  modalCloseBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  modalCloseBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
 });
