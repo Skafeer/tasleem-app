@@ -15,7 +15,7 @@ const PRIMARY = '#0c6679';
 const BG      = '#f2f6f9';
 
 // ── صورة طارق ──
-const TARIQ_IMG = require('/workspaces/tasleem-app/tasleem-app/assets/tariq.png');
+const TARIQ_IMG = require('/../../assets/tariq.png');
 
 export default function ProfileScreen() {
   const router = useRouter();
