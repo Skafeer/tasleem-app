@@ -1,7 +1,7 @@
 // /workspaces/tasleem-app/tasleem-app/app/(tabs)/profile.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
+  View, Text, StyleSheet, TouchableOpacity, Image, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,26 @@ const TARIQ_IMG = require('../../assets/tariq.png');
 
 export default function ProfileScreen() {
   const router = useRouter();
+  
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const menuAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.02, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.timing(menuAnim, {
+      toValue: 1,
+      duration: 600,
+      delay: 150,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -46,9 +66,11 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <ScrollView
+      <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
       >
 
         {/* ── Header ── */}
@@ -61,10 +83,11 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── بطاقة المستخدم ── */}
-        <LinearGradient
-          colors={[PRIMARY, '#0a8a9f', '#0c6679']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={s.heroCard}>
+        <Animated.View style={{ transform: [{ translateY: scrollY.interpolate({ inputRange: [-100, 0, 100], outputRange: [-20, 0, 20], extrapolate: 'clamp' }) }] }}>
+          <LinearGradient
+            colors={[PRIMARY, '#0a8a9f', '#0c6679']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={s.heroCard}>
           <View style={s.heroContent}>
             <View style={s.avatarContainer}>
               <View style={s.avatarRing}>
@@ -81,7 +104,8 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
-        </LinearGradient>
+          </LinearGradient>
+        </Animated.View>
 
         {/* ── بطاقات الأرباح ── */}
         <View style={s.statsGrid}>
@@ -104,11 +128,12 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── طارق AI ── */}
-        <TouchableOpacity
-          style={s.tariqSection}
-          onPress={() => router.push('/tariq')}
-          activeOpacity={0.85}
-        >
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <TouchableOpacity
+            style={s.tariqSection}
+            onPress={() => router.push('/tariq')}
+            activeOpacity={0.85}
+          >
           <LinearGradient
             colors={['#1e3a5f', '#0c6679']}
             start={{ x: 0, y: 0 }}
@@ -136,10 +161,11 @@ export default function ProfileScreen() {
               color="rgba(255,255,255,0.7)"
             />
           </LinearGradient>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* ── قائمة الخيارات ── */}
-        <View style={s.menuSection}>
+        <Animated.View style={[s.menuSection, { opacity: menuAnim, transform: [{ translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
           <Text style={s.menuSectionTitle}>القائمة</Text>
           {menuItems.map((item, idx) => (
             <TouchableOpacity
@@ -157,7 +183,7 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-back" size={16} color="#d1d5db" />
             </TouchableOpacity>
           ))}
-        </View>
+        </Animated.View>
 
         {/* ── تسجيل الخروج ── */}
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
@@ -171,7 +197,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={s.version}>إصدار التطبيق 1.0.0</Text>
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }

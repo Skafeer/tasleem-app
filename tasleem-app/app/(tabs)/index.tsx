@@ -48,14 +48,16 @@ const sk = StyleSheet.create({
   line: { height: 11, backgroundColor: '#e8edf2', borderRadius: 6, width: '80%' },
 });
 
-// ── Product Card Component ──
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+
 const ProductCard = React.memo(({ 
   product, 
   isFav, 
   CARD_WIDTH, 
   onPress, 
   onToggleFav,
-  onViewDetails 
+  onViewDetails,
+  index
 }: any) => {
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
@@ -70,11 +72,33 @@ const ProductCard = React.memo(({
   
   const CARD_HEIGHT = CARD_WIDTH + 155;
   
+  // Animations
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    const delay = (index % 10) * 100;
+    Animated.parallel([
+      Animated.timing(opacityAnim, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
+      Animated.timing(translateYAnim, { toValue: 0, duration: 400, delay, useNativeDriver: true }),
+    ]).start();
+  }, [index]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
+  };
+
   return (
-    <TouchableOpacity
-      style={[s.card, { width: CARD_WIDTH, height: CARD_HEIGHT }]}
+    <AnimatedTouchableOpacity
+      style={[s.card, { width: CARD_WIDTH, height: CARD_HEIGHT, opacity: opacityAnim, transform: [{ scale: scaleAnim }, { translateY: translateYAnim }] }]}
       onPress={() => onPress(product.id)}
-      activeOpacity={0.92}>
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}>
       <View style={[s.imgBox, { height: CARD_WIDTH }]}>
         {imgs[0] ? (
           <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
@@ -151,7 +175,7 @@ const ProductCard = React.memo(({
           <Text style={s.detailsBtnText}>عرض التفاصيل</Text>
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </AnimatedTouchableOpacity>
   );
 });
 
@@ -549,14 +573,15 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             }
-            renderItem={({ item: p }) => (
+            renderItem={({ item: p, index }) => (
               <ProductCard
                 product={p}
-                isFav={(favoriteIds as number[]).includes(p.id)}
+                isFav={(favoriteIds as number[]).includes((p as any).id)}
                 CARD_WIDTH={CARD_WIDTH}
                 onPress={handleProductPress}
                 onToggleFav={handleToggleFav}
                 onViewDetails={handleViewDetails}
+                index={index}
               />
             )}
           />
@@ -704,20 +729,30 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    height: 48,
+    shadowColor: '#0c6679',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    borderWidth: 1,
     borderColor: '#e8edf2',
-    gap: 8,
+    gap: 10,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
+  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right', fontWeight: '500' },
   filterBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 20,
     backgroundColor: '#fff',
-    borderWidth: 1.5,
+    shadowColor: '#0c6679',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    borderWidth: 1,
     borderColor: '#e8edf2',
     justifyContent: 'center',
     alignItems: 'center',
