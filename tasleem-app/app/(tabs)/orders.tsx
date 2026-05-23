@@ -178,25 +178,17 @@ export default function OrdersScreen() {
     return dt.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-
-  const OrderCardComponent = React.memo(({ o, index, status, canCancel }: any) => {
-    const translateY = useRef(new Animated.Value(20)).current;
-    const opacity = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 400, delay: (index % 10) * 100, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 400, delay: (index % 10) * 100, useNativeDriver: true }),
-      ]).start();
-    }, [index]);
+  const renderOrder = ({ item: o }: any) => {
+    const status = STATUS[o.status] || STATUS.processing;
+    const canCancel = CANCELLABLE.includes(o.status);
 
     return (
-      <AnimatedTouchableOpacity
-        style={[s.orderCard, { opacity, transform: [{ translateY }] }]}
+      <TouchableOpacity
+        style={s.orderCard}
         onPress={() => router.push(`/order-details/${o.id}`)}
         activeOpacity={0.92}>
         
+        {/* رأس البطاقة */}
         <View style={s.cardHeader}>
           <View style={[s.statusBadge, { backgroundColor: status.bg }]}>
             <Ionicons name={status.icon} size={14} color={status.color} />
@@ -205,6 +197,7 @@ export default function OrdersScreen() {
           <Text style={s.orderId}>طلب #{o.id}</Text>
         </View>
 
+        {/* معلومات الزبون */}
         <View style={s.customerInfo}>
           <Ionicons name="person-outline" size={14} color="#9ca3af" />
           <Text style={s.customerName}>{o.customerName || 'بدون اسم'}</Text>
@@ -216,11 +209,13 @@ export default function OrdersScreen() {
           )}
         </View>
 
+        {/* التاريخ */}
         <View style={s.dateRow}>
           <Ionicons name="calendar-outline" size={12} color="#9ca3af" />
           <Text style={s.dateText}>{formatDate(o.createdAt)}</Text>
         </View>
 
+        {/* السعر والربح */}
         <View style={s.amountRow}>
           {o.totalProfit != null && (
             <View style={s.profitTag}>
@@ -233,6 +228,7 @@ export default function OrdersScreen() {
           </Text>
         </View>
 
+        {/* أزرار الإجراءات */}
         <View style={s.cardFooter}>
           <TouchableOpacity
             style={[s.cancelBtn, !canCancel && s.cancelBtnDisabled]}
@@ -251,15 +247,8 @@ export default function OrdersScreen() {
             <Text style={s.detailsBtnText}>التفاصيل</Text>
           </TouchableOpacity>
         </View>
-      </AnimatedTouchableOpacity>
+      </TouchableOpacity>
     );
-  });
-
-  const renderOrder = ({ item: o, index }: any) => {
-    const status = STATUS[o.status] || STATUS.processing;
-    const canCancel = CANCELLABLE.includes(o.status);
-
-    return <OrderCardComponent o={o} index={index} status={status} canCancel={canCancel} />;
   };
 
   return (
@@ -473,13 +462,11 @@ const s = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
