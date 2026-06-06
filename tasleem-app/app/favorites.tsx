@@ -12,6 +12,7 @@ import api from '../src/lib/api';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
+const OUT_OF_STOCK = '#9ca3af';
 
 // Skeleton Card
 function SkeletonFavCard({ width }: { width: number }) {
@@ -53,9 +54,13 @@ export default function FavoritesScreen() {
     queryFn: async () => { const { data } = await api.get('/api/favorites'); return data as number[]; },
   });
 
+  // ✅ جلب جميع المنتجات (بما فيها المنتهية المخزون)
   const { data: allProducts = [], isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
-    queryFn: async () => { const { data } = await api.get('/api/products?activeOnly=true'); return data; },
+    queryFn: async () => { 
+      const { data } = await api.get('/api/products'); // إزالة activeOnly=true لجلب الكل
+      return data; 
+    },
   });
 
   const removeFav = useMutation({
@@ -63,9 +68,16 @@ export default function FavoritesScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['favorites'] }),
   });
 
+  // تصفية المنتجات المفضلة فقط
   const favorites = (allProducts as any[]).filter((p: any) => (favoriteIds as number[]).includes(p.id));
   const isLoading = loadingIds || loadingProducts;
   const getImages = (p: any) => p.images ? p.images.split(',').filter(Boolean) : p.imageUrl ? [p.imageUrl] : [];
+
+  const handleCardPress = (product: any) => {
+    // ✅ إذا كان المنتج نافذ، لا يفتح الصفحة
+    if (product.stock === 0) return;
+    router.push(`/products/${product.id}`);
+  };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -112,47 +124,70 @@ export default function FavoritesScreen() {
             const imgs = getImages(p);
             const hasDiscount = p.discount > 0;
             const discounted = hasDiscount ? p.wholesalePrice * (1 - p.discount / 100) : p.wholesalePrice;
+            const isOutOfStock = p.stock === 0;
+
             return (
               <TouchableOpacity
-                style={[s.card, { width: CARD_WIDTH }]}
-                onPress={() => router.push(`/products/${p.id}`)}
-                activeOpacity={0.92}>
+                style={[
+                  s.card, 
+                  { width: CARD_WIDTH },
+                  isOutOfStock && s.cardOutOfStock  // ✅ إضافة نمط المنتج النافذ
+                ]}
+                onPress={() => handleCardPress(p)}
+                activeOpacity={isOutOfStock ? 1 : 0.92}
+                disabled={isOutOfStock}  // ✅ تعطيل التفاعل مع البطاقة
+              >
                 
                 <View style={[s.imgBox, { height: CARD_WIDTH }]}>
                   {imgs[0] ? (
-                    <Image source={{ uri: imgs[0] }} style={s.img} resizeMode="cover" />
+                    <Image 
+                      source={{ uri: imgs[0] }} 
+                      style={[s.img, isOutOfStock && s.imgOutOfStock]} 
+                      resizeMode="cover" 
+                    />
                   ) : (
-                    <View style={[s.img, s.imgPlaceholder]}>
-                      <Ionicons name="image-outline" size={28} color="#d1d5db" />
+                    <View style={[s.img, s.imgPlaceholder, isOutOfStock && s.imgOutOfStock]}>
+                      <Ionicons name="image-outline" size={28} color={isOutOfStock ? "#cbd5e1" : "#d1d5db"} />
                     </View>
                   )}
                   
-                  {hasDiscount && (
+                  {hasDiscount && !isOutOfStock && (
                     <View style={s.discountBadge}>
                       <Text style={s.discountText}>-{p.discount}%</Text>
                     </View>
                   )}
                   
+                  {/* ✅ إضافة شعار "نافذ" إذا كان المخزون صفر */}
+                  {isOutOfStock && (
+                    <View style={s.outOfStockBadge}>
+                      <Text style={s.outOfStockText}>نافذ</Text>
+                    </View>
+                  )}
+                  
                   <TouchableOpacity 
-                    style={s.favBtn} 
+                    style={[s.favBtn, isOutOfStock && s.favBtnOutOfStock]} 
                     onPress={() => removeFav.mutate(p.id)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Ionicons name="heart" size={16} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
                 
-                <View style={s.cardBody}>
-                  <Text style={s.productName} numberOfLines={2}>{p.name}</Text>
+                <View style={[s.cardBody, isOutOfStock && s.cardBodyOutOfStock]}>
+                  <Text style={[s.productName, isOutOfStock && s.textOutOfStock]} numberOfLines={2}>{p.name}</Text>
                   
                   <View style={s.priceRow}>
-                    {hasDiscount && (
+                    {hasDiscount && !isOutOfStock && (
                       <Text style={s.oldPrice}>{p.wholesalePrice.toLocaleString()}</Text>
                     )}
-                    <Text style={s.price}>{Math.round(discounted).toLocaleString()} د.ع</Text>
+                    <Text style={[s.price, isOutOfStock && s.priceOutOfStock]}>
+                      {isOutOfStock ? 'غير متوفر' : `${Math.round(discounted).toLocaleString()} د.ع`}
+                    </Text>
                   </View>
                   
-                  <View style={s.catPill}>
-                    <Text style={s.catPillText} numberOfLines={1}>{p.category}</Text>
+                  <View style={[s.catPill, isOutOfStock && s.catPillOutOfStock]}>
+                    <Text style={[s.catPillText, isOutOfStock && s.catPillTextOutOfStock]} numberOfLines={1}>
+                      {p.category || 'منوعات'}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -231,6 +266,12 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  // ✅ نمط المنتج النافذ
+  cardOutOfStock: {
+    opacity: 0.75,
+    backgroundColor: '#f3f4f6',
+    borderColor: '#e5e7eb',
+  },
   imgBox: {
     position: 'relative',
     overflow: 'hidden',
@@ -238,6 +279,9 @@ const s = StyleSheet.create({
   img: {
     width: '100%',
     height: '100%',
+  },
+  imgOutOfStock: {
+    opacity: 0.6,
   },
   imgPlaceholder: {
     backgroundColor: '#f3f4f6',
@@ -258,6 +302,21 @@ const s = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  // ✅ شعار "نافذ"
+  outOfStockBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#6b7280',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  outOfStockText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   favBtn: {
     position: 'absolute',
     top: 8,
@@ -269,9 +328,15 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  favBtnOutOfStock: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
   cardBody: {
     padding: 10,
     gap: 6,
+  },
+  cardBodyOutOfStock: {
+    opacity: 0.8,
   },
   productName: {
     fontSize: 13,
@@ -279,6 +344,9 @@ const s = StyleSheet.create({
     color: '#111827',
     textAlign: 'right',
     lineHeight: 18,
+  },
+  textOutOfStock: {
+    color: '#6b7280',
   },
   priceRow: {
     flexDirection: 'row',
@@ -290,6 +358,10 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: PRIMARY,
+  },
+  priceOutOfStock: {
+    color: '#9ca3af',
+    fontSize: 12,
   },
   oldPrice: {
     fontSize: 11,
@@ -303,9 +375,15 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: 'flex-start',
   },
+  catPillOutOfStock: {
+    backgroundColor: '#e5e7eb',
+  },
   catPillText: {
     fontSize: 10,
     color: PRIMARY,
     fontWeight: '600',
+  },
+  catPillTextOutOfStock: {
+    color: '#9ca3af',
   },
 });
