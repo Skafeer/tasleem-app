@@ -22,10 +22,11 @@ const STATUS: any = {
 export default function WithdrawHistoryScreen() {
   const router = useRouter();
 
+  // ✅ تعديل: استخدام API الخاص بسحوبات المستخدم فقط
   const { data: withdrawals = [], isLoading } = useQuery({
-    queryKey: ['withdrawals'],
+    queryKey: ['my-withdrawals'],
     queryFn: async () => {
-      const { data } = await api.get('/api/withdrawals');
+      const { data } = await api.get('/api/withdrawals/my');
       return Array.isArray(data) ? data : [];
     },
   });

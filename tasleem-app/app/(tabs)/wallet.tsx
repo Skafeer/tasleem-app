@@ -59,11 +59,12 @@ export default function WalletScreen() {
     },
   });
 
+  // ✅ تعديل: استخدام API الخاص بسحوبات المستخدم فقط (للتاجر والأدمن العادي)
   const { data: withdrawals = [], isLoading, refetch: refetchWithdrawals } = useQuery({
-    queryKey: ['withdrawals'],
+    queryKey: ['my-withdrawals'],
     refetchInterval: 15000,
     queryFn: async () => {
-      const { data } = await api.get('/api/withdrawals');
+      const { data } = await api.get('/api/withdrawals/my');
       return Array.isArray(data)
         ? [...data].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         : [];
@@ -82,7 +83,7 @@ export default function WalletScreen() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
+      queryClient.invalidateQueries({ queryKey: ['my-withdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['user'] });
       setIsOpen(false);
       setAmount('');

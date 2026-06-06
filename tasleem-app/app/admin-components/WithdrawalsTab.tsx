@@ -35,10 +35,11 @@ export default function WithdrawalsTab() {
   const [filter, setFilter] = useState('all');
   const [dropdownId, setDropdownId] = useState<number | null>(null);
 
+  // ✅ تعديل: استخدام API الخاص بالأدمن (كل السحوبات لجميع التجار)
   const { data: withdrawals = [], isLoading } = useQuery({
     queryKey: ['admin-withdrawals'],
     queryFn: async () => {
-      const { data } = await api.get('/api/withdrawals');
+      const { data } = await api.get('/api/admin/withdrawals');
       return Array.isArray(data)
         ? [...data].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         : [];

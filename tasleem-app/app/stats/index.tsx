@@ -34,10 +34,11 @@ export default function StatsScreen() {
     },
   });
 
+  // ✅ تعديل: استخدام API الخاص بسحوبات المستخدم فقط (للتاجر)
   const { data: withdrawalsRes } = useQuery({
     queryKey: ['merchant-withdrawals-stats'],
     queryFn: async () => { 
-      const { data } = await api.get('/api/withdrawals'); 
+      const { data } = await api.get('/api/withdrawals/my'); 
       return data; 
     },
   });
