@@ -54,11 +54,11 @@ export default function FavoritesScreen() {
     queryFn: async () => { const { data } = await api.get('/api/favorites'); return data as number[]; },
   });
 
-  // ✅ جلب جميع المنتجات (بما فيها المنتهية المخزون)
+  // ✅ استخدام API الخاص بجلب جميع المنتجات (بما فيها النافذة)
   const { data: allProducts = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ['products'],
+    queryKey: ['all-products'],
     queryFn: async () => { 
-      const { data } = await api.get('/api/products'); // إزالة activeOnly=true لجلب الكل
+      const { data } = await api.get('/api/products/all'); 
       return data; 
     },
   });
