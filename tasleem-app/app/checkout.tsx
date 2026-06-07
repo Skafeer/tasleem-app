@@ -139,36 +139,22 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ الحل النهائي - تعطيل التحقق من الرقم الاحتياطي مؤقتاً للتأكد
+  // ✅ الحل الجذري والنهائي - لا يوجد أي تحقق على رقم الهاتف الاحتياطي
   const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
     
+    // تنظيف الرقم الرئيسي
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith('07')) {
+    
+    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
     
-    // ✅ DEBUG: طباعة القيم
-    console.log('========== DEBUG ==========');
-    console.log('customerPhone:', customerPhone);
-    console.log('cleanPhone:', cleanPhone);
-    console.log('backupPhone:', backupPhone);
-    console.log('backupPhone length:', backupPhone?.length);
-    console.log('backupPhone === customerPhone?', backupPhone === customerPhone);
-    console.log('===========================');
-    
-    // ✅ مؤقتاً: تعطيل التحقق من الرقم الاحتياطي تماماً
-    // if (backupPhone && backupPhone.trim() !== '') {
-    //   const cleanBackup = backupPhone.replace(/[^0-9]/g, '');
-    //   if (!cleanBackup || cleanBackup.length !== 11 || !cleanBackup.startsWith('07')) {
-    //     toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
-    //     return;
-    //   }
-    // }
+    // ✅ لا يوجد أي تحقق من رقم الهاتف الاحتياطي نهائياً
     
     if (!province.trim()) {
       toast.warning('يرجى اختيار المحافظة');
@@ -192,10 +178,9 @@ export default function CheckoutScreen() {
 
     const fullAddress = `${province} - ${area} - ${address}`;
     
-    // استخدام الرقم الاحتياطي إذا وجد
-    const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
-    const phoneDetails = cleanBackup
-      ? `${cleanPhone} (احتياطي: ${cleanBackup})`
+    // استخدام الرقم الاحتياطي إذا وجد، وإلا استخدام الرقم الرئيسي فقط
+    const phoneDetails = backupPhone && backupPhone.trim() !== ''
+      ? `${cleanPhone} (احتياطي: ${backupPhone})`
       : cleanPhone;
 
     submitOrder.mutate({
@@ -289,10 +274,7 @@ export default function CheckoutScreen() {
             placeholder="07XXXXXXXXX (اختياري)"
             placeholderTextColor="#9ca3af"
             value={backupPhone}
-            onChangeText={v => {
-              const cleaned = v.replace(/[^0-9]/g, '');
-              if (cleaned.length <= 11) setBackupPhone(cleaned);
-            }}
+            onChangeText={setBackupPhone}
             keyboardType="phone-pad"
             maxLength={11}
             textAlign="right"
