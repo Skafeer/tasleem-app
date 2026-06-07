@@ -38,6 +38,7 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [backupPhone, setBackupPhone] = useState(''); // ✅ تمت إعادة الإضافة
   const [province, setProvince] = useState('');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
@@ -138,6 +139,12 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
+  // ✅ التحقق من رقم الهاتف - نفس القوانين لكلا الحقلين
+  const isValidPhone = (phone: string) => {
+    if (!phone) return false;
+    return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
+  };
+
   const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
@@ -146,8 +153,15 @@ export default function CheckoutScreen() {
     
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
     
-    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
+    if (!isValidPhone(cleanPhone)) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
+      return;
+    }
+    
+    // ✅ التحقق من الرقم الاحتياطي (اختياري - فقط إذا كان موجوداً)
+    const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    if (cleanBackup && !isValidPhone(cleanBackup)) {
+      toast.warning('رقم الهاتف الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
     
@@ -172,11 +186,16 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
+    
+    // ✅ بناء رقم الهاتف مع الاحتياطي إذا وجد
+    const phoneDetails = cleanBackup
+      ? `${cleanPhone} (احتياطي: ${cleanBackup})`
+      : cleanPhone;
 
     submitOrder.mutate({
       items,
       customerName,
-      customerPhone: cleanPhone,
+      customerPhone: phoneDetails,
       province,
       address: fullAddress,
       notes: notes || '',
@@ -252,6 +271,22 @@ export default function CheckoutScreen() {
             onChangeText={v => {
               const cleaned = v.replace(/[^0-9]/g, '');
               if (cleaned.length <= 11) setCustomerPhone(cleaned);
+            }}
+            keyboardType="phone-pad"
+            maxLength={11}
+            textAlign="right"
+          />
+
+          {/* ✅ الحقل الاحتياطي - تمت إعادة إضافته بشكل نظيف */}
+          <Text style={s.label}>رقم الهاتف الاحتياطي (اختياري)</Text>
+          <TextInput
+            style={s.input}
+            placeholder="07XXXXXXXXX (اختياري)"
+            placeholderTextColor="#9ca3af"
+            value={backupPhone}
+            onChangeText={v => {
+              const cleaned = v.replace(/[^0-9]/g, '');
+              if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
             keyboardType="phone-pad"
             maxLength={11}
