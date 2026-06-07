@@ -144,15 +144,19 @@ export default function CheckoutScreen() {
   });
 
   const handleSubmit = async () => {
+    // ✅ تنظيف الأرقام من المسافات والأحرف غير الرقمية
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
-    if (!customerPhone.trim() || !customerPhone.startsWith('07') || customerPhone.length !== 11) {
+    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
-    if (backupPhone && (!backupPhone.startsWith('07') || backupPhone.length !== 11)) {
+    if (cleanBackupPhone && (!cleanBackupPhone.startsWith('07') || cleanBackupPhone.length !== 11)) {
       toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
@@ -177,7 +181,10 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    const phoneDetails = backupPhone ? `${customerPhone} (احتياطي: ${backupPhone})` : customerPhone;
+    // ✅ استخدام الأرقام المنظفة
+    const phoneDetails = cleanBackupPhone 
+      ? `${cleanPhone} (احتياطي: ${cleanBackupPhone})` 
+      : cleanPhone;
 
     submitOrder.mutate({
       items,
@@ -257,7 +264,9 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={customerPhone}
             onChangeText={v => {
-              if (v.length <= 11 && /^[0-9]*$/.test(v)) setCustomerPhone(v);
+              // تنظيف الإدخال من أي شيء غير أرقام
+              const cleaned = v.replace(/[^0-9]/g, '');
+              if (cleaned.length <= 11) setCustomerPhone(cleaned);
             }}
             keyboardType="phone-pad"
             maxLength={11}
@@ -271,7 +280,9 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
-              if (v.length <= 11 && /^[0-9]*$/.test(v)) setBackupPhone(v);
+              // تنظيف الإدخال من أي شيء غير أرقام
+              const cleaned = v.replace(/[^0-9]/g, '');
+              if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
             keyboardType="phone-pad"
             maxLength={11}
