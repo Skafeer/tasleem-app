@@ -23,13 +23,6 @@ const PROVINCES = [
 // دالة مفتاح السلة
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 
-// ✅ دالة التحقق من رقم الهاتف - نفس الريجيكس تبع الباك إند
-const isValidPhoneNumber = (phone: string): boolean => {
-  if (!phone) return false;
-  // نفس الريجيكس: /^07[0-9]{9}$/
-  return /^07[0-9]{9}$/.test(phone);
-};
-
 export default function CheckoutScreen() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -146,41 +139,36 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ معالج إرسال الطلب مع تحسين التحقق من الأرقام
+  // ✅ الحل النهائي - تعطيل التحقق من الرقم الاحتياطي مؤقتاً للتأكد
   const handleSubmit = async () => {
-    // تنظيف الرقم الرئيسي
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    
-    // ✅ تنظيف الرقم الاحتياطي
-    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
-    
-    // ✅ Debug: اطبع القيم قبل التحقق
-    console.log('📞 === DEBUG SUBMIT ===');
-    console.log('customerPhone RAW:', JSON.stringify(customerPhone));
-    console.log('cleanPhone:', cleanPhone);
-    console.log('cleanPhone length:', cleanPhone.length);
-    console.log('backupPhone RAW:', JSON.stringify(backupPhone));
-    console.log('cleanBackupPhone:', cleanBackupPhone);
-    console.log('cleanBackupPhone length:', cleanBackupPhone.length);
-    console.log('isValid cleanPhone:', /^07[0-9]{9}$/.test(cleanPhone));
-    console.log('isValid cleanBackupPhone:', cleanBackupPhone ? /^07[0-9]{9}$/.test(cleanBackupPhone) : 'empty');
-    
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
     
-    // ✅ التحقق من الرقم الرئيسي
-    if (!isValidPhoneNumber(cleanPhone)) {
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    if (!cleanPhone || cleanPhone.length !== 11 || !cleanPhone.startsWith('07')) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
     
-    // ✅ التحقق من الرقم الاحتياطي (إذا كان موجوداً)
-    if (cleanBackupPhone && !isValidPhoneNumber(cleanBackupPhone)) {
-      toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
-      return;
-    }
+    // ✅ DEBUG: طباعة القيم
+    console.log('========== DEBUG ==========');
+    console.log('customerPhone:', customerPhone);
+    console.log('cleanPhone:', cleanPhone);
+    console.log('backupPhone:', backupPhone);
+    console.log('backupPhone length:', backupPhone?.length);
+    console.log('backupPhone === customerPhone?', backupPhone === customerPhone);
+    console.log('===========================');
+    
+    // ✅ مؤقتاً: تعطيل التحقق من الرقم الاحتياطي تماماً
+    // if (backupPhone && backupPhone.trim() !== '') {
+    //   const cleanBackup = backupPhone.replace(/[^0-9]/g, '');
+    //   if (!cleanBackup || cleanBackup.length !== 11 || !cleanBackup.startsWith('07')) {
+    //     toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
+    //     return;
+    //   }
+    // }
     
     if (!province.trim()) {
       toast.warning('يرجى اختيار المحافظة');
@@ -203,8 +191,11 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    const phoneDetails = cleanBackupPhone
-      ? `${cleanPhone} (احتياطي: ${cleanBackupPhone})`
+    
+    // استخدام الرقم الاحتياطي إذا وجد
+    const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    const phoneDetails = cleanBackup
+      ? `${cleanPhone} (احتياطي: ${cleanBackup})`
       : cleanPhone;
 
     submitOrder.mutate({
@@ -299,10 +290,7 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
-              // ✅ طباعة القيمة المدخلة للتصحيح
-              console.log('✏️ backupPhone input:', v);
               const cleaned = v.replace(/[^0-9]/g, '');
-              console.log('✏️ cleaned backupPhone:', cleaned);
               if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
             keyboardType="phone-pad"
