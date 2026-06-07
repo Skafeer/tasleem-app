@@ -23,6 +23,13 @@ const PROVINCES = [
 // دالة مفتاح السلة
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 
+// ✅ دالة التحقق من رقم الهاتف - نفس الريجيكس تبع الباك إند
+const isValidPhoneNumber = (phone: string): boolean => {
+  if (!phone) return false;
+  // نفس الريجيكس: /^07[0-9]{9}$/
+  return /^07[0-9]{9}$/.test(phone);
+};
+
 export default function CheckoutScreen() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -139,29 +146,40 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ الحل السريع والمباشر
+  // ✅ معالج إرسال الطلب مع تحسين التحقق من الأرقام
   const handleSubmit = async () => {
+    // تنظيف الرقم الرئيسي
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    
+    // ✅ تنظيف الرقم الاحتياطي
+    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    
+    // ✅ Debug: اطبع القيم قبل التحقق
+    console.log('📞 === DEBUG SUBMIT ===');
+    console.log('customerPhone RAW:', JSON.stringify(customerPhone));
+    console.log('cleanPhone:', cleanPhone);
+    console.log('cleanPhone length:', cleanPhone.length);
+    console.log('backupPhone RAW:', JSON.stringify(backupPhone));
+    console.log('cleanBackupPhone:', cleanBackupPhone);
+    console.log('cleanBackupPhone length:', cleanBackupPhone.length);
+    console.log('isValid cleanPhone:', /^07[0-9]{9}$/.test(cleanPhone));
+    console.log('isValid cleanBackupPhone:', cleanBackupPhone ? /^07[0-9]{9}$/.test(cleanBackupPhone) : 'empty');
+    
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
     
-    // تنظيف الرقم الرئيسي
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
+    // ✅ التحقق من الرقم الرئيسي
+    if (!isValidPhoneNumber(cleanPhone)) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
     
-    // ✅ تنظيف الرقم الاحتياطي (نفس طريقة الرقم الرئيسي)
-    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
-    
-    // ✅ فقط إذا كان المستخدم أدخل رقماً في الحقل الاحتياطي، تحقق منه
-    if (cleanBackupPhone) {
-      if (!cleanBackupPhone.startsWith('07') || cleanBackupPhone.length !== 11) {
-        toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
-        return;
-      }
+    // ✅ التحقق من الرقم الاحتياطي (إذا كان موجوداً)
+    if (cleanBackupPhone && !isValidPhoneNumber(cleanBackupPhone)) {
+      toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
+      return;
     }
     
     if (!province.trim()) {
@@ -281,7 +299,10 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
+              // ✅ طباعة القيمة المدخلة للتصحيح
+              console.log('✏️ backupPhone input:', v);
               const cleaned = v.replace(/[^0-9]/g, '');
+              console.log('✏️ cleaned backupPhone:', cleaned);
               if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
             keyboardType="phone-pad"
