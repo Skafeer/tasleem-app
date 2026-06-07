@@ -158,7 +158,7 @@ export default function CheckoutScreen() {
       return;
     }
     
-    // التحقق من الرقم الاحتياطي (اختياري - للتنبيه فقط)
+    // تنظيف الرقم الاحتياطي
     const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
     if (cleanBackup && !isValidPhone(cleanBackup)) {
       toast.warning('رقم الهاتف الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
@@ -187,11 +187,12 @@ export default function CheckoutScreen() {
 
     const fullAddress = `${province} - ${area} - ${address}`;
 
-    // ✅ إرسال الرقم الرئيسي فقط (لا تدمج الرقمين معاً)
+    // ✅ إرسال الرقمين بشكل منفصل
     submitOrder.mutate({
       items,
       customerName,
       customerPhone: cleanPhone,
+      backupPhone: cleanBackup,
       province,
       address: fullAddress,
       notes: notes || '',
