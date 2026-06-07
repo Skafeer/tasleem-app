@@ -192,7 +192,7 @@ export default function CheckoutScreen() {
       items,
       customerName,
       customerPhone: cleanPhone,
-      backupPhone: cleanBackup,
+      backupPhone: cleanBackup || null,
       province,
       address: fullAddress,
       notes: notes || '',
