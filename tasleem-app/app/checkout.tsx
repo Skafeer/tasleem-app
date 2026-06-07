@@ -139,28 +139,29 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ دالة التحقق من رقم الهاتف (نفس القوانين للرقمين)
-  const isValidPhone = (phone: string): boolean => {
-    if (!phone) return false;
-    return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
-  };
-
+  // ✅ الحل السريع والمباشر
   const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
     
-    // ✅ التحقق من الرقم الرئيسي (إجباري)
-    if (!isValidPhone(customerPhone)) {
+    // تنظيف الرقم الرئيسي
+    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
     
-    // ✅ التحقق من الرقم الاحتياطي (اختياري: إذا كان موجوداً وليس فارغاً، تأكد من صحته)
-    if (backupPhone && backupPhone.trim() !== '' && !isValidPhone(backupPhone)) {
-      toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم (أو اتركه فارغاً)');
-      return;
+    // ✅ تنظيف الرقم الاحتياطي (نفس طريقة الرقم الرئيسي)
+    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    
+    // ✅ فقط إذا كان المستخدم أدخل رقماً في الحقل الاحتياطي، تحقق منه
+    if (cleanBackupPhone) {
+      if (!cleanBackupPhone.startsWith('07') || cleanBackupPhone.length !== 11) {
+        toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
+        return;
+      }
     }
     
     if (!province.trim()) {
@@ -184,9 +185,9 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    const phoneDetails = backupPhone && backupPhone.trim() !== ''
-      ? `${customerPhone} (احتياطي: ${backupPhone})`
-      : customerPhone;
+    const phoneDetails = cleanBackupPhone
+      ? `${cleanPhone} (احتياطي: ${cleanBackupPhone})`
+      : cleanPhone;
 
     submitOrder.mutate({
       items,
@@ -265,7 +266,6 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={customerPhone}
             onChangeText={v => {
-              // السماح فقط بالأرقام
               const cleaned = v.replace(/[^0-9]/g, '');
               if (cleaned.length <= 11) setCustomerPhone(cleaned);
             }}
@@ -281,7 +281,6 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
-              // ✅ نفس معالجة الحقل الأول: السماح فقط بالأرقام
               const cleaned = v.replace(/[^0-9]/g, '');
               if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
