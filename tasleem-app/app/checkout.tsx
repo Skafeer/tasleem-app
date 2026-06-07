@@ -38,7 +38,7 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [backupPhone, setBackupPhone] = useState(''); // ✅ تمت إعادة الإضافة
+  const [backupPhone, setBackupPhone] = useState('');
   const [province, setProvince] = useState('');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
@@ -139,7 +139,7 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ التحقق من رقم الهاتف - نفس القوانين لكلا الحقلين
+  // دالة التحقق من رقم الهاتف
   const isValidPhone = (phone: string) => {
     if (!phone) return false;
     return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
@@ -158,7 +158,7 @@ export default function CheckoutScreen() {
       return;
     }
     
-    // ✅ التحقق من الرقم الاحتياطي (اختياري - فقط إذا كان موجوداً)
+    // التحقق من الرقم الاحتياطي (اختياري - للتنبيه فقط)
     const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
     if (cleanBackup && !isValidPhone(cleanBackup)) {
       toast.warning('رقم الهاتف الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
@@ -186,16 +186,12 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    
-    // ✅ بناء رقم الهاتف مع الاحتياطي إذا وجد
-    const phoneDetails = cleanBackup
-      ? `${cleanPhone} (احتياطي: ${cleanBackup})`
-      : cleanPhone;
 
+    // ✅ إرسال الرقم الرئيسي فقط (لا تدمج الرقمين معاً)
     submitOrder.mutate({
       items,
       customerName,
-      customerPhone: phoneDetails,
+      customerPhone: cleanPhone,
       province,
       address: fullAddress,
       notes: notes || '',
@@ -277,7 +273,6 @@ export default function CheckoutScreen() {
             textAlign="right"
           />
 
-          {/* ✅ الحقل الاحتياطي - تمت إعادة إضافته بشكل نظيف */}
           <Text style={s.label}>رقم الهاتف الاحتياطي (اختياري)</Text>
           <TextInput
             style={s.input}
