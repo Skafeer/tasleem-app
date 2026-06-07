@@ -38,7 +38,6 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [backupPhone, setBackupPhone] = useState('');
   const [province, setProvince] = useState('');
   const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
@@ -139,22 +138,18 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // ✅ الحل الجذري والنهائي - لا يوجد أي تحقق على رقم الهاتف الاحتياطي
   const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
     
-    // تنظيف الرقم الرئيسي
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
     
     if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
-    
-    // ✅ لا يوجد أي تحقق من رقم الهاتف الاحتياطي نهائياً
     
     if (!province.trim()) {
       toast.warning('يرجى اختيار المحافظة');
@@ -177,16 +172,11 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    
-    // استخدام الرقم الاحتياطي إذا وجد، وإلا استخدام الرقم الرئيسي فقط
-    const phoneDetails = backupPhone && backupPhone.trim() !== ''
-      ? `${cleanPhone} (احتياطي: ${backupPhone})`
-      : cleanPhone;
 
     submitOrder.mutate({
       items,
       customerName,
-      customerPhone: phoneDetails,
+      customerPhone: cleanPhone,
       province,
       address: fullAddress,
       notes: notes || '',
@@ -263,18 +253,6 @@ export default function CheckoutScreen() {
               const cleaned = v.replace(/[^0-9]/g, '');
               if (cleaned.length <= 11) setCustomerPhone(cleaned);
             }}
-            keyboardType="phone-pad"
-            maxLength={11}
-            textAlign="right"
-          />
-
-          <Text style={s.label}>رقم الهاتف الاحتياطي (اختياري)</Text>
-          <TextInput
-            style={s.input}
-            placeholder="07XXXXXXXXX (اختياري)"
-            placeholderTextColor="#9ca3af"
-            value={backupPhone}
-            onChangeText={setBackupPhone}
             keyboardType="phone-pad"
             maxLength={11}
             textAlign="right"
