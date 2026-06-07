@@ -20,6 +20,28 @@ const PROVINCES = [
   'صلاح الدين', 'المثنى', 'كركوك', 'دهوك', 'أربيل', 'السليمانية'
 ];
 
+// ✅ دالة تطبيع رقم الهاتف (إزالة كل الحروف غير الأرقام + تحويل الأرقام العربية)
+const normalizePhoneNumber = (phone: string): string => {
+  if (!phone) return '';
+  
+  // تحويل الأرقام العربية (٠-٩) إلى إنجليزية (0-9)
+  const arabicNumbers: { [key: string]: string } = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+  };
+  
+  let normalized = phone;
+  // استبدال الأرقام العربية
+  for (const [arabic, english] of Object.entries(arabicNumbers)) {
+    normalized = normalized.replace(new RegExp(arabic, 'g'), english);
+  }
+  
+  // إزالة كل ما ليس رقم
+  normalized = normalized.replace(/[^0-9]/g, '');
+  
+  return normalized;
+};
+
 // دالة مفتاح السلة - نفس الموجودة في cart.tsx
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 
@@ -49,10 +71,8 @@ export default function CheckoutScreen() {
   const [showProvinces, setShowProvinces] = useState(false);
 
   const loadCart = useCallback(async () => {
-    // انتظر حتى يتم تحميل بيانات المستخدم
     if (userLoading) return;
     
-    // إذا لم يكن هناك مفتاح (مستخدم غير مسجل) ارجع للخلف
     if (!CART_KEY) {
       toast.warning('الرجاء تسجيل الدخول أولاً');
       router.back();
@@ -132,7 +152,6 @@ export default function CheckoutScreen() {
     },
     onSuccess: async () => {
       toast.success('تم إرسال الطلب بنجاح! 🎉');
-      // حذف السلة باستخدام المفتاح الصحيح
       if (CART_KEY) {
         await AsyncStorage.removeItem(CART_KEY);
       }
@@ -144,9 +163,9 @@ export default function CheckoutScreen() {
   });
 
   const handleSubmit = async () => {
-    // ✅ تنظيف الأرقام من المسافات والأحرف غير الرقمية
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    const cleanBackupPhone = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
+    // ✅ استخدام دالة التطبيع
+    const cleanPhone = normalizePhoneNumber(customerPhone);
+    const cleanBackupPhone = backupPhone ? normalizePhoneNumber(backupPhone) : '';
     
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
@@ -181,7 +200,6 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    // ✅ استخدام الأرقام المنظفة
     const phoneDetails = cleanBackupPhone 
       ? `${cleanPhone} (احتياطي: ${cleanBackupPhone})` 
       : cleanPhone;
@@ -225,7 +243,6 @@ export default function CheckoutScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header RTL ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -264,9 +281,8 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={customerPhone}
             onChangeText={v => {
-              // تنظيف الإدخال من أي شيء غير أرقام
-              const cleaned = v.replace(/[^0-9]/g, '');
-              if (cleaned.length <= 11) setCustomerPhone(cleaned);
+              const normalized = normalizePhoneNumber(v);
+              if (normalized.length <= 11) setCustomerPhone(normalized);
             }}
             keyboardType="phone-pad"
             maxLength={11}
@@ -280,9 +296,8 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
-              // تنظيف الإدخال من أي شيء غير أرقام
-              const cleaned = v.replace(/[^0-9]/g, '');
-              if (cleaned.length <= 11) setBackupPhone(cleaned);
+              const normalized = normalizePhoneNumber(v);
+              if (normalized.length <= 11) setBackupPhone(normalized);
             }}
             keyboardType="phone-pad"
             maxLength={11}
@@ -410,7 +425,6 @@ export default function CheckoutScreen() {
 
       </ScrollView>
 
-      {/* Footer */}
       <View style={s.footer}>
         <TouchableOpacity
           style={s.submitBtn}
@@ -427,7 +441,6 @@ export default function CheckoutScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal اختيار المحافظة */}
       <Modal visible={showProvinces} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
