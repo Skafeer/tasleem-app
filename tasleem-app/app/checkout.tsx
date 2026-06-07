@@ -20,36 +20,13 @@ const PROVINCES = [
   'صلاح الدين', 'المثنى', 'كركوك', 'دهوك', 'أربيل', 'السليمانية'
 ];
 
-// ✅ دالة تطبيع رقم الهاتف (إزالة كل الحروف غير الأرقام + تحويل الأرقام العربية)
-const normalizePhoneNumber = (phone: string): string => {
-  if (!phone) return '';
-  
-  // تحويل الأرقام العربية (٠-٩) إلى إنجليزية (0-9)
-  const arabicNumbers: { [key: string]: string } = {
-    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
-    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
-  };
-  
-  let normalized = phone;
-  // استبدال الأرقام العربية
-  for (const [arabic, english] of Object.entries(arabicNumbers)) {
-    normalized = normalized.replace(new RegExp(arabic, 'g'), english);
-  }
-  
-  // إزالة كل ما ليس رقم
-  normalized = normalized.replace(/[^0-9]/g, '');
-  
-  return normalized;
-};
-
-// دالة مفتاح السلة - نفس الموجودة في cart.tsx
+// دالة مفتاح السلة
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   
-  // جلب بيانات المستخدم لتحديد مفتاح السلة الصحيح
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
@@ -162,23 +139,30 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
+  // ✅ دالة التحقق من رقم الهاتف (نفس القوانين للرقمين)
+  const isValidPhone = (phone: string): boolean => {
+    if (!phone) return false;
+    return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
+  };
+
   const handleSubmit = async () => {
-    // ✅ استخدام دالة التطبيع
-    const cleanPhone = normalizePhoneNumber(customerPhone);
-    const cleanBackupPhone = backupPhone ? normalizePhoneNumber(backupPhone) : '';
-    
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
-    if (!cleanPhone || !cleanPhone.startsWith('07') || cleanPhone.length !== 11) {
+    
+    // ✅ التحقق من الرقم الرئيسي (إجباري)
+    if (!isValidPhone(customerPhone)) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
-    if (cleanBackupPhone && (!cleanBackupPhone.startsWith('07') || cleanBackupPhone.length !== 11)) {
-      toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
+    
+    // ✅ التحقق من الرقم الاحتياطي (اختياري: إذا كان موجوداً وليس فارغاً، تأكد من صحته)
+    if (backupPhone && backupPhone.trim() !== '' && !isValidPhone(backupPhone)) {
+      toast.warning('رقم الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم (أو اتركه فارغاً)');
       return;
     }
+    
     if (!province.trim()) {
       toast.warning('يرجى اختيار المحافظة');
       return;
@@ -200,9 +184,9 @@ export default function CheckoutScreen() {
     }));
 
     const fullAddress = `${province} - ${area} - ${address}`;
-    const phoneDetails = cleanBackupPhone 
-      ? `${cleanPhone} (احتياطي: ${cleanBackupPhone})` 
-      : cleanPhone;
+    const phoneDetails = backupPhone && backupPhone.trim() !== ''
+      ? `${customerPhone} (احتياطي: ${backupPhone})`
+      : customerPhone;
 
     submitOrder.mutate({
       items,
@@ -281,23 +265,25 @@ export default function CheckoutScreen() {
             placeholderTextColor="#9ca3af"
             value={customerPhone}
             onChangeText={v => {
-              const normalized = normalizePhoneNumber(v);
-              if (normalized.length <= 11) setCustomerPhone(normalized);
+              // السماح فقط بالأرقام
+              const cleaned = v.replace(/[^0-9]/g, '');
+              if (cleaned.length <= 11) setCustomerPhone(cleaned);
             }}
             keyboardType="phone-pad"
             maxLength={11}
             textAlign="right"
           />
 
-          <Text style={s.label}>رقم الهاتف الاحتياطي</Text>
+          <Text style={s.label}>رقم الهاتف الاحتياطي (اختياري)</Text>
           <TextInput
             style={s.input}
             placeholder="07XXXXXXXXX (اختياري)"
             placeholderTextColor="#9ca3af"
             value={backupPhone}
             onChangeText={v => {
-              const normalized = normalizePhoneNumber(v);
-              if (normalized.length <= 11) setBackupPhone(normalized);
+              // ✅ نفس معالجة الحقل الأول: السماح فقط بالأرقام
+              const cleaned = v.replace(/[^0-9]/g, '');
+              if (cleaned.length <= 11) setBackupPhone(cleaned);
             }}
             keyboardType="phone-pad"
             maxLength={11}
