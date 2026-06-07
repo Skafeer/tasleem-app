@@ -167,6 +167,22 @@ export default function OrderDetailsScreen() {
             </View>
           </View>
 
+          {/* ✅ رقم الهاتف الاحتياطي - يظهر فقط إذا كان موجوداً */}
+          {order.backupPhone && (
+            <>
+              <View style={s.separator} />
+              <View style={s.infoRow}>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={s.infoLabel}>الهاتف الاحتياطي</Text>
+                  <Text style={s.infoValue}>{order.backupPhone}</Text>
+                </View>
+                <View style={[s.cardIconBox, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name="call-outline" size={16} color="#f59e0b" />
+                </View>
+              </View>
+            </>
+          )}
+
           <View style={s.separator} />
 
           <View style={s.addressRow}>
@@ -384,6 +400,7 @@ const s = StyleSheet.create({
   infoValue: { fontSize: 14, fontWeight: '600', color: '#374151', textAlign: 'right' },
   separator: { height: 1, backgroundColor: '#e8edf2', marginVertical: 12 },
   addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   // ── Products ──
   productRow: {

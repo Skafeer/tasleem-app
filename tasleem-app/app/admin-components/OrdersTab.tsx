@@ -142,6 +142,7 @@ export default function OrdersTab() {
     setEditForm({
       customerName: o.customerName || '',
       customerPhone: o.customerPhone || '',
+      backupPhone: o.backupPhone || '',
       province: o.province || '',
       address: o.address || '',
       notes: o.notes || '',
@@ -180,7 +181,10 @@ export default function OrdersTab() {
       quantity: Number(i.quantity),
       price: Number(i.price),
     }));
-    updateOrder.mutate({ id: editOrder.id, data: { ...editForm, items } });
+    const updateData: any = { ...editForm, items };
+    // إذا كان backupPhone فارغاً، احذفه من الكائن المرسل (أو اتركه)
+    if (!updateData.backupPhone) delete updateData.backupPhone;
+    updateOrder.mutate({ id: editOrder.id, data: updateData });
   };
 
   const filtered = orders;
@@ -336,6 +340,15 @@ export default function OrdersTab() {
                     </TouchableOpacity>
                     <Text style={s.infoSub}>{o.customerPhone}</Text>
                   </View>
+                  {/* ✅ رقم الهاتف الاحتياطي */}
+                  {o.backupPhone && (
+                    <View style={s.infoLine}>
+                      <TouchableOpacity style={s.copyBtn} onPress={() => copy(o.backupPhone, 'رقم الاحتياطي')}>
+                        <Ionicons name="copy-outline" size={13} color={PRIMARY} />
+                      </TouchableOpacity>
+                      <Text style={s.infoSub}>احتياطي: {o.backupPhone}</Text>
+                    </View>
+                  )}
                   {(o.province || o.address) && (
                     <View style={s.infoLine}>
                       <TouchableOpacity
@@ -529,6 +542,18 @@ export default function OrdersTab() {
                   value={editForm.customerPhone}
                   onChangeText={v => setEditForm((p: any) => ({ ...p, customerPhone: v }))}
                   placeholder="رقم الهاتف"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                  textAlign="right"
+                />
+
+                {/* ✅ رقم الهاتف الاحتياطي (اختياري) */}
+                <Text style={s.inputLabel}>رقم الهاتف الاحتياطي (اختياري)</Text>
+                <TextInput
+                  style={s.input}
+                  value={editForm.backupPhone || ''}
+                  onChangeText={v => setEditForm((p: any) => ({ ...p, backupPhone: v }))}
+                  placeholder="07XXXXXXXXX (اختياري)"
                   placeholderTextColor="#9ca3af"
                   keyboardType="phone-pad"
                   textAlign="right"
