@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -51,9 +50,12 @@ export default function ProductDetailScreen() {
     },
   });
 
+  // ✅ الحصول على الصور بالترتيب الصحيح
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
-    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
+    // ✅ إذا كانت الصور معكوسة، استخدم reverse() لتصحيح الترتيب
+    const ordered = imgs.reverse();
+    return ordered.length > 0 ? ordered : (p.imageUrl ? [p.imageUrl] : []);
   };
 
   const getAdLinks = (p: any) => {
@@ -115,7 +117,6 @@ export default function ProductDetailScreen() {
     Clipboard.setString(String(product.id));
     toast.success('تم نسخ ID المنتج ✅');
   };
-
 
   // ✅ حفظ صورة واحدة للمعرض
   const saveImage = async (url: string) => {
@@ -190,6 +191,12 @@ export default function ProductDetailScreen() {
   const adLinks = getAdLinks(product);
   const sliderHeight = Math.min(width, 420);
 
+  // ✅ عند تغيير الصفحة، يتم تحديث activeImg
+  const onScrollEnd = (e: any) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
+    setActiveImg(index);
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
@@ -214,9 +221,7 @@ export default function ProductDetailScreen() {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(_, i) => String(i)}
             getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-            onMomentumScrollEnd={e => {
-              setActiveImg(Math.round(e.nativeEvent.contentOffset.x / width));
-            }}
+            onMomentumScrollEnd={onScrollEnd}
             renderItem={({ item }) => (
               <Image source={{ uri: item }} style={{ width, height: sliderHeight }} resizeMode="cover" />
             )}
