@@ -50,12 +50,10 @@ export default function ProductDetailScreen() {
     },
   });
 
-  // ✅ الحصول على الصور بالترتيب المعكوس (الأخيرة أولاً)
+  // ✅ الحصول على الصور بالترتيب الأصلي من قاعدة البيانات
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
-    // عكس المصفوفة: الصورة التي كانت أخيرة تصبح أولى
-    const reversed = [...imgs].reverse();
-    return reversed.length > 0 ? reversed : (p.imageUrl ? [p.imageUrl] : []);
+    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
   };
 
   const getAdLinks = (p: any) => {
@@ -88,10 +86,11 @@ export default function ProductDetailScreen() {
         cart[existing].quantity += Number(quantity);
         cart[existing].sellingPrice = Number(sellingPrice);
       } else {
+        const originalImages = getImages(product);
         cart.push({
           productId: product.id,
           name: product.name,
-          imageUrl: getImages(product)[0] || '',
+          imageUrl: originalImages[0] || '',
           wholesalePrice: discountedPrice,
           sellingPrice: Number(sellingPrice),
           quantity: Number(quantity),
@@ -119,7 +118,7 @@ export default function ProductDetailScreen() {
   };
 
   // ✅ حفظ صورة واحدة للمعرض
-  const saveImage = async (url: string, index: number) => {
+  const saveImage = async (url: string) => {
     setShowDownload(false);
     setSaving(true);
     try {
@@ -129,7 +128,7 @@ export default function ProductDetailScreen() {
         return;
       }
       const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
-      const filename = `tasleem_${Date.now()}_${index}.${ext}`;
+      const filename = `tasleem_${Date.now()}.${ext}`;
       const tempUri  = FileSystem.cacheDirectory + filename;
       await FileSystem.downloadAsync(url, tempUri);
       await MediaLibrary.saveToLibraryAsync(tempUri);
@@ -151,11 +150,11 @@ export default function ProductDetailScreen() {
         toast.error('يجب منح صلاحية الوصول للمعرض');
         return;
       }
-      const imgs = product ? getImages(product) : [];
+      const originalImages = getImages(product);
       const base = Date.now();
       let saved = 0;
-      for (let i = 0; i < imgs.length; i++) {
-        const url      = imgs[i];
+      for (let i = 0; i < originalImages.length; i++) {
+        const url      = originalImages[i];
         const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
         const filename = `tasleem_${base}_${i}.${ext}`;
         const tempUri  = FileSystem.cacheDirectory + filename;
@@ -187,11 +186,15 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const images = getImages(product);
+  // ✅ للحصول على الصور الأصلية من قاعدة البيانات
+  const originalImages = getImages(product);
+  // ✅ للعرض فقط: عكس الترتيب (الأخيرة تصبح أولى)
+  const displayImages = [...originalImages].reverse();
+  
   const adLinks = getAdLinks(product);
   const sliderHeight = Math.min(width, 420);
 
-  // ✅ عند تغيير الصفحة، يتم تحديث activeImg
+  // ✅ عند تغيير الصفحة، يتم تحديث activeImg بناءً على المصفوفة المعروضة
   const onScrollEnd = (e: any) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
     setActiveImg(index);
@@ -215,7 +218,7 @@ export default function ProductDetailScreen() {
         <View style={[s.sliderBox, { height: sliderHeight }]}>
           <FlatList
             ref={flatRef}
-            data={images}
+            data={displayImages}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -236,9 +239,9 @@ export default function ProductDetailScreen() {
             }
           </TouchableOpacity>
 
-          {images.length > 1 && (
+          {displayImages.length > 1 && (
             <View style={s.dots}>
-              {images.map((_: any, i: number) => (
+              {displayImages.map((_: any, i: number) => (
                 <TouchableOpacity
                   key={i}
                   style={[s.dot, i === activeImg && s.dotActive]}
@@ -267,7 +270,7 @@ export default function ProductDetailScreen() {
 
           <View style={s.imgCounter}>
             <Ionicons name="images-outline" size={12} color="#fff" />
-            <Text style={s.imgCounterText}>{activeImg + 1}/{images.length}</Text>
+            <Text style={s.imgCounterText}>{activeImg + 1}/{displayImages.length}</Text>
           </View>
         </View>
 
@@ -467,25 +470,29 @@ export default function ProductDetailScreen() {
               </View>
               <View>
                 <Text style={s.dlTitle}>حفظ الصور</Text>
-                <Text style={s.dlSub}>{images?.length ?? 0} صورة متاحة</Text>
+                <Text style={s.dlSub}>{originalImages?.length ?? 0} صورة متاحة</Text>
               </View>
             </View>
 
-            {/* خيار ١ */}
+            {/* خيار ١ - حفظ الصورة المعروضة حالياً */}
             <TouchableOpacity
               style={s.dlOption}
-              onPress={() => saveImage(images[activeImg], activeImg)}>
+              onPress={() => {
+                // الحصول على الصورة الأصلية المقابلة للصورة المعروضة
+                const originalIndex = originalImages.length - 1 - activeImg;
+                saveImage(originalImages[originalIndex]);
+              }}>
               <View style={[s.dlOptIcon, { backgroundColor: PRIMARY + '12' }]}>
                 <Ionicons name="image-outline" size={20} color={PRIMARY} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.dlOptTitle}>حفظ هذه الصورة</Text>
-                <Text style={s.dlOptSub}>الصورة {activeImg + 1} من {images?.length ?? 0}</Text>
+                <Text style={s.dlOptSub}>الصورة {activeImg + 1} من {displayImages?.length ?? 0}</Text>
               </View>
               <Ionicons name="chevron-back" size={18} color="#9ca3af" />
             </TouchableOpacity>
 
-            {/* خيار ٢ */}
+            {/* خيار ٢ - حفظ جميع الصور */}
             <TouchableOpacity
               style={[s.dlOption, { borderBottomWidth: 0 }]}
               onPress={saveAllImages}>
@@ -494,7 +501,7 @@ export default function ProductDetailScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.dlOptTitle}>حفظ جميع الصور</Text>
-                <Text style={s.dlOptSub}>{images?.length ?? 0} صورة دفعة واحدة</Text>
+                <Text style={s.dlOptSub}>{originalImages?.length ?? 0} صورة دفعة واحدة</Text>
               </View>
               <Ionicons name="chevron-back" size={18} color="#9ca3af" />
             </TouchableOpacity>
