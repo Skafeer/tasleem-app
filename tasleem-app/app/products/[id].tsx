@@ -50,12 +50,12 @@ export default function ProductDetailScreen() {
     },
   });
 
-  // ✅ الحصول على الصور بالترتيب الصحيح
+  // ✅ الحصول على الصور بالترتيب المعكوس (الأخيرة أولاً)
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
-    // ✅ إذا كانت الصور معكوسة، استخدم reverse() لتصحيح الترتيب
-    const ordered = imgs.reverse();
-    return ordered.length > 0 ? ordered : (p.imageUrl ? [p.imageUrl] : []);
+    // عكس المصفوفة: الصورة التي كانت أخيرة تصبح أولى
+    const reversed = [...imgs].reverse();
+    return reversed.length > 0 ? reversed : (p.imageUrl ? [p.imageUrl] : []);
   };
 
   const getAdLinks = (p: any) => {
@@ -119,7 +119,7 @@ export default function ProductDetailScreen() {
   };
 
   // ✅ حفظ صورة واحدة للمعرض
-  const saveImage = async (url: string) => {
+  const saveImage = async (url: string, index: number) => {
     setShowDownload(false);
     setSaving(true);
     try {
@@ -129,7 +129,7 @@ export default function ProductDetailScreen() {
         return;
       }
       const ext      = url.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
-      const filename = `tasleem_${Date.now()}.${ext}`;
+      const filename = `tasleem_${Date.now()}_${index}.${ext}`;
       const tempUri  = FileSystem.cacheDirectory + filename;
       await FileSystem.downloadAsync(url, tempUri);
       await MediaLibrary.saveToLibraryAsync(tempUri);
@@ -474,7 +474,7 @@ export default function ProductDetailScreen() {
             {/* خيار ١ */}
             <TouchableOpacity
               style={s.dlOption}
-              onPress={() => saveImage(images[activeImg])}>
+              onPress={() => saveImage(images[activeImg], activeImg)}>
               <View style={[s.dlOptIcon, { backgroundColor: PRIMARY + '12' }]}>
                 <Ionicons name="image-outline" size={20} color={PRIMARY} />
               </View>
