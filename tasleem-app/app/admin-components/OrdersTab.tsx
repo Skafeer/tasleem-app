@@ -43,7 +43,9 @@ const getFirstImage = (product: any) => {
 
 export default function OrdersTab() {
   const qc = useQueryClient();
+  // ✅ state للبحث المؤقت (يتغير مع كل حرف)
   const [searchTerm, setSearchTerm] = useState('');
+  // ✅ state للبحث بعد debounce (يستخدم في الاستعلام)
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -51,7 +53,7 @@ export default function OrdersTab() {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
 
-  // ✅ Debounce
+  // ✅ تطبيق debounce: لا نرسل طلب البحث إلا بعد 500ms من توقف الكتابة
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -59,6 +61,7 @@ export default function OrdersTab() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // ✅ استعلام الطلبات مع debouncedSearch
   const {
     data: ordersData,
     isLoading,
@@ -194,6 +197,19 @@ export default function OrdersTab() {
     updateOrder.mutate({ id: editOrder.id, data: updateData });
   };
 
+  // ✅ عند تغيير الفلتر، إعادة تعيين البحث
+  const handleFilterChange = (key: string) => {
+    setFilter(key);
+    setSearchTerm(''); // مسح حقل البحث
+    // debouncedSearch سيتم تحديثه تلقائياً عبر useEffect
+  };
+
+  // ✅ عند مسح البحث
+  const clearSearch = () => {
+    setSearchTerm('');
+    // debouncedSearch سيتم تحديثه تلقائياً عبر useEffect
+  };
+
   const filtered = orders;
 
   const counts: Record<string, number> = {};
@@ -226,7 +242,7 @@ export default function OrdersTab() {
             textAlign="right"
           />
           {searchTerm ? (
-            <TouchableOpacity onPress={() => setSearchTerm('')}>
+            <TouchableOpacity onPress={clearSearch}>
               <Ionicons name="close-circle" size={17} color="#9ca3af" />
             </TouchableOpacity>
           ) : null}
@@ -236,7 +252,7 @@ export default function OrdersTab() {
             <TouchableOpacity
               key={f.key}
               style={[s.chip, filter === f.key && s.chipActive]}
-              onPress={() => setFilter(f.key)}>
+              onPress={() => handleFilterChange(f.key)}>
               <Text style={[s.chipTxt, filter === f.key && s.chipTxtActive]}>{f.label}</Text>
               {f.key !== 'all' && counts[f.key] > 0 && (
                 <View style={[s.chipBadge, filter === f.key && s.chipBadgeActive]}>
