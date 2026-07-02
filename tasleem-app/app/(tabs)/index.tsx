@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useScrollToTop } from '@react-navigation/native';
 import api from '../../src/lib/api';
 import BannerSlider from '../admin-components/BannerSlider';
 
@@ -174,6 +175,11 @@ export default function HomeScreen() {
     sortBy: 'newest',
   });
 
+  // ✅ Ref للـ FlatList الرئيسي
+  const flatListRef = useRef<FlatList>(null);
+  // ✅ استخدام useScrollToTop للتمرير إلى الأعلى عند الضغط على التاب
+  useScrollToTop(flatListRef);
+
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['active-categories'],
     queryFn: async () => {
@@ -232,7 +238,6 @@ export default function HomeScreen() {
   });
 
   const unreadCount = (allNotifications as any[]).filter((n: any) => !n.is_read).length;
-  // ✅ لا useFocusEffect هنا — يمنع مسح التحديثات عند العودة من صفحة الإشعارات
 
   const fetchCartCount = useCallback(async () => {
     try {
@@ -491,6 +496,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <FlatList
+            ref={flatListRef}
             data={filtered}
             numColumns={2}
             keyExtractor={(item, index) => (item as any).id?.toString() || index.toString()}
