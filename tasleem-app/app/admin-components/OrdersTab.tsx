@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, FlatList, Image,
@@ -14,7 +14,7 @@ const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
-// ✅ حالات الطلب الجديدة (تم حذف pending و preparing)
+// ✅ حالات الطلب الجديدة
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
   shipping: { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
@@ -24,7 +24,7 @@ const STATUS: Record<string, { label: string; color: string; bg: string; icon: a
   postponed: { label: 'مؤجل', color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
 };
 
-// ✅ الفلاتر الجديدة (تم حذف pending و preparing)
+// ✅ الفلاتر
 const FILTERS = [
   { key: 'all', label: 'الكل' },
   { key: 'processing', label: 'معالجة' },
@@ -43,12 +43,21 @@ const getFirstImage = (product: any) => {
 
 export default function OrdersTab() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dropdownId, setDropdownId] = useState<number | null>(null);
   const [editOrder, setEditOrder] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+
+  // ✅ Debounce
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   const {
     data: ordersData,
@@ -57,13 +66,13 @@ export default function OrdersTab() {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: ['admin-orders', filter, search],
+    queryKey: ['admin-orders', filter, debouncedSearch],
     queryFn: async ({ pageParam = 1 }) => {
       const params = new URLSearchParams({
         page: String(pageParam),
         limit: '20',
         ...(filter !== 'all' && { status: filter }),
-        ...(search && { search }),
+        ...(debouncedSearch && { search: debouncedSearch }),
       });
       const { data } = await api.get(`/api/orders?${params}`);
       return data;
@@ -129,7 +138,6 @@ export default function OrdersTab() {
     toast.success(`تم نسخ ${label}`);
   };
 
-  // ✅ دالة formatDate المصححة
   const formatDate = (d: string) => {
     if (!d) return '';
     const dt = new Date(d);
@@ -182,7 +190,6 @@ export default function OrdersTab() {
       price: Number(i.price),
     }));
     const updateData: any = { ...editForm, items };
-    // إذا كان backupPhone فارغاً، احذفه من الكائن المرسل (أو اتركه)
     if (!updateData.backupPhone) delete updateData.backupPhone;
     updateOrder.mutate({ id: editOrder.id, data: updateData });
   };
@@ -213,13 +220,13 @@ export default function OrdersTab() {
           <TextInput
             style={s.searchInput}
             placeholder="ابحث برقم الطلب أو اسم الزبون..."
-            value={search}
-            onChangeText={setSearch}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
             placeholderTextColor="#9ca3af"
             textAlign="right"
           />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
+          {searchTerm ? (
+            <TouchableOpacity onPress={() => setSearchTerm('')}>
               <Ionicons name="close-circle" size={17} color="#9ca3af" />
             </TouchableOpacity>
           ) : null}
@@ -340,7 +347,6 @@ export default function OrdersTab() {
                     </TouchableOpacity>
                     <Text style={s.infoSub}>{o.customerPhone}</Text>
                   </View>
-                  {/* ✅ رقم الهاتف الاحتياطي */}
                   {o.backupPhone && (
                     <View style={s.infoLine}>
                       <TouchableOpacity style={s.copyBtn} onPress={() => copy(o.backupPhone, 'رقم الاحتياطي')}>
@@ -547,7 +553,6 @@ export default function OrdersTab() {
                   textAlign="right"
                 />
 
-                {/* ✅ رقم الهاتف الاحتياطي (اختياري) */}
                 <Text style={s.inputLabel}>رقم الهاتف الاحتياطي (اختياري)</Text>
                 <TextInput
                   style={s.input}

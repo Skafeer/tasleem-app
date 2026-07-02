@@ -16,7 +16,7 @@ import api from '../src/lib/api';
 const TARIQ_IMG = require('../assets/tariq.png');
 
 const PRIMARY     = '#0c6679';
-const ACCENT      = '#f5a006'; // برتقالي تسليم
+const ACCENT      = '#f5a006';
 const PRIMARY2    = '#0e7d96';
 const BG          = '#f0f4f8';
 const STORAGE_KEY = 'tariq_messages_v2';
