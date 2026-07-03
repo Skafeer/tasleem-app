@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, FlatList, Alert, KeyboardAvoidingView, Platform, Image, Switch } from 'react-native';
+import { 
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
+  Modal, TextInput, ActivityIndicator, FlatList, Alert, 
+  KeyboardAvoidingView, Platform, Image, Switch 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +26,8 @@ export default function ProductsTab() {
   const [form, setForm] = useState({
     name: '', description: '', categories: [] as string[],
     companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-    stock: '', discount: '', adLinks: '', images: [] as string[],
+    stock: '', discount: '', adLinks: [] as string[], // ✅ تغيير من string إلى array
+    images: [] as string[],
     isActive: true,
     isRenewable: false
   });
@@ -118,11 +123,16 @@ export default function ProductsTab() {
 
   const saveProduct = useMutation({
     mutationFn: async (data: any) => {
+      // ✅ تحويل مصفوفة الروابط إلى string مفصولة بفواصل لتخزينها في قاعدة البيانات
+      const payload = {
+        ...data,
+        adLinks: data.adLinks.join(','), 
+      };
       if (editingProduct) {
-        const res = await api.put(`/api/products/${editingProduct.id}`, data);
+        const res = await api.put(`/api/products/${editingProduct.id}`, payload);
         return res.data;
       } else {
-        const res = await api.post('/api/products', data);
+        const res = await api.post('/api/products', payload);
         return res.data;
       }
     },
@@ -181,7 +191,7 @@ export default function ProductsTab() {
       sellingPriceMin: minPrice,
       stock: Number(form.stock),
       discount: Number(form.discount) || 0,
-      adLinks: form.adLinks,
+      adLinks: form.adLinks, // ✅ سيتم تحويله إلى string في mutate
       images: form.images.join(','),
       isActive: form.isActive,
       isRenewable: form.isRenewable,
@@ -192,13 +202,16 @@ export default function ProductsTab() {
     setForm({
       name: '', description: '', categories: [],
       companyWholesalePrice: '', wholesalePrice: '', suggestedPrice: '', sellingPriceMin: '',
-      stock: '', discount: '', adLinks: '', images: [], isActive: true, isRenewable: false
+      stock: '', discount: '', adLinks: [], // ✅ reset to array
+      images: [], isActive: true, isRenewable: false
     });
     setEditingProduct(null);
   };
 
   const openEdit = (p: any) => {
     setEditingProduct(p);
+    // ✅ تحويل adLinks من string إلى array
+    const adLinksArray = p.adLinks ? p.adLinks.split(',').filter(Boolean).map((link: string) => link.trim()) : [];
     setForm({
       name: p.name,
       description: p.description || '',
@@ -209,12 +222,41 @@ export default function ProductsTab() {
       sellingPriceMin: String(p.sellingPriceMin),
       stock: String(p.stock),
       discount: String(p.discount || 0),
-      adLinks: p.adLinks || '',
+      adLinks: adLinksArray,
       images: p.images ? p.images.split(',').filter(Boolean) : [],
       isActive: p.isActive !== false,
       isRenewable: !!p.isRenewable,
     });
     setShowModal(true);
+  };
+
+  // ✅ إضافة رابط جديد
+  const addAdLink = () => {
+    if (form.adLinks.length >= 10) {
+      toast.warning('الحد الأقصى 10 روابط');
+      return;
+    }
+    setForm(prev => ({
+      ...prev,
+      adLinks: [...prev.adLinks, '']
+    }));
+  };
+
+  // ✅ تحديث رابط معين
+  const updateAdLink = (index: number, value: string) => {
+    const newLinks = [...form.adLinks];
+    newLinks[index] = value;
+    setForm(prev => ({ ...prev, adLinks: newLinks }));
+  };
+
+  // ✅ حذف رابط معين
+  const removeAdLink = (index: number) => {
+    if (form.adLinks.length <= 1) {
+      toast.warning('يجب أن يكون هناك رابط واحد على الأقل');
+      return;
+    }
+    const newLinks = form.adLinks.filter((_, i) => i !== index);
+    setForm(prev => ({ ...prev, adLinks: newLinks }));
   };
 
   return (
@@ -365,10 +407,12 @@ export default function ProductsTab() {
 
       {/* Modal إضافة/تعديل المنتج */}
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: '#fff' }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}>
+            
             <View style={s.modalHeader}>
               <TouchableOpacity onPress={() => {
                 setShowModal(false);
@@ -523,16 +567,38 @@ export default function ProductsTab() {
                 placeholderTextColor="#9ca3af"
               />
 
-              <Text style={s.inputLabel}>روابط إعلانية</Text>
-              <TextInput
-                style={[s.input, s.textareaSmall]}
-                placeholder="https://link1.com,https://link2.com"
-                value={form.adLinks}
-                onChangeText={v => setForm(p => ({ ...p, adLinks: v }))}
-                multiline
-                textAlign="right"
-                placeholderTextColor="#9ca3af"
-              />
+              {/* ✅ قسم الروابط الإعلانية الجديد */}
+              <Text style={s.inputLabel}>الروابط الإعلانية ({form.adLinks.length}/10)</Text>
+              
+              {form.adLinks.map((link, index) => (
+                <View key={index} style={s.adLinkRow}>
+                  <TextInput
+                    style={[s.input, s.adLinkInput]}
+                    placeholder={`رابط ${index + 1}`}
+                    value={link}
+                    onChangeText={(text) => updateAdLink(index, text)}
+                    textAlign="right"
+                    placeholderTextColor="#9ca3af"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={s.removeAdLinkBtn}
+                    onPress={() => removeAdLink(index)}>
+                    <Ionicons name="close-circle" size={24} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              
+              <TouchableOpacity
+                style={[s.addAdLinkBtn, form.adLinks.length >= 10 && s.addAdLinkBtnDisabled]}
+                onPress={addAdLink}
+                disabled={form.adLinks.length >= 10}>
+                <Ionicons name="add-circle-outline" size={20} color={form.adLinks.length >= 10 ? '#9ca3af' : PRIMARY} />
+                <Text style={[s.addAdLinkBtnText, form.adLinks.length >= 10 && s.addAdLinkBtnTextDisabled]}>
+                  إضافة رابط جديد
+                </Text>
+              </TouchableOpacity>
 
               <Text style={s.inputLabel}>صور ({form.images.length}/10) — اضغط على الصورة لتعيينها رئيسية</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -581,8 +647,8 @@ export default function ProductsTab() {
                 )}
               </TouchableOpacity>
             </ScrollView>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -741,6 +807,45 @@ const s = StyleSheet.create({
   categoryChipActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
   categoryChipText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
   categoryChipTextActive: { color: PRIMARY },
+
+  // ✅ أنماط الروابط الإعلانية
+  adLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  adLinkInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  removeAdLinkBtn: {
+    padding: 4,
+  },
+  addAdLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  addAdLinkBtnDisabled: {
+    opacity: 0.5,
+  },
+  addAdLinkBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: PRIMARY,
+  },
+  addAdLinkBtnTextDisabled: {
+    color: '#9ca3af',
+  },
 
   imgPreview: { width: 90, height: 90, borderRadius: 14, marginRight: 10, position: 'relative' },
   imgPreviewImg: { width: '100%', height: '100%', borderRadius: 14 },
