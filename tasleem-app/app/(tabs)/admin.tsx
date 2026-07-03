@@ -50,7 +50,7 @@ function HamburgerButton() {
   return (
     <TouchableOpacity
       style={styles.hamburgerBtn}
-      onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+      onPress={() => navigation.dispatch(DrawerActions.openDrawer())} // ✅ يعمل الآن
     >
       <Ionicons name="menu-outline" size={24} color="#111827" />
     </TouchableOpacity>

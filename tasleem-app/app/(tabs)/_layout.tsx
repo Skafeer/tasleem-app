@@ -44,9 +44,6 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
-      {/* الترتيب الجديد: من اليمين إلى اليسار */}
-      
-      {/* 1. الرئيسية (كانت آخر واحدة) */}
       <Tabs.Screen name="index" options={{
         title: 'الرئيسية',
         tabBarIcon: ({ color, focused }) => (
@@ -54,7 +51,6 @@ export default function TabsLayout() {
         ),
       }} />
       
-      {/* 2. طلباتي (كانت الرابعة) */}
       <Tabs.Screen name="orders" options={{
         title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
@@ -62,16 +58,14 @@ export default function TabsLayout() {
         ),
       }} />
       
-      {/* 3. الإدارة (كانت الثالثة) */}
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
         tabBarIcon: ({ color, focused }) => (
           <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
         ),
-        href: isAdmin ? '/(tabs)/admin' : null,
+        href: isAdmin ? undefined : null, // ✅ إخفاء التبويب إذا لم يكن أدمن
       }} />
       
-      {/* 4. المحفظة (كانت الثانية) */}
       <Tabs.Screen name="wallet" options={{
         title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
@@ -79,7 +73,6 @@ export default function TabsLayout() {
         ),
       }} />
       
-      {/* 5. حسابي (كان الأول) */}
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
