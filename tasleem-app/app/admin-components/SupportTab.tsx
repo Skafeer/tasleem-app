@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
-  Alert, Clipboard, Image, RefreshControl, Animated,
+  Alert, Clipboard, Image, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,8 +13,6 @@ import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
-const ADMIN_BUBBLE = '#10b981'; // ✅ أخضر للأدمن
-const USER_BUBBLE = '#ffffff';   // ✅ أبيض للمستخدم
 
 const formatTime = (date: string) => {
   const d = date.endsWith('Z') || date.includes('+') ? date : date + 'Z';
@@ -28,29 +26,10 @@ const formatDate = (date: string) => {
 
 type SortType = 'recent' | 'unread' | 'most';
 
-// ── مكوّن رسالة واحدة مع أنيميشن خفيف ──
+// مكوّن رسالة واحدة - RTL صحيح
 const ChatBubble = ({ item, nextItem, onLongPress, index }: any) => {
   const isAdmin = item.from_admin;
   const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(10)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        delay: index * 30,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 250,
-        delay: index * 30,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   return (
     <>
@@ -59,13 +38,7 @@ const ChatBubble = ({ item, nextItem, onLongPress, index }: any) => {
           <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
         </View>
       )}
-      <Animated.View
-        style={[
-          s.messageRow,
-          isAdmin ? s.messageRowAdmin : s.messageRowUser,
-          { opacity: fadeAnim, transform: [{ translateY }] },
-        ]}
-      >
+      <View style={[s.messageRow, isAdmin ? s.messageRowAdmin : s.messageRowUser]}>
         {!isAdmin && (
           <View style={s.userAvatar}>
             <Ionicons name="person" size={14} color="#fff" />
@@ -74,8 +47,7 @@ const ChatBubble = ({ item, nextItem, onLongPress, index }: any) => {
         <TouchableOpacity
           style={s.bubbleWrap}
           onLongPress={() => item.message && onLongPress(item.message)}
-          activeOpacity={0.85}
-        >
+          activeOpacity={0.85}>
           <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
             {item.image_url && (
               <Image source={{ uri: item.image_url }} style={s.messageImage} resizeMode="cover" />
@@ -90,7 +62,7 @@ const ChatBubble = ({ item, nextItem, onLongPress, index }: any) => {
             </Text>
           </View>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     </>
   );
 };
@@ -105,6 +77,7 @@ export default function SupportTab() {
   const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // مراقبة عدد الرسائل غير المقروءة
   const prevUnreadCount = useRef<number>(0);
 
   const { data: conversations = [], isLoading, refetch } = useQuery({
@@ -118,6 +91,7 @@ export default function SupportTab() {
 
   const convList = conversations as any[];
 
+  // إشعار بالرسائل الجديدة
   useEffect(() => {
     if (!convList.length) return;
     const totalUnread = convList.reduce((sum: number, c: any) => sum + (c.unread || 0), 0);
@@ -127,6 +101,16 @@ export default function SupportTab() {
     }
     prevUnreadCount.current = totalUnread;
   }, [convList]);
+
+  // عند اختيار مستخدم، التمرير إلى أحدث رسالة (نهاية المحادثة)
+  useEffect(() => {
+    if (selectedUser && flatListRef.current) {
+      // ننتظر قليلاً حتى يتم تحميل البيانات
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 200);
+    }
+  }, [selectedUser]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -141,6 +125,7 @@ export default function SupportTab() {
     onSuccess: () => {
       setReply('');
       qc.invalidateQueries({ queryKey: ['admin-support'] });
+      // التمرير إلى أسفل بعد إرسال الرد
       setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 100);
     },
     onError: () => toast.error('فشل إرسال الرد'),
@@ -259,6 +244,7 @@ export default function SupportTab() {
   if (!selectedUser) {
     return (
       <SafeAreaView style={s.container} edges={['bottom']}>
+        {/* شريط البحث */}
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
@@ -276,6 +262,7 @@ export default function SupportTab() {
           ) : null}
         </View>
 
+        {/* أزرار الترتيب */}
         <View style={s.sortRow}>
           {([['recent', 'الأحدث'], ['unread', 'غير مقروء'], ['most', 'الأكثر']] as [SortType, string][]).map(([key, label]) => (
             <TouchableOpacity
@@ -345,6 +332,7 @@ export default function SupportTab() {
   }
 
   // ── نافذة المحادثة (RTL صحيح) ──
+  // يتم عكس المصفوفة لعرض الأحدث أولاً (بسبب inverted)
   const msgs = [...(selectedUser.messages || [])].reverse();
 
   return (
@@ -397,7 +385,7 @@ export default function SupportTab() {
           )}
         />
 
-        {/* شريط الإدخال */}
+        {/* شريط الإدخال - RTL صحيح */}
         <View style={s.inputRow}>
           <TouchableOpacity
             style={[s.sendBtn, (!reply.trim() || sendReply.isPending) && s.sendBtnOff]}
@@ -440,7 +428,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 15, color: '#9ca3af' },
   listContent: { paddingBottom: 20 },
 
-  // ── البحث ──
+  // شريط البحث
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -457,6 +445,7 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
 
+  // أزرار الترتيب
   sortRow: {
     flexDirection: 'row',
     gap: 8,
@@ -475,7 +464,7 @@ const s = StyleSheet.create({
   sortText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
   sortTextActive: { color: '#fff' },
 
-  // ── بطاقة المحادثة ──
+  // بطاقة المحادثة
   convCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -519,7 +508,7 @@ const s = StyleSheet.create({
   convLastMsg: { fontSize: 13, color: '#6b7280', textAlign: 'right' },
   convLastMsgBold: { color: '#111827', fontWeight: '600' },
 
-  // ── هيدر المحادثة ──
+  // هيدر المحادثة
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,7 +542,6 @@ const s = StyleSheet.create({
   },
   unblockBtn: { backgroundColor: '#ecfdf5' },
 
-  // ── قائمة الرسائل ──
   messagesList: { paddingHorizontal: 12, paddingVertical: 8 },
   emptyChat: {
     flex: 1,
@@ -563,7 +551,7 @@ const s = StyleSheet.create({
     transform: [{ scaleY: -1 }],
   },
 
-  // ── فقاعات المحادثة (RTL) ──
+  // فقاعات المحادثة - RTL صحيح
   messageRow: { flexDirection: 'row', marginBottom: 3, alignItems: 'flex-end', gap: 6 },
   messageRowAdmin: { justifyContent: 'flex-start' },
   messageRowUser: { justifyContent: 'flex-end' },
@@ -580,9 +568,9 @@ const s = StyleSheet.create({
 
   bubbleWrap: { maxWidth: '78%' },
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 3 },
-  // ✅ تغيير الألوان: الأدمن أخضر، المستخدم أبيض
+  // ✅ ألوان جديدة: رسائل الأدمن باللون الأساسي، رسائل المستخدم باللون الأبيض
   bubbleAdmin: {
-    backgroundColor: ADMIN_BUBBLE,
+    backgroundColor: PRIMARY,  // #0c6679
     borderBottomLeftRadius: 4,
     shadowColor: '#000',
     shadowOpacity: 0.04,
@@ -590,7 +578,7 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   bubbleUser: {
-    backgroundColor: USER_BUBBLE,
+    backgroundColor: '#ffffff',
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#e8edf2',
@@ -598,7 +586,7 @@ const s = StyleSheet.create({
 
   messageImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
   bubbleText: { fontSize: 15, lineHeight: 22 },
-  bubbleTextAdmin: { color: '#fff', textAlign: 'left' },
+  bubbleTextAdmin: { color: '#ffffff', textAlign: 'left' },
   bubbleTextUser: { color: '#111827', textAlign: 'right' },
 
   bubbleTime: { fontSize: 10 },
@@ -616,7 +604,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ── شريط الإدخال ──
+  // شريط الإدخال
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
