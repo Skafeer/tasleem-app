@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, FlatList,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +27,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75;
 const CLOSE_THRESHOLD = DRAWER_WIDTH * 0.2; // 20%
 
-// تعريف التبويبات
 const TABS = [
   { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',   component: OrdersTab },
   { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',         component: ProductsTab },
@@ -50,57 +48,73 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('orders');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // القيمة المتحركة
-  const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  // قيمة التحريك (translateX) و الشفافية (opacity)
+  const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   // 🔓 فتح السلايد
   const openDrawer = () => {
     setIsDrawerOpen(true);
-    Animated.spring(translateX, {
-      toValue: 0,
-      useNativeDriver: true,
-      speed: 12,
-      bounciness: 4,
-    }).start();
+    Animated.parallel([
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 12,
+        bounciness: 4,
+      }),
+      Animated.spring(opacity, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 12,
+        bounciness: 4,
+      }),
+    ]).start();
   };
 
-  // 🔒 إغلاق السلايد (بدقة تامة)
+  // 🔒 إغلاق السلايد (اختفاء تام)
   const closeDrawer = () => {
     setIsDrawerOpen(false);
-    Animated.timing(translateX, {
-      toValue: -DRAWER_WIDTH,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      // تأكيد الموضع النهائي
-      translateX.setValue(-DRAWER_WIDTH);
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -SCREEN_WIDTH, // إبعاد السلايد تماماً عن الشاشة
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // تأكيد نهائي أن السلايد خارج الشاشة
+      translateX.setValue(-SCREEN_WIDTH);
+      opacity.setValue(0);
     });
   };
 
-  // تبديل الحالة
   const toggleDrawer = () => {
     if (isDrawerOpen) closeDrawer();
     else openDrawer();
   };
 
-  // تغيير التبويب مع إغلاق السلايد
   const handleTabChange = (key: string) => {
     setActiveTab(key);
     closeDrawer();
   };
 
-  // PanResponder للسحب من الحافة
+  // PanResponder
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // نسمح بالسحب فقط إذا كان السلايد مغلقاً والحركة أفقية وباتجاه اليمين
         if (isDrawerOpen) return false;
         return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx > 5;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // نحد من قيمة السحب بحيث لا تتجاوز 0 (السلايد لا يخرج عن الشاشة)
-        const newX = Math.min(0, gestureState.dx - DRAWER_WIDTH);
+        const newX = Math.min(0, gestureState.dx - SCREEN_WIDTH);
         translateX.setValue(newX);
+        // حساب الشفافية بناءً على موضع السلايد
+        const newOpacity = Math.max(0, Math.min(1, (gestureState.dx + SCREEN_WIDTH) / SCREEN_WIDTH));
+        opacity.setValue(newOpacity);
       },
       onPanResponderRelease: (evt, gestureState) => {
         const dx = gestureState.dx;
@@ -198,7 +212,6 @@ export default function AdminScreen() {
 
   const ActiveComponent = visibleTabs.find(t => t.key === activeTab)?.component || OrdersTab;
 
-  // عناصر القائمة
   const renderDrawerItem = ({ item }: { item: any }) => {
     const badge = getBadge(item.key);
     const isActive = activeTab === item.key;
@@ -268,10 +281,10 @@ export default function AdminScreen() {
           styles.drawer,
           {
             transform: [{ translateX }],
+            opacity, // ✅ إضافة الشفافية
           },
         ]}
       >
-        {/* زر إغلاق داخل السلايد */}
         <TouchableOpacity style={styles.drawerCloseBtn} onPress={closeDrawer}>
           <Ionicons name="close-outline" size={24} color="#6b7280" />
         </TouchableOpacity>
