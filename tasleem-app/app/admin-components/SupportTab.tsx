@@ -75,16 +75,31 @@ export default function SupportTab() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ مراقبة عدد الرسائل غير المقروءة لعرض إشعار
+  const prevUnreadCount = useRef<number>(0);
+
   const { data: conversations = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-support'],
     queryFn: async () => {
       const { data } = await api.get('/api/admin/support');
       return data;
     },
-    refetchInterval: 10000,
+    refetchInterval: 5000, // ✅ تحديث كل 5 ثواني للحصول على رسائل جديدة بسرعة
   });
 
   const convList = conversations as any[];
+
+  // ✅ عند تغيير المحادثات، تحقق من وجود رسائل جديدة غير مقروءة
+  useEffect(() => {
+    if (!convList.length) return;
+    const totalUnread = convList.reduce((sum: number, c: any) => sum + (c.unread || 0), 0);
+    if (totalUnread > prevUnreadCount.current) {
+      // ✅ هناك رسائل جديدة
+      const newMessagesCount = totalUnread - prevUnreadCount.current;
+      toast.info(`📩 لديك ${newMessagesCount} رسالة جديدة من التجار`);
+    }
+    prevUnreadCount.current = totalUnread;
+  }, [convList]);
 
   const onRefresh = async () => {
     setRefreshing(true);
