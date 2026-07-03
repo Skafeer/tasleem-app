@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, FlatList,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,9 @@ const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75;
+const CLOSE_THRESHOLD = DRAWER_WIDTH * 0.2; // 20%
 
+// تعريف التبويبات
 const TABS = [
   { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',   component: OrdersTab },
   { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',         component: ProductsTab },
@@ -47,51 +50,61 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('orders');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // القيمة المتحركة
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
-  // ✅ فتح السلايد (باستخدام spring للحركة الطبيعية)
+  // 🔓 فتح السلايد
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.spring(translateX, {
       toValue: 0,
       useNativeDriver: true,
-      speed: 10,
-      bounciness: 3,
+      speed: 12,
+      bounciness: 4,
     }).start();
   };
 
-  // ✅ إغلاق السلايد (باستخدام timing للدقة المطلقة)
+  // 🔒 إغلاق السلايد (بدقة تامة)
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     Animated.timing(translateX, {
       toValue: -DRAWER_WIDTH,
-      duration: 250,
+      duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      // تأكيد نهائي للإغلاق
+      // تأكيد الموضع النهائي
       translateX.setValue(-DRAWER_WIDTH);
     });
   };
 
+  // تبديل الحالة
   const toggleDrawer = () => {
     if (isDrawerOpen) closeDrawer();
     else openDrawer();
   };
 
-  // PanResponder
+  // تغيير التبويب مع إغلاق السلايد
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+    closeDrawer();
+  };
+
+  // PanResponder للسحب من الحافة
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // نسمح بالسحب فقط إذا كان السلايد مغلقاً والحركة أفقية وباتجاه اليمين
         if (isDrawerOpen) return false;
         return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx > 5;
       },
       onPanResponderMove: (evt, gestureState) => {
+        // نحد من قيمة السحب بحيث لا تتجاوز 0 (السلايد لا يخرج عن الشاشة)
         const newX = Math.min(0, gestureState.dx - DRAWER_WIDTH);
         translateX.setValue(newX);
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const threshold = DRAWER_WIDTH * 0.2;
-        if (gestureState.dx > threshold) {
+        const dx = gestureState.dx;
+        if (dx > CLOSE_THRESHOLD) {
           openDrawer();
         } else {
           closeDrawer();
@@ -100,12 +113,7 @@ export default function AdminScreen() {
     })
   ).current;
 
-  const handleTabChange = (key: string) => {
-    setActiveTab(key);
-    closeDrawer();
-  };
-
-  // بيانات الصلاحيات والإحصائيات (كما في السابق)
+  // بيانات الصلاحيات والإحصائيات
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
@@ -190,6 +198,7 @@ export default function AdminScreen() {
 
   const ActiveComponent = visibleTabs.find(t => t.key === activeTab)?.component || OrdersTab;
 
+  // عناصر القائمة
   const renderDrawerItem = ({ item }: { item: any }) => {
     const badge = getBadge(item.key);
     const isActive = activeTab === item.key;
@@ -222,6 +231,7 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* خلفية معتمة */}
       {isDrawerOpen && (
         <TouchableOpacity
           style={styles.overlay}
@@ -230,6 +240,7 @@ export default function AdminScreen() {
         />
       )}
 
+      {/* المحتوى الرئيسي */}
       <View style={styles.mainContent} {...panResponder.panHandlers}>
         <View style={styles.header}>
           <TouchableOpacity onPress={toggleDrawer} style={styles.hamburgerBtn}>
@@ -251,6 +262,7 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
 
+      {/* السلايد الجانبي */}
       <Animated.View
         style={[
           styles.drawer,
@@ -259,6 +271,11 @@ export default function AdminScreen() {
           },
         ]}
       >
+        {/* زر إغلاق داخل السلايد */}
+        <TouchableOpacity style={styles.drawerCloseBtn} onPress={closeDrawer}>
+          <Ionicons name="close-outline" size={24} color="#6b7280" />
+        </TouchableOpacity>
+
         <View style={styles.drawerHeader}>
           <View style={styles.drawerHeaderIcon}>
             <Ionicons name="shield-checkmark" size={28} color={PRIMARY} />
@@ -326,10 +343,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 5,
+    paddingHorizontal: 16,
+  },
+  drawerCloseBtn: {
+    alignSelf: 'flex-start',
+    padding: 8,
+    marginTop: 12,
+    marginBottom: 4,
   },
   drawerHeader: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
     marginBottom: 10,
