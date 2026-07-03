@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Animated, PanResponder, Dimensions, RefreshControl,
+  Animated, PanResponder, Dimensions, RefreshControl, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,22 +48,22 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('orders');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Animated value لتحريك الدراور
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
-  // إعداد PanResponder للسحب
+  // PanResponder للتحكم بالسحب
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // نسمح بالسحب فقط إذا كانت الحركة أفقية
-        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+        // نسمح بالسحب فقط إذا كانت الحركة أفقية والدراور مغلق
+        if (isDrawerOpen) return false;
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx > 5;
       },
       onPanResponderMove: (evt, gestureState) => {
         const newX = Math.min(0, gestureState.dx - DRAWER_WIDTH);
         translateX.setValue(newX);
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const threshold = DRAWER_WIDTH * 0.3;
+        const threshold = DRAWER_WIDTH * 0.2; // 20% عتبة
         if (gestureState.dx > threshold) {
           openDrawer();
         } else {
@@ -73,14 +73,13 @@ export default function AdminScreen() {
     })
   ).current;
 
-  // دوال فتح وإغلاق الدراور
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.spring(translateX, {
       toValue: 0,
       useNativeDriver: true,
-      speed: 8,
-      bounciness: 4,
+      speed: 10,
+      bounciness: 3,
     }).start();
   };
 
@@ -89,26 +88,25 @@ export default function AdminScreen() {
     Animated.spring(translateX, {
       toValue: -DRAWER_WIDTH,
       useNativeDriver: true,
-      speed: 8,
-      bounciness: 4,
-    }).start();
+      speed: 10,
+      bounciness: 3,
+    }).start(() => {
+      // تأكد من الوصول إلى القيمة النهائية (للتأكد من الإغلاق التام)
+      translateX.setValue(-DRAWER_WIDTH);
+    });
   };
 
   const toggleDrawer = () => {
-    if (isDrawerOpen) {
-      closeDrawer();
-    } else {
-      openDrawer();
-    }
+    if (isDrawerOpen) closeDrawer();
+    else openDrawer();
   };
 
-  // عند تغيير التبويب، نغلق الدراور
   const handleTabChange = (key: string) => {
     setActiveTab(key);
     closeDrawer();
   };
 
-  // بيانات الصلاحيات (كما في السابق)
+  // بيانات الصلاحيات والإحصائيات (كما في السابق)
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
@@ -172,7 +170,6 @@ export default function AdminScreen() {
     userPermissions = JSON.parse((user as any)?.permissions || '[]');
   } catch {}
 
-  // تصفية التبويبات حسب الصلاحيات
   const visibleTabs = TABS.filter(t => {
     if (t.key === 'admins') return isSuperAdmin;
     if (t.key === 'support') return isSuperAdmin || userPermissions.includes('notifications');
@@ -180,7 +177,6 @@ export default function AdminScreen() {
     return userPermissions.includes(t.key);
   });
 
-  // حساب العدد لكل تبويب
   const merchantCount = (users as any[]).filter((u: any) => u.role !== 'admin').length;
   const pendingWithdrawals = (withdrawals as any[]).filter((w: any) => w.status === 'pending').length;
 
@@ -193,19 +189,49 @@ export default function AdminScreen() {
     return 0;
   };
 
-  // الحصول على المكون النشط
   const ActiveComponent = visibleTabs.find(t => t.key === activeTab)?.component || OrdersTab;
 
-  // إخفاء السحب عند فتح الدراور
+  // منع تمرير الخلفية عند فتح الدراور
   useEffect(() => {
     if (isDrawerOpen) {
-      // يمكن إضافة منع للتمرير هنا
+      // يمكن إضافة منع للتمرير هنا إذا لزم الأمر
     }
   }, [isDrawerOpen]);
 
+  // دالة عرض عنصر القائمة (للـ FlatList)
+  const renderDrawerItem = ({ item }: { item: any }) => {
+    const badge = getBadge(item.key);
+    const isActive = activeTab === item.key;
+    return (
+      <TouchableOpacity
+        style={[styles.drawerItem, isActive && styles.drawerItemActive]}
+        onPress={() => handleTabChange(item.key)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.drawerItemContent}>
+          <Ionicons
+            name={item.icon as any}
+            size={20}
+            color={isActive ? PRIMARY : '#6b7280'}
+          />
+          <Text style={[styles.drawerItemLabel, isActive && styles.drawerItemLabelActive]}>
+            {item.label}
+          </Text>
+          {badge > 0 && (
+            <View style={[styles.drawerBadge, isActive && styles.drawerBadgeActive]}>
+              <Text style={[styles.drawerBadgeText, isActive && styles.drawerBadgeTextActive]}>
+                {badge}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* خلفية معتمة عند فتح الدراور */}
+      {/* خلفية معتمة */}
       {isDrawerOpen && (
         <TouchableOpacity
           style={styles.overlay}
@@ -216,7 +242,6 @@ export default function AdminScreen() {
 
       {/* المحتوى الرئيسي */}
       <View style={styles.mainContent} {...panResponder.panHandlers}>
-        {/* الهيدر */}
         <View style={styles.header}>
           <TouchableOpacity onPress={toggleDrawer} style={styles.hamburgerBtn}>
             <Ionicons name="menu-outline" size={24} color="#111827" />
@@ -225,7 +250,6 @@ export default function AdminScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* المحتوى الديناميكي */}
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 50 }}
@@ -255,37 +279,13 @@ export default function AdminScreen() {
           <Text style={styles.drawerHeaderSub}>مدير النظام</Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {visibleTabs.map((t) => {
-            const badge = getBadge(t.key);
-            const isActive = activeTab === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.drawerItem, isActive && styles.drawerItemActive]}
-                onPress={() => handleTabChange(t.key)}
-              >
-                <View style={styles.drawerItemContent}>
-                  <Ionicons
-                    name={t.icon as any}
-                    size={20}
-                    color={isActive ? PRIMARY : '#6b7280'}
-                  />
-                  <Text style={[styles.drawerItemLabel, isActive && styles.drawerItemLabelActive]}>
-                    {t.label}
-                  </Text>
-                  {badge > 0 && (
-                    <View style={[styles.drawerBadge, isActive && styles.drawerBadgeActive]}>
-                      <Text style={[styles.drawerBadgeText, isActive && styles.drawerBadgeTextActive]}>
-                        {badge}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          data={visibleTabs}
+          keyExtractor={(item) => item.key}
+          renderItem={renderDrawerItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        />
       </Animated.View>
     </SafeAreaView>
   );
