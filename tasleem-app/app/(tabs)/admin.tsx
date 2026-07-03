@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { useNavigation, DrawerActions } from '@react-navigation/native'; // ✅ استيراد DrawerActions من هنا
 import api from '../../src/lib/api';
 
 import ProductsTab    from '../admin-components/ProductsTab';
@@ -24,24 +26,39 @@ import InventoryTab   from '../admin-components/InventoryTab';
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 
-const TABS = [
-  { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',    activeIcon: 'bag-handle' },
-  { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',           activeIcon: 'cube' },
-  { key: 'withdrawals', label: 'السحوبات',  icon: 'cash-outline',           activeIcon: 'cash' },
-  { key: 'merchants',   label: 'التجار',    icon: 'people-outline',         activeIcon: 'people' },
-  { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',       activeIcon: 'pricetag' },
-  { key: 'banners',     label: 'البنرات',   icon: 'images-outline',         activeIcon: 'images' },
-  { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',      activeIcon: 'bar-chart' },
-  { key: 'inventory',   label: 'المخزون',   icon: 'layers-outline',         activeIcon: 'layers' },
-  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',           activeIcon: 'grid' },
-  { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', activeIcon: 'notifications' },
-  { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',    activeIcon: 'shield-half' },
-  { key: 'support',     label: 'الدعم',     icon: 'headset-outline',        activeIcon: 'headset' },
-];
+const Drawer = createDrawerNavigator();
+
+// مكون مخصص لقائمة الدراور
+function CustomDrawerContent(props: any) {
+  return (
+    <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 20 }}>
+      <View style={styles.drawerHeader}>
+        <View style={styles.drawerHeaderIcon}>
+          <Ionicons name="shield-checkmark" size={28} color={PRIMARY} />
+        </View>
+        <Text style={styles.drawerHeaderTitle}>لوحة الإدارة</Text>
+        <Text style={styles.drawerHeaderSub}>مدير النظام</Text>
+      </View>
+      <DrawerItemList {...props} />
+    </DrawerContentScrollView>
+  );
+}
+
+// مكون زر الهامبرغر
+function HamburgerButton() {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      style={styles.hamburgerBtn}
+      onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+    >
+      <Ionicons name="menu-outline" size={24} color="#111827" />
+    </TouchableOpacity>
+  );
+}
 
 export default function AdminScreen() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<string>('orders');
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: user } = useQuery({
@@ -107,217 +124,139 @@ export default function AdminScreen() {
     userPermissions = JSON.parse((user as any)?.permissions || '[]');
   } catch {}
 
-  const visibleTabs = TABS.filter(t => {
-    if (t.key === 'admins') return isSuperAdmin;
-    if (t.key === 'support') return isSuperAdmin || userPermissions.includes('notifications');
+  // تعريف شاشات الدراور بناءً على الصلاحيات
+  const screens = [
+    { name: 'Orders', component: OrdersTab, label: 'الطلبات', icon: 'bag-handle-outline' },
+    { name: 'Products', component: ProductsTab, label: 'المنتجات', icon: 'cube-outline' },
+    { name: 'Withdrawals', component: WithdrawalsTab, label: 'السحوبات', icon: 'cash-outline' },
+    { name: 'Merchants', component: MerchantsTab, label: 'التجار', icon: 'people-outline' },
+    { name: 'Promos', component: PromosTab, label: 'الأكواد', icon: 'pricetag-outline' },
+    { name: 'Banners', component: BannersTab, label: 'البنرات', icon: 'images-outline' },
+    { name: 'Stats', component: StatsTab, label: 'إحصائيات', icon: 'bar-chart-outline' },
+    { name: 'Inventory', component: InventoryTab, label: 'المخزون', icon: 'layers-outline' },
+    { name: 'Categories', component: CategoriesTab, label: 'الفئات', icon: 'grid-outline' },
+    { name: 'Notifications', component: NotificationsTab, label: 'الإشعارات', icon: 'notifications-outline' },
+    { name: 'Admins', component: AdminsTab, label: 'الأدمنية', icon: 'shield-half-outline' },
+    { name: 'Support', component: SupportTab, label: 'الدعم', icon: 'headset-outline' },
+  ];
+
+  const visibleScreens = screens.filter(s => {
+    if (s.name === 'Admins') return isSuperAdmin;
+    if (s.name === 'Support') return isSuperAdmin || userPermissions.includes('notifications');
     if (isSuperAdmin) return true;
-    return userPermissions.includes(t.key);
+    return userPermissions.includes(s.name.toLowerCase());
   });
 
+  // حساب الأعداد للشاشات
   const merchantCount = (users as any[]).filter((u: any) => u.role !== 'admin').length;
   const pendingWithdrawals = (withdrawals as any[]).filter((w: any) => w.status === 'pending').length;
 
-  const getBadge = (key: string) => {
-    if (key === 'orders') return (orders as any[]).length;
-    if (key === 'products') return (products as any[]).length;
-    if (key === 'withdrawals') return pendingWithdrawals;
-    if (key === 'merchants') return merchantCount;
-    if (key === 'promos') return (promos as any[]).length;
+  const getBadge = (name: string) => {
+    if (name === 'Orders') return (orders as any[]).length;
+    if (name === 'Products') return (products as any[]).length;
+    if (name === 'Withdrawals') return pendingWithdrawals;
+    if (name === 'Merchants') return merchantCount;
+    if (name === 'Promos') return (promos as any[]).length;
     return 0;
   };
 
-  const currentTab = TABS.find(t => t.key === tab);
-
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-
-      <View style={s.header}>
-        <View style={s.headerTop}>
-          <TouchableOpacity style={s.refreshBtn} onPress={onRefresh}>
-            <Ionicons name="refresh-outline" size={19} color="#6b7280" />
-          </TouchableOpacity>
-
-          <View style={s.headerTitleWrap}>
-            <Text style={s.headerTitle}>لوحة الإدارة</Text>
-            <Text style={s.headerSub}>مرحباً مدير النظام 👋</Text>
-          </View>
-
-          <View style={s.headerBadge}>
-            <Ionicons name="shield-checkmark" size={18} color={PRIMARY} />
-          </View>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsContent}>
-          {visibleTabs.map(t => {
-            const isActive = tab === t.key;
-            const badge = getBadge(t.key);
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[s.tabBtn, isActive && s.tabBtnActive]}
-                onPress={() => setTab(t.key)}>
-                <Ionicons
-                  name={(isActive ? t.activeIcon : t.icon) as any}
-                  size={14}
-                  color={isActive ? PRIMARY : '#6b7280'}
-                />
-                <Text style={[s.tabText, isActive && s.tabTextActive]}>{t.label}</Text>
-                {badge > 0 && (
-                  <View style={[s.tabBadge, isActive && s.tabBadgeActive]}>
-                    <Text style={[s.tabBadgeText, isActive && s.tabBadgeTextActive]}>
-                      {badge}
-                    </Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Drawer.Navigator
+        initialRouteName="Orders"
+        screenOptions={{
+          headerShown: true,
+          headerStyle: { backgroundColor: '#fff', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#e8edf2' },
+          headerTitleStyle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+          headerTitleAlign: 'center',
+          headerRight: () => <HamburgerButton />,
+          drawerStyle: {
+            width: 280,
+            backgroundColor: '#fff',
+          },
+          drawerActiveTintColor: PRIMARY,
+          drawerInactiveTintColor: '#6b7280',
+          drawerActiveBackgroundColor: PRIMARY + '12',
+          drawerItemStyle: { borderRadius: 12, marginHorizontal: 10 },
+          drawerLabelStyle: { fontSize: 14, fontWeight: '600', textAlign: 'right' },
+        }}
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+      >
+        {visibleScreens.map((s) => {
+          const badge = getBadge(s.name);
+          return (
+            <Drawer.Screen
+              key={s.name}
+              name={s.name}
+              component={s.component}
+              options={{
+                title: s.label,
+                drawerIcon: ({ color, size }) => (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name={s.icon as any} size={size || 20} color={color} />
+                    {badge > 0 && (
+                      <View style={[styles.drawerBadge, { backgroundColor: color }]}>
+                        <Text style={styles.drawerBadgeText}>{badge}</Text>
+                      </View>
+                    )}
                   </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      <View style={s.sectionBar}>
-        <Ionicons name={currentTab?.activeIcon as any} size={16} color={PRIMARY} />
-        <Text style={s.sectionBarText}>{currentTab?.label}</Text>
-      </View>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 50 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
-        }
-        showsVerticalScrollIndicator={false}>
-
-        {tab === 'orders' && <OrdersTab />}
-        {tab === 'products' && <ProductsTab />}
-        {tab === 'withdrawals' && <WithdrawalsTab />}
-        {tab === 'merchants' && <MerchantsTab />}
-        {tab === 'promos' && <PromosTab />}
-        {tab === 'banners' && <BannersTab />}
-        {tab === 'stats' && <StatsTab />}
-        {tab === 'inventory' && <InventoryTab />}
-        {tab === 'categories' && <CategoriesTab />}
-        {tab === 'notifications' && <NotificationsTab />}
-        {tab === 'admins' && <AdminsTab />}
-        {tab === 'support' && <SupportTab />}
-
-      </ScrollView>
+                ),
+              }}
+            />
+          );
+        })}
+      </Drawer.Navigator>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-
-  header: {
-    backgroundColor: '#fff',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8edf2',
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-  },
-  headerTitleWrap: { alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
-  headerSub: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
-
-  headerBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#f0f9fa',
-    borderWidth: 1.5,
-    borderColor: '#d4eef3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  refreshBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#f0f9fa',
-    borderWidth: 1.5,
-    borderColor: '#d4eef3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  tabsContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-    alignItems: 'center',
-  },
-
-  tabBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-  },
-
-  tabBtnActive: {
-    backgroundColor: PRIMARY + '12',
-    borderColor: PRIMARY,
-  },
-
-  tabText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-
-  tabTextActive: {
-    color: PRIMARY,
-    fontWeight: '700',
-  },
-
-  tabBadge: {
-    backgroundColor: '#e5e7eb',
+  hamburgerBtn: {
+    padding: 8,
+    marginRight: 12,
     borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    backgroundColor: '#f0f9fa',
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
   },
-
-  tabBadgeActive: {
-    backgroundColor: PRIMARY,
-  },
-
-  tabBadgeText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: 'bold',
-  },
-
-  tabBadgeTextActive: {
-    color: '#fff',
-  },
-
-  sectionBar: {
-    flexDirection: 'row',
+  drawerHeader: {
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
+    marginBottom: 10,
   },
-
-  sectionBarText: {
-    fontSize: 14,
-    fontWeight: '700',
+  drawerHeaderIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  drawerHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#111827',
+  },
+  drawerHeaderSub: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  drawerBadge: {
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  drawerBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
