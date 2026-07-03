@@ -26,7 +26,6 @@ const BG = '#f2f6f9';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75;
 
-// تعريف التبويبات
 const TABS = [
   { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',   component: OrdersTab },
   { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',         component: ProductsTab },
@@ -50,29 +49,7 @@ export default function AdminScreen() {
 
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
-  // PanResponder للتحكم بالسحب
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // نسمح بالسحب فقط إذا كانت الحركة أفقية والدراور مغلق
-        if (isDrawerOpen) return false;
-        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx > 5;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        const newX = Math.min(0, gestureState.dx - DRAWER_WIDTH);
-        translateX.setValue(newX);
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        const threshold = DRAWER_WIDTH * 0.2; // 20% عتبة
-        if (gestureState.dx > threshold) {
-          openDrawer();
-        } else {
-          closeDrawer();
-        }
-      },
-    })
-  ).current;
-
+  // ✅ فتح السلايد (باستخدام spring للحركة الطبيعية)
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.spring(translateX, {
@@ -83,15 +60,15 @@ export default function AdminScreen() {
     }).start();
   };
 
+  // ✅ إغلاق السلايد (باستخدام timing للدقة المطلقة)
   const closeDrawer = () => {
     setIsDrawerOpen(false);
-    Animated.spring(translateX, {
+    Animated.timing(translateX, {
       toValue: -DRAWER_WIDTH,
+      duration: 250,
       useNativeDriver: true,
-      speed: 10,
-      bounciness: 3,
     }).start(() => {
-      // تأكد من الوصول إلى القيمة النهائية (للتأكد من الإغلاق التام)
+      // تأكيد نهائي للإغلاق
       translateX.setValue(-DRAWER_WIDTH);
     });
   };
@@ -100,6 +77,28 @@ export default function AdminScreen() {
     if (isDrawerOpen) closeDrawer();
     else openDrawer();
   };
+
+  // PanResponder
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (isDrawerOpen) return false;
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && gestureState.dx > 5;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        const newX = Math.min(0, gestureState.dx - DRAWER_WIDTH);
+        translateX.setValue(newX);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const threshold = DRAWER_WIDTH * 0.2;
+        if (gestureState.dx > threshold) {
+          openDrawer();
+        } else {
+          closeDrawer();
+        }
+      },
+    })
+  ).current;
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
@@ -191,14 +190,6 @@ export default function AdminScreen() {
 
   const ActiveComponent = visibleTabs.find(t => t.key === activeTab)?.component || OrdersTab;
 
-  // منع تمرير الخلفية عند فتح الدراور
-  useEffect(() => {
-    if (isDrawerOpen) {
-      // يمكن إضافة منع للتمرير هنا إذا لزم الأمر
-    }
-  }, [isDrawerOpen]);
-
-  // دالة عرض عنصر القائمة (للـ FlatList)
   const renderDrawerItem = ({ item }: { item: any }) => {
     const badge = getBadge(item.key);
     const isActive = activeTab === item.key;
@@ -231,7 +222,6 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* خلفية معتمة */}
       {isDrawerOpen && (
         <TouchableOpacity
           style={styles.overlay}
@@ -240,7 +230,6 @@ export default function AdminScreen() {
         />
       )}
 
-      {/* المحتوى الرئيسي */}
       <View style={styles.mainContent} {...panResponder.panHandlers}>
         <View style={styles.header}>
           <TouchableOpacity onPress={toggleDrawer} style={styles.hamburgerBtn}>
@@ -262,7 +251,6 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
 
-      {/* القائمة الجانبية */}
       <Animated.View
         style={[
           styles.drawer,
