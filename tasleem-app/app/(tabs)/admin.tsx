@@ -33,14 +33,14 @@ const TABS = [
   { key: 'products',    label: 'المنتجات',  icon: 'cube-outline',         component: ProductsTab },
   { key: 'withdrawals', label: 'السحوبات',  icon: 'cash-outline',         component: WithdrawalsTab },
   { key: 'merchants',   label: 'التجار',    icon: 'people-outline',       component: MerchantsTab },
-  { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',     component: PromosTab },
-  { key: 'banners',     label: 'البنرات',   icon: 'images-outline',       component: BannersTab },
-  { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',    component: StatsTab },
   { key: 'inventory',   label: 'المخزون',   icon: 'layers-outline',       component: InventoryTab },
-  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',         component: CategoriesTab },
   { key: 'notifications', label: 'الإشعارات', icon: 'notifications-outline', component: NotificationsTab },
-  { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',  component: AdminsTab },
   { key: 'support',     label: 'الدعم',     icon: 'headset-outline',      component: SupportTab },
+  { key: 'stats',       label: 'إحصائيات',  icon: 'bar-chart-outline',    component: StatsTab },
+  { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',         component: CategoriesTab },
+  { key: 'banners',     label: 'البنرات',   icon: 'images-outline',       component: BannersTab },
+  { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',     component: PromosTab },
+  { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',  component: AdminsTab },
 ];
 
 export default function AdminScreen() {
@@ -53,7 +53,7 @@ export default function AdminScreen() {
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  // 🔓 فتح السلايد (بأنيميشن سلس)
+  // 🔓 فتح السلايد
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.parallel([
@@ -72,7 +72,7 @@ export default function AdminScreen() {
     ]).start();
   };
 
-  // 🔒 إغلاق السلايد (بأنيميشن سلس وناعم)
+  // 🔒 إغلاق السلايد
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     Animated.parallel([
@@ -89,7 +89,6 @@ export default function AdminScreen() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // التأكد من القيم النهائية (للتخلص من أي أخطاء تراكمية)
       translateX.setValue(-SCREEN_WIDTH);
       opacity.setValue(0);
     });
