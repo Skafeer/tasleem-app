@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, PanResponder, Dimensions, RefreshControl, FlatList,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,7 @@ const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.75;
-const CLOSE_THRESHOLD = DRAWER_WIDTH * 0.2; // 20%
+const CLOSE_THRESHOLD = DRAWER_WIDTH * 0.2;
 
 const TABS = [
   { key: 'orders',      label: 'الطلبات',   icon: 'bag-handle-outline',   component: OrdersTab },
@@ -48,45 +49,47 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState('orders');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // قيمة التحريك (translateX) و الشفافية (opacity)
+  // Animations
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  // 🔓 فتح السلايد
+  // 🔓 فتح السلايد (بأنيميشن سلس)
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.parallel([
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
-        speed: 12,
-        bounciness: 4,
+        speed: 10,
+        bounciness: 6,
       }),
       Animated.spring(opacity, {
         toValue: 1,
         useNativeDriver: true,
-        speed: 12,
-        bounciness: 4,
+        speed: 10,
+        bounciness: 6,
       }),
     ]).start();
   };
 
-  // 🔒 إغلاق السلايد (اختفاء تام)
+  // 🔒 إغلاق السلايد (بأنيميشن سلس وناعم)
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     Animated.parallel([
       Animated.timing(translateX, {
-        toValue: -SCREEN_WIDTH, // إبعاد السلايد تماماً عن الشاشة
-        duration: 200,
+        toValue: -SCREEN_WIDTH,
+        duration: 280,
+        easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 200,
+        duration: 280,
+        easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // تأكيد نهائي أن السلايد خارج الشاشة
+      // التأكد من القيم النهائية (للتخلص من أي أخطاء تراكمية)
       translateX.setValue(-SCREEN_WIDTH);
       opacity.setValue(0);
     });
@@ -112,13 +115,11 @@ export default function AdminScreen() {
       onPanResponderMove: (evt, gestureState) => {
         const newX = Math.min(0, gestureState.dx - SCREEN_WIDTH);
         translateX.setValue(newX);
-        // حساب الشفافية بناءً على موضع السلايد
         const newOpacity = Math.max(0, Math.min(1, (gestureState.dx + SCREEN_WIDTH) / SCREEN_WIDTH));
         opacity.setValue(newOpacity);
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const dx = gestureState.dx;
-        if (dx > CLOSE_THRESHOLD) {
+        if (gestureState.dx > CLOSE_THRESHOLD) {
           openDrawer();
         } else {
           closeDrawer();
@@ -217,6 +218,7 @@ export default function AdminScreen() {
     const isActive = activeTab === item.key;
     return (
       <TouchableOpacity
+        key={item.key}
         style={[styles.drawerItem, isActive && styles.drawerItemActive]}
         onPress={() => handleTabChange(item.key)}
         activeOpacity={0.7}
@@ -281,7 +283,7 @@ export default function AdminScreen() {
           styles.drawer,
           {
             transform: [{ translateX }],
-            opacity, // ✅ إضافة الشفافية
+            opacity,
           },
         ]}
       >
