@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
-  Alert, Clipboard, Image, RefreshControl,
+  Alert, Clipboard, Image, RefreshControl, Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,6 +13,8 @@ import { toast } from '../../src/lib/toast';
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
+const ADMIN_BUBBLE = '#10b981'; // ✅ أخضر للأدمن
+const USER_BUBBLE = '#ffffff';   // ✅ أبيض للمستخدم
 
 const formatTime = (date: string) => {
   const d = date.endsWith('Z') || date.includes('+') ? date : date + 'Z';
@@ -25,14 +28,44 @@ const formatDate = (date: string) => {
 
 type SortType = 'recent' | 'unread' | 'most';
 
-// مكوّن رسالة واحدة - RTL صحيح
-const ChatBubble = ({ item, nextItem, onLongPress }: any) => {
+// ── مكوّن رسالة واحدة مع أنيميشن خفيف ──
+const ChatBubble = ({ item, nextItem, onLongPress, index }: any) => {
   const isAdmin = item.from_admin;
   const showDate = !nextItem || formatDate(item.created_at) !== formatDate(nextItem.created_at);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        delay: index * 30,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 250,
+        delay: index * 30,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   return (
     <>
-      <View style={[s.messageRow, isAdmin ? s.messageRowAdmin : s.messageRowUser]}>
+      {showDate && (
+        <View style={s.dateDivider}>
+          <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
+        </View>
+      )}
+      <Animated.View
+        style={[
+          s.messageRow,
+          isAdmin ? s.messageRowAdmin : s.messageRowUser,
+          { opacity: fadeAnim, transform: [{ translateY }] },
+        ]}
+      >
         {!isAdmin && (
           <View style={s.userAvatar}>
             <Ionicons name="person" size={14} color="#fff" />
@@ -41,7 +74,8 @@ const ChatBubble = ({ item, nextItem, onLongPress }: any) => {
         <TouchableOpacity
           style={s.bubbleWrap}
           onLongPress={() => item.message && onLongPress(item.message)}
-          activeOpacity={0.85}>
+          activeOpacity={0.85}
+        >
           <View style={[s.bubble, isAdmin ? s.bubbleAdmin : s.bubbleUser]}>
             {item.image_url && (
               <Image source={{ uri: item.image_url }} style={s.messageImage} resizeMode="cover" />
@@ -56,12 +90,7 @@ const ChatBubble = ({ item, nextItem, onLongPress }: any) => {
             </Text>
           </View>
         </TouchableOpacity>
-      </View>
-      {showDate && (
-        <View style={s.dateDivider}>
-          <Text style={s.dateDividerText}>{formatDate(item.created_at)}</Text>
-        </View>
-      )}
+      </Animated.View>
     </>
   );
 };
@@ -74,8 +103,8 @@ export default function SupportTab() {
   const [sort, setSort] = useState<SortType>('recent');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
-  // ✅ مراقبة عدد الرسائل غير المقروءة لعرض إشعار
   const prevUnreadCount = useRef<number>(0);
 
   const { data: conversations = [], isLoading, refetch } = useQuery({
@@ -84,17 +113,15 @@ export default function SupportTab() {
       const { data } = await api.get('/api/admin/support');
       return data;
     },
-    refetchInterval: 5000, // ✅ تحديث كل 5 ثواني للحصول على رسائل جديدة بسرعة
+    refetchInterval: 5000,
   });
 
   const convList = conversations as any[];
 
-  // ✅ عند تغيير المحادثات، تحقق من وجود رسائل جديدة غير مقروءة
   useEffect(() => {
     if (!convList.length) return;
     const totalUnread = convList.reduce((sum: number, c: any) => sum + (c.unread || 0), 0);
     if (totalUnread > prevUnreadCount.current) {
-      // ✅ هناك رسائل جديدة
       const newMessagesCount = totalUnread - prevUnreadCount.current;
       toast.info(`📩 لديك ${newMessagesCount} رسالة جديدة من التجار`);
     }
@@ -114,6 +141,7 @@ export default function SupportTab() {
     onSuccess: () => {
       setReply('');
       qc.invalidateQueries({ queryKey: ['admin-support'] });
+      setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 100);
     },
     onError: () => toast.error('فشل إرسال الرد'),
   });
@@ -230,8 +258,7 @@ export default function SupportTab() {
   // ── قائمة المحادثات ──
   if (!selectedUser) {
     return (
-      <View style={s.container}>
-        {/* شريط البحث */}
+      <SafeAreaView style={s.container} edges={['bottom']}>
         <View style={s.searchBox}>
           <Ionicons name="search-outline" size={18} color="#9ca3af" />
           <TextInput
@@ -249,7 +276,6 @@ export default function SupportTab() {
           ) : null}
         </View>
 
-        {/* أزرار الترتيب */}
         <View style={s.sortRow}>
           {([['recent', 'الأحدث'], ['unread', 'غير مقروء'], ['most', 'الأكثر']] as [SortType, string][]).map(([key, label]) => (
             <TouchableOpacity
@@ -314,7 +340,7 @@ export default function SupportTab() {
             }}
           />
         )}
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -322,9 +348,8 @@ export default function SupportTab() {
   const msgs = [...(selectedUser.messages || [])].reverse();
 
   return (
-    <View style={s.container}>
-
-      {/* هيدر المحادثة - بدون تدرج */}
+    <SafeAreaView style={s.container} edges={['bottom']}>
+      {/* هيدر المحادثة */}
       <View style={s.chatHeader}>
         <TouchableOpacity style={s.backBtn} onPress={() => setSelectedUser(null)}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -344,13 +369,18 @@ export default function SupportTab() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         <FlatList
+          ref={flatListRef}
           data={msgs}
           keyExtractor={(item: any) => String(item.id)}
           inverted
           contentContainerStyle={s.messagesList}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={s.emptyChat}>
               <Ionicons name="chatbubbles-outline" size={48} color="#d1d5db" />
@@ -362,11 +392,12 @@ export default function SupportTab() {
               item={item}
               nextItem={msgs[index + 1]}
               onLongPress={handleLongPress}
+              index={index}
             />
           )}
         />
 
-        {/* شريط الإدخال - RTL صحيح */}
+        {/* شريط الإدخال */}
         <View style={s.inputRow}>
           <TouchableOpacity
             style={[s.sendBtn, (!reply.trim() || sendReply.isPending) && s.sendBtnOff]}
@@ -399,7 +430,7 @@ export default function SupportTab() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -409,7 +440,7 @@ const s = StyleSheet.create({
   emptyText: { fontSize: 15, color: '#9ca3af' },
   listContent: { paddingBottom: 20 },
 
-  // شريط البحث
+  // ── البحث ──
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -426,7 +457,6 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  // أزرار الترتيب
   sortRow: {
     flexDirection: 'row',
     gap: 8,
@@ -445,7 +475,7 @@ const s = StyleSheet.create({
   sortText: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
   sortTextActive: { color: '#fff' },
 
-  // بطاقة المحادثة
+  // ── بطاقة المحادثة ──
   convCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -489,7 +519,7 @@ const s = StyleSheet.create({
   convLastMsg: { fontSize: 13, color: '#6b7280', textAlign: 'right' },
   convLastMsgBold: { color: '#111827', fontWeight: '600' },
 
-  // هيدر المحادثة
+  // ── هيدر المحادثة ──
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -523,6 +553,7 @@ const s = StyleSheet.create({
   },
   unblockBtn: { backgroundColor: '#ecfdf5' },
 
+  // ── قائمة الرسائل ──
   messagesList: { paddingHorizontal: 12, paddingVertical: 8 },
   emptyChat: {
     flex: 1,
@@ -532,7 +563,7 @@ const s = StyleSheet.create({
     transform: [{ scaleY: -1 }],
   },
 
-  // فقاعات المحادثة - RTL صحيح
+  // ── فقاعات المحادثة (RTL) ──
   messageRow: { flexDirection: 'row', marginBottom: 3, alignItems: 'flex-end', gap: 6 },
   messageRowAdmin: { justifyContent: 'flex-start' },
   messageRowUser: { justifyContent: 'flex-end' },
@@ -549,25 +580,30 @@ const s = StyleSheet.create({
 
   bubbleWrap: { maxWidth: '78%' },
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 3 },
+  // ✅ تغيير الألوان: الأدمن أخضر، المستخدم أبيض
   bubbleAdmin: {
-    backgroundColor: '#fff',
+    backgroundColor: ADMIN_BUBBLE,
     borderBottomLeftRadius: 4,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
+  },
+  bubbleUser: {
+    backgroundColor: USER_BUBBLE,
+    borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#e8edf2',
   },
-  bubbleUser: { backgroundColor: PRIMARY, borderBottomRightRadius: 4 },
 
   messageImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
   bubbleText: { fontSize: 15, lineHeight: 22 },
-  bubbleTextAdmin: { color: '#111827', textAlign: 'left' },
-  bubbleTextUser: { color: '#fff', textAlign: 'right' },
+  bubbleTextAdmin: { color: '#fff', textAlign: 'left' },
+  bubbleTextUser: { color: '#111827', textAlign: 'right' },
+
   bubbleTime: { fontSize: 10 },
-  bubbleTimeAdmin: { color: '#9ca3af', textAlign: 'left' },
-  bubbleTimeUser: { color: 'rgba(255,255,255,0.7)', textAlign: 'right' },
+  bubbleTimeAdmin: { color: 'rgba(255,255,255,0.7)', textAlign: 'left' },
+  bubbleTimeUser: { color: '#9ca3af', textAlign: 'right' },
 
   dateDivider: { alignItems: 'center', marginVertical: 10 },
   dateDividerText: {
@@ -580,7 +616,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // شريط الإدخال
+  // ── شريط الإدخال ──
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

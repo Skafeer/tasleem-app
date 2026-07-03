@@ -118,6 +118,7 @@ export default function SupportScreen() {
     Alert.alert('', 'تم نسخ الرسالة');
   };
 
+  // التمرير إلى الأسفل عند إضافة رسائل جديدة
   useEffect(() => {
     if ((messages as any[]).length > 0)
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
@@ -143,7 +144,12 @@ export default function SupportScreen() {
         <Text style={s.headerSub}>نرد خلال ساعات العمل</Text>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* ✅ تحسين KeyboardAvoidingView ليرتفع المحتوى مع الكيبورد */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
         
         {/* Skeleton Loading */}
         {isLoading && msgList.length === 0 ? (
@@ -155,8 +161,14 @@ export default function SupportScreen() {
             ref={flatListRef}
             data={msgList}
             keyExtractor={(item: any) => String(item.id)}
-            contentContainerStyle={s.messagesList}
+            // ✅ جعل القائمة تملأ المساحة، وعندما تكون فارغة نوسّط العنصر الفارغ
+            contentContainerStyle={[
+              s.messagesList, 
+              msgList.length === 0 && s.emptyListContainer
+            ]}
             showsVerticalScrollIndicator={false}
+            // ✅ إغلاق الكيبورد عند النقر على أي مكان في القائمة
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
             }
@@ -347,14 +359,19 @@ const s = StyleSheet.create({
     paddingBottom: 8,
     flexGrow: 1,
   },
+  // ✅ عند عدم وجود رسائل، نوسّط العنصر الفارغ
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // ── Empty State ──
   empty: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
     gap: 12,
+    paddingHorizontal: 20,
   },
   emptyIconBox: {
     width: 80,
