@@ -48,11 +48,12 @@ function KpiCard({ icon, color, bg, label, value, sub }: any) {
 }
 
 function BarRow({ label, count, max, color, sub }: any) {
+  const barWidth = count > 0 ? Math.max((count / max) * BAR_W, 6) : 0;
   return (
     <View style={s.barRow}>
       <Text style={s.barLabel}>{label}</Text>
       <View style={s.barTrack}>
-        <View style={[s.barFill, { width: count > 0 ? Math.max((count / max) * BAR_W, 6) : 0, backgroundColor: color }]} />
+        <View style={[s.barFill, { width: barWidth, backgroundColor: color }]} />
       </View>
       <View style={s.barMeta}>
         <Text style={s.barCount}>{count}</Text>
@@ -67,32 +68,22 @@ export default function StatsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [revenueTab, setRevenueTab] = useState<'day' | 'week' | 'month' | 'year'>('month');
 
+  // ✅ استرجاع البيانات من الباك إند مباشرة
   const { data: statsData, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-stats-data'],
     queryFn: async () => {
       try {
         const { data } = await api.get('/api/admin/stats-data');
         return data;
-      } catch {
-        // fallback — نجمع البيانات من endpoints منفصلة
-        const [orders, products, users, withdrawals] = await Promise.allSettled([
-          api.get('/api/admin/orders'),
-          api.get('/api/products'),
-          api.get('/api/admin/users'),
-          api.get('/api/admin/withdrawals'),
-        ]);
-        return {
-          orders:      orders.status      === 'fulfilled' ? orders.value.data      : [],
-          products:    products.status    === 'fulfilled' ? products.value.data    : [],
-          users:       users.status       === 'fulfilled' ? users.value.data       : [],
-          withdrawals: withdrawals.status === 'fulfilled' ? withdrawals.value.data : [],
-          _fallback: true,
-        };
+      } catch (err) {
+        console.error('Stats API error:', err);
+        throw err;
       }
     },
     refetchInterval: 60000,
-    retry: 1,
+    retry: 2,
     retryDelay: 2000,
+    staleTime: 30000,
   });
 
   const onRefresh = async () => {
@@ -101,7 +92,8 @@ export default function StatsTab() {
     setRefreshing(false);
   };
 
-  if (isLoading) {
+  // حالات التحميل والخطأ
+  if (isLoading && !statsData) {
     return (
       <View style={s.center}>
         <ActivityIndicator size="large" color={PRIMARY} />
@@ -124,11 +116,13 @@ export default function StatsTab() {
     );
   }
 
+  // استخراج البيانات من الـ API
   const orders = statsData?.orders || [];
   const users = statsData?.users || [];
   const withdrawals = statsData?.withdrawals || [];
   const products = statsData?.products || [];
 
+  // عمليات حسابية
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -170,6 +164,7 @@ export default function StatsTab() {
 
   const activeRevTab = revenueTab === 'day' ? todayRev : revenueTab === 'week' ? weekRev : revenueTab === 'month' ? monthRev : yearRev;
 
+  // آخر 6 أشهر
   const last6: { label: string; revenue: number; profit: number; count: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(thisYear, thisMonth - i, 1);
@@ -188,17 +183,19 @@ export default function StatsTab() {
   }
   const maxMonthRev = Math.max(...last6.map(m => m.revenue), 1);
 
+  // آخر 7 أيام
   const last7Days: { label: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const ds = d.toDateString();
     last7Days.push({
       label: DAYS[d.getDay()].slice(0, 3),
-      count: allOrders.filter(o => new Date(o.createdAt).toDateString() === ds).length
+      count: allOrders.filter(o => new Date(o.createdAt).toDateString() === ds).length,
     });
   }
   const maxDayCount = Math.max(...last7Days.map(d => d.count), 1);
 
+  // التجار
   const merchants = (users as any[]).filter(u => u.role !== 'admin');
   const newThisMonth = merchants.filter(u => {
     const d = new Date(u.createdAt);
@@ -207,6 +204,7 @@ export default function StatsTab() {
   const totalBalances = merchants.reduce((s, u) => s + (u.balance || 0), 0);
   const totalPending = merchants.reduce((s, u) => s + (u.pendingBalance || 0), 0);
 
+  // أكثر 5 تجار نشاطاً
   const merchantMap: Record<number, { name: string; count: number; revenue: number; profit: number }> = {};
   allOrders.forEach(o => {
     if (!o.merchantId) return;
@@ -223,6 +221,7 @@ export default function StatsTab() {
   const top5 = Object.values(merchantMap).sort((a, b) => b.count - a.count).slice(0, 5);
   const maxCount = top5[0]?.count || 1;
 
+  // المنتجات
   const allProducts = products as any[];
   const activeProducts = allProducts.filter(p => p.stock > 0);
   const outOfStock = allProducts.filter(p => p.stock === 0);
@@ -231,12 +230,13 @@ export default function StatsTab() {
   const potentialRev = allProducts.reduce((s, p) => s + ((p.wholesalePrice || 0) * p.stock), 0);
   const potentialProfit = potentialRev - totalStockVal;
 
+  // أكثر 5 منتجات مبيعاً
   const productSales: Record<number, { name: string; count: number; revenue: number }> = {};
   allOrders.forEach(o => {
     if (o.status !== 'delivered') return;
     (o.items || []).forEach((item: any) => {
       if (!productSales[item.productId]) {
-        productSales[item.productId] = { name: item.productName || `#${item.productId}`, count: 0, revenue: 0 };
+        productSales[item.productId] = { name: item.product?.name || `#${item.productId}`, count: 0, revenue: 0 };
       }
       productSales[item.productId].count += (item.quantity || 1);
       productSales[item.productId].revenue += ((item.price || 0) * (item.quantity || 1));
@@ -245,6 +245,7 @@ export default function StatsTab() {
   const top5Products = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
   const maxProdCount = top5Products[0]?.count || 1;
 
+  // السحوبات
   const ws = withdrawals as any[];
   const pendingW = ws.filter(w => w.status === 'pending');
   const approvedW = ws.filter(w => w.status === 'approved');
@@ -274,7 +275,7 @@ export default function StatsTab() {
       <SectionTitle icon="cash" title="الإيرادات والأرباح" color={SUCCESS} />
 
       <View style={s.tabs}>
-        {(['day', 'week', 'month', 'year'] as const).map((k, idx) => {
+        {(['day', 'week', 'month', 'year'] as const).map((k) => {
           const labels = { day: 'اليوم', week: 'الأسبوع', month: 'الشهر', year: 'السنة' };
           return (
             <TouchableOpacity key={k} style={[s.tab, revenueTab === k && s.tabActive]} onPress={() => setRevenueTab(k)}>
