@@ -17,8 +17,20 @@ const SECONDARY = '#f5a006';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
-// أنواع الفلترة
-type FilterType = 'all' | 'active' | 'inactive' | 'high_orders' | 'low_orders' | 'has_balance' | 'no_balance';
+// --- أنواع الفلاتر (مثل الصفحة الرئيسية ولكن خاصة بالتجار) ---
+type FilterState = {
+  status: 'all' | 'active' | 'inactive';
+  balance: 'all' | 'has_balance' | 'no_balance';
+  orders: 'all' | 'high_orders' | 'low_orders';
+  sortBy: 'newest' | 'name_asc' | 'name_desc' | 'balance_high' | 'balance_low' | 'orders_high';
+};
+
+const defaultFilters: FilterState = {
+  status: 'all',
+  balance: 'all',
+  orders: 'all',
+  sortBy: 'newest',
+};
 
 export default function MerchantsTab() {
   const qc = useQueryClient();
@@ -27,9 +39,11 @@ export default function MerchantsTab() {
   const [editForm, setEditForm] = useState<any>({});
   const [showPass, setShowPass] = useState(false);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [tempFilters, setTempFilters] = useState<FilterState>(defaultFilters); // للمودال
   const [showFilterModal, setShowFilterModal] = useState(false);
 
+  // جلب بيانات التجار
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
@@ -39,6 +53,7 @@ export default function MerchantsTab() {
     refetchInterval: 30000,
   });
 
+  // --- دوال التحديث والحذف (نفسها) ---
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: any) => {
       const res = await api.patch(`/api/admin/users/${id}`, data);
@@ -103,12 +118,12 @@ export default function MerchantsTab() {
     updateUser.mutate({ id: editUser.id, data: editForm });
   };
 
-  // ✅ دالة الفلترة المحسنة
+  // --- دالة الفلترة المحسنة (مثل الصفحة الرئيسية) ---
   const getFilteredMerchants = () => {
     let filtered = (users as any[])
       .filter((u: any) => u.role !== 'admin');
 
-    // البحث (رقم التاجر، الاسم، الهاتف)
+    // البحث
     if (search.trim()) {
       const query = search.trim().toLowerCase();
       filtered = filtered.filter((u: any) =>
@@ -118,50 +133,72 @@ export default function MerchantsTab() {
       );
     }
 
-    // ✅ الفلاتر المخصصة
-    switch (filter) {
-      case 'active':
-        filtered = filtered.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0);
-        break;
-      case 'inactive':
-        filtered = filtered.filter((u: any) => (u.balance || 0) === 0 && (u.pendingBalance || 0) === 0);
-        break;
-      case 'high_orders':
-        // نأخذ التجار الذين لديهم أكثر من 10 طلبات (نحسبها من الـ orders في الـ API)
-        // مؤقتاً نستخدم الـ balance كمعيار
-        filtered = filtered.filter((u: any) => (u.balance || 0) > 50000);
-        break;
-      case 'low_orders':
-        filtered = filtered.filter((u: any) => (u.balance || 0) < 10000);
-        break;
-      case 'has_balance':
-        filtered = filtered.filter((u: any) => (u.balance || 0) > 0);
-        break;
-      case 'no_balance':
-        filtered = filtered.filter((u: any) => (u.balance || 0) === 0);
-        break;
-      default:
-        break;
+    // فلترة حسب الحالة (النشاط)
+    if (filters.status === 'active') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0);
+    } else if (filters.status === 'inactive') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) === 0 && (u.pendingBalance || 0) === 0);
     }
 
-    // ترتيب حسب الأحدث
-    return filtered.sort((a: any, b: any) => b.id - a.id);
+    // فلترة حسب الرصيد
+    if (filters.balance === 'has_balance') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) > 0);
+    } else if (filters.balance === 'no_balance') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) === 0);
+    }
+
+    // فلترة حسب الطلبات (تقديرية باستخدام الرصيد كمعيار مؤقت)
+    if (filters.orders === 'high_orders') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) > 50000);
+    } else if (filters.orders === 'low_orders') {
+      filtered = filtered.filter((u: any) => (u.balance || 0) < 10000);
+    }
+
+    // الترتيب
+    switch (filters.sortBy) {
+      case 'name_asc':
+        filtered.sort((a: any, b: any) => a.storeName?.localeCompare(b.storeName) || 0);
+        break;
+      case 'name_desc':
+        filtered.sort((a: any, b: any) => b.storeName?.localeCompare(a.storeName) || 0);
+        break;
+      case 'balance_high':
+        filtered.sort((a: any, b: any) => (b.balance || 0) - (a.balance || 0));
+        break;
+      case 'balance_low':
+        filtered.sort((a: any, b: any) => (a.balance || 0) - (b.balance || 0));
+        break;
+      case 'orders_high':
+        filtered.sort((a: any, b: any) => (b.pendingBalance || 0) - (a.pendingBalance || 0));
+        break;
+      default: // 'newest'
+        filtered.sort((a: any, b: any) => b.id - a.id);
+    }
+
+    return filtered;
   };
 
   const merchants = getFilteredMerchants();
 
-  // أسماء الفلاتر للعرض
-  const filterLabels: Record<FilterType, string> = {
-    all: 'الكل',
-    active: 'نشط',
-    inactive: 'غير نشط',
-    high_orders: 'طلبات عالية',
-    low_orders: 'طلبات قليلة',
-    has_balance: 'لديه رصيد',
-    no_balance: 'رصيد صفر',
+  // --- دوال المودال ---
+  const openFilterModal = () => {
+    setTempFilters({ ...filters });
+    setShowFilterModal(true);
   };
 
-  // إحصائيات سريعة
+  const applyFilters = () => {
+    setFilters({ ...tempFilters });
+    setShowFilterModal(false);
+  };
+
+  const resetFilters = () => {
+    setFilters(defaultFilters);
+    setTempFilters(defaultFilters);
+    setSearch('');
+    setShowFilterModal(false);
+  };
+
+  // --- إحصائيات سريعة (مثل السابق) ---
   const totalMerchants = (users as any[]).filter((u: any) => u.role !== 'admin').length;
   const activeMerchants = (users as any[]).filter((u: any) => u.role !== 'admin' && (u.balance || 0) > 0).length;
   const totalBalance = (users as any[]).filter((u: any) => u.role !== 'admin').reduce((s, u) => s + (u.balance || 0), 0);
@@ -178,7 +215,7 @@ export default function MerchantsTab() {
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* شريط البحث والفلترة */}
+      {/* ── شريط البحث والفلترة (مثل الصفحة الرئيسية) ── */}
       <View style={s.topBar}>
         <View style={s.searchWrap}>
           <Ionicons name="search-outline" size={17} color="#9ca3af" />
@@ -197,23 +234,12 @@ export default function MerchantsTab() {
           ) : null}
         </View>
 
-        {/* زر الفلترة مع عرض الفلتر الحالي */}
-        <TouchableOpacity
-          style={[s.filterBtn, filter !== 'all' && s.filterBtnActive]}
-          onPress={() => setShowFilterModal(true)}
-        >
-          <Ionicons
-            name="options-outline"
-            size={18}
-            color={filter !== 'all' ? PRIMARY : '#6b7280'}
-          />
-          <Text style={[s.filterBtnText, filter !== 'all' && s.filterBtnTextActive]}>
-            {filterLabels[filter]}
-          </Text>
+        <TouchableOpacity style={s.filterBtn} onPress={openFilterModal}>
+          <Ionicons name="options-outline" size={20} color={PRIMARY} />
         </TouchableOpacity>
       </View>
 
-      {/* إحصائيات سريعة */}
+      {/* ── إحصائيات سريعة (نفسها) ── */}
       <View style={s.quickStats}>
         <View style={s.statItem}>
           <Text style={s.statNumber}>{totalMerchants}</Text>
@@ -238,7 +264,7 @@ export default function MerchantsTab() {
         </View>
       </View>
 
-      {/* قائمة التجار */}
+      {/* ── قائمة التجار ── */}
       <FlatList
         data={merchants}
         keyExtractor={(item: any) => item.id.toString()}
@@ -248,7 +274,9 @@ export default function MerchantsTab() {
           <View style={s.center}>
             <Ionicons name="people-outline" size={52} color="#d1d5db" />
             <Text style={s.emptyTxt}>
-              {search ? 'لا توجد نتائج مطابقة للبحث' : 'لا يوجد تجار'}
+              {search || filters.status !== 'all' || filters.balance !== 'all' || filters.orders !== 'all'
+                ? 'لا توجد نتائج مطابقة للبحث أو الفلتر'
+                : 'لا يوجد تجار'}
             </Text>
           </View>
         }
@@ -356,109 +384,122 @@ export default function MerchantsTab() {
         )}
       />
 
-      {/* ✅ Modal الفلترة المحسّن */}
-      <Modal visible={showFilterModal} transparent animationType="slide">
+      {/* ── مودال الفلترة (نفس تصميم الصفحة الرئيسية) ── */}
+      <Modal visible={showFilterModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.filterModalContent}>
             <View style={s.filterModalHeader}>
               <Text style={s.filterModalTitle}>فلترة التجار</Text>
               <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
+                <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* قسم النشاط */}
               <Text style={s.filterSectionTitle}>حسب النشاط</Text>
-              <View style={s.filterGrid}>
-                {(['all', 'active', 'inactive'] as FilterType[]).map((key) => (
+              <View style={s.filterOptionsGroup}>
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'active', label: 'نشط' },
+                  { id: 'inactive', label: 'غير نشط' },
+                ].map(option => (
                   <TouchableOpacity
-                    key={key}
-                    style={[s.filterOption, filter === key && s.filterOptionActive]}
-                    onPress={() => {
-                      setFilter(key);
-                      setShowFilterModal(false);
-                    }}
+                    key={option.id}
+                    style={s.filterOption}
+                    onPress={() => setTempFilters(prev => ({ ...prev, status: option.id as any }))}
                   >
-                    <Ionicons
-                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={18}
-                      color={filter === key ? PRIMARY : '#d1d5db'}
-                    />
-                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
-                      {filterLabels[key]}
-                    </Text>
+                    <View style={[s.radioCircle, tempFilters.status === option.id && s.radioSelected]} />
+                    <Text style={s.filterOptionText}>{option.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
+              {/* قسم الرصيد */}
               <Text style={s.filterSectionTitle}>حسب الرصيد</Text>
-              <View style={s.filterGrid}>
-                {(['has_balance', 'no_balance'] as FilterType[]).map((key) => (
+              <View style={s.filterOptionsGroup}>
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'has_balance', label: 'لديه رصيد' },
+                  { id: 'no_balance', label: 'رصيد صفر' },
+                ].map(option => (
                   <TouchableOpacity
-                    key={key}
-                    style={[s.filterOption, filter === key && s.filterOptionActive]}
-                    onPress={() => {
-                      setFilter(key);
-                      setShowFilterModal(false);
-                    }}
+                    key={option.id}
+                    style={s.filterOption}
+                    onPress={() => setTempFilters(prev => ({ ...prev, balance: option.id as any }))}
                   >
-                    <Ionicons
-                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={18}
-                      color={filter === key ? PRIMARY : '#d1d5db'}
-                    />
-                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
-                      {filterLabels[key]}
-                    </Text>
+                    <View style={[s.radioCircle, tempFilters.balance === option.id && s.radioSelected]} />
+                    <Text style={s.filterOptionText}>{option.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
+              {/* قسم الطلبات */}
               <Text style={s.filterSectionTitle}>حسب الطلبات</Text>
-              <View style={s.filterGrid}>
-                {(['high_orders', 'low_orders'] as FilterType[]).map((key) => (
+              <View style={s.filterOptionsGroup}>
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'high_orders', label: 'طلبات عالية' },
+                  { id: 'low_orders', label: 'طلبات قليلة' },
+                ].map(option => (
                   <TouchableOpacity
-                    key={key}
-                    style={[s.filterOption, filter === key && s.filterOptionActive]}
-                    onPress={() => {
-                      setFilter(key);
-                      setShowFilterModal(false);
-                    }}
+                    key={option.id}
+                    style={s.filterOption}
+                    onPress={() => setTempFilters(prev => ({ ...prev, orders: option.id as any }))}
                   >
-                    <Ionicons
-                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={18}
-                      color={filter === key ? PRIMARY : '#d1d5db'}
-                    />
-                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
-                      {filterLabels[key]}
-                    </Text>
+                    <View style={[s.radioCircle, tempFilters.orders === option.id && s.radioSelected]} />
+                    <Text style={s.filterOptionText}>{option.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <TouchableOpacity
-                style={s.clearFilterBtn}
-                onPress={() => {
-                  setFilter('all');
-                  setSearch('');
-                  setShowFilterModal(false);
-                }}
-              >
+              {/* قسم الترتيب */}
+              <Text style={s.filterSectionTitle}>ترتيب حسب</Text>
+              <View style={s.filterOptionsGroup}>
+                {[
+                  { id: 'newest', label: 'الأحدث' },
+                  { id: 'name_asc', label: 'الاسم (أ-ي)' },
+                  { id: 'name_desc', label: 'الاسم (ي-أ)' },
+                  { id: 'balance_high', label: 'أعلى رصيد' },
+                  { id: 'balance_low', label: 'أقل رصيد' },
+                  { id: 'orders_high', label: 'أكثر طلبات' },
+                ].map(option => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={s.filterOption}
+                    onPress={() => setTempFilters(prev => ({ ...prev, sortBy: option.id as any }))}
+                  >
+                    <View style={[s.radioCircle, tempFilters.sortBy === option.id && s.radioSelected]} />
+                    <Text style={s.filterOptionText}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* زر إعادة تعيين (داخل المودال) */}
+              <TouchableOpacity style={s.resetFilterBtn} onPress={resetFilters}>
                 <Ionicons name="refresh-outline" size={16} color={PRIMARY} />
-                <Text style={s.clearFilterText}>إعادة تعيين الفلتر</Text>
+                <Text style={s.resetFilterBtnText}>إعادة تعيين الفلتر</Text>
               </TouchableOpacity>
             </ScrollView>
+
+            {/* أزرار التطبيق والإلغاء */}
+            <View style={s.modalFooter}>
+              <TouchableOpacity style={s.cancelFilterBtn} onPress={() => setShowFilterModal(false)}>
+                <Text style={s.cancelFilterBtnText}>إلغاء</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.applyFilterBtn} onPress={applyFilters}>
+                <Text style={s.applyFilterText}>تطبيق الفلتر</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal التعديل - نفس الكود */}
+      {/* ── مودال التعديل (نفسه) ── */}
       <Modal visible={!!editUser} transparent animationType="slide">
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modalOverlay}>
             <View style={s.modalCard}>
-
               <View style={s.modalHeader}>
                 <TouchableOpacity onPress={() => setEditUser(null)} style={s.modalCloseBtn}>
                   <Ionicons name="close" size={20} color="#6b7280" />
@@ -467,7 +508,6 @@ export default function MerchantsTab() {
               </View>
 
               <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
-
                 <Text style={s.inputLabel}>اسم المتجر</Text>
                 <TextInput
                   style={s.input}
@@ -525,7 +565,6 @@ export default function MerchantsTab() {
                     textAlign="right"
                   />
                 </View>
-
               </ScrollView>
 
               <View style={s.modalFooter}>
@@ -543,7 +582,6 @@ export default function MerchantsTab() {
                   )}
                 </TouchableOpacity>
               </View>
-
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -552,6 +590,7 @@ export default function MerchantsTab() {
   );
 }
 
+// ── الأنماط (مع إضافة أنماط الراديو والأزرار) ──
 const s = StyleSheet.create({
   listContent: { padding: 12, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
@@ -582,19 +621,15 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
   filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#fff',
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: '#e8edf2',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  filterBtnActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
-  filterBtnText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  filterBtnTextActive: { color: PRIMARY },
 
   // ── إحصائيات سريعة ──
   quickStats: {
@@ -610,7 +645,7 @@ const s = StyleSheet.create({
   statNumber: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   statLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
 
-  // ── الكارد ──
+  // ── كارد التاجر ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -722,11 +757,12 @@ const s = StyleSheet.create({
   balanceLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
   balanceVal: { fontSize: 14, fontWeight: 'bold' },
 
-  // ── Modal الفلترة ──
+  // ── مودال الفلترة (جديد) ──
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   filterModalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '80%',
   },
@@ -737,18 +773,23 @@ const s = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#e8edf2',
   },
   filterModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   filterSectionTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#374151',
-    marginTop: 14,
+    marginTop: 16,
     marginBottom: 10,
     textAlign: 'right',
   },
-  filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  filterOptionsGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 6,
+  },
   filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -761,10 +802,20 @@ const s = StyleSheet.create({
     borderColor: '#e5e7eb',
     minWidth: '30%',
   },
-  filterOptionActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+  },
+  radioSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: PRIMARY,
+  },
   filterOptionText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
-  filterOptionTextActive: { color: PRIMARY },
-  clearFilterBtn: {
+
+  resetFilterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -776,10 +827,37 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: PRIMARY + '30',
   },
-  clearFilterText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
+  resetFilterBtnText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
 
-  // ── Modal التعديل ──
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e8edf2',
+  },
+  cancelFilterBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelFilterBtnText: { fontSize: 14, color: '#64748b', fontWeight: '600' },
+  applyFilterBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyFilterText: { fontSize: 14, color: '#fff', fontWeight: 'bold' },
+
+  // ── مودال التعديل ──
   modalCard: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 28,
@@ -805,7 +883,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   modalBody: { padding: 20, paddingBottom: 10 },
-  modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
 
   inputLabel: {
     fontSize: 12,
