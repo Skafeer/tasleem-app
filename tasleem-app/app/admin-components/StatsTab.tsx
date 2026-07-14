@@ -67,8 +67,8 @@ export default function StatsTab() {
   const qc = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [revenueTab, setRevenueTab] = useState<'day' | 'week' | 'month' | 'year'>('month');
+  const [activeStat, setActiveStat] = useState<string | null>(null);
 
-  // ✅ استرجاع البيانات من الباك إند مباشرة
   const { data: statsData, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-stats-data'],
     queryFn: async () => {
@@ -92,7 +92,6 @@ export default function StatsTab() {
     setRefreshing(false);
   };
 
-  // حالات التحميل والخطأ
   if (isLoading && !statsData) {
     return (
       <View style={s.center}>
@@ -116,13 +115,11 @@ export default function StatsTab() {
     );
   }
 
-  // استخراج البيانات من الـ API
   const orders = statsData?.orders || [];
   const users = statsData?.users || [];
   const withdrawals = statsData?.withdrawals || [];
   const products = statsData?.products || [];
 
-  // عمليات حسابية
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -134,7 +131,7 @@ export default function StatsTab() {
   const cancelled = allOrders.filter(o => o.status === 'cancelled');
   const returned = allOrders.filter(o => o.status === 'returned');
   const postponed = allOrders.filter(o => o.status === 'postponed');
-  const active = allOrders.filter(o => ['pending', 'processing', 'preparing', 'shipping'].includes(o.status));
+  const activeOrders = allOrders.filter(o => ['processing', 'shipping'].includes(o.status));
 
   const todayOrders = allOrders.filter(o => new Date(o.createdAt).toDateString() === today);
   const weekOrders = allOrders.filter(o => new Date(o.createdAt) >= weekAgo);
@@ -164,7 +161,6 @@ export default function StatsTab() {
 
   const activeRevTab = revenueTab === 'day' ? todayRev : revenueTab === 'week' ? weekRev : revenueTab === 'month' ? monthRev : yearRev;
 
-  // آخر 6 أشهر
   const last6: { label: string; revenue: number; profit: number; count: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(thisYear, thisMonth - i, 1);
@@ -183,7 +179,6 @@ export default function StatsTab() {
   }
   const maxMonthRev = Math.max(...last6.map(m => m.revenue), 1);
 
-  // آخر 7 أيام
   const last7Days: { label: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -195,7 +190,6 @@ export default function StatsTab() {
   }
   const maxDayCount = Math.max(...last7Days.map(d => d.count), 1);
 
-  // التجار
   const merchants = (users as any[]).filter(u => u.role !== 'admin');
   const newThisMonth = merchants.filter(u => {
     const d = new Date(u.createdAt);
@@ -204,7 +198,6 @@ export default function StatsTab() {
   const totalBalances = merchants.reduce((s, u) => s + (u.balance || 0), 0);
   const totalPending = merchants.reduce((s, u) => s + (u.pendingBalance || 0), 0);
 
-  // أكثر 5 تجار نشاطاً
   const merchantMap: Record<number, { name: string; count: number; revenue: number; profit: number }> = {};
   allOrders.forEach(o => {
     if (!o.merchantId) return;
@@ -221,7 +214,6 @@ export default function StatsTab() {
   const top5 = Object.values(merchantMap).sort((a, b) => b.count - a.count).slice(0, 5);
   const maxCount = top5[0]?.count || 1;
 
-  // المنتجات
   const allProducts = products as any[];
   const activeProducts = allProducts.filter(p => p.stock > 0);
   const outOfStock = allProducts.filter(p => p.stock === 0);
@@ -230,7 +222,6 @@ export default function StatsTab() {
   const potentialRev = allProducts.reduce((s, p) => s + ((p.wholesalePrice || 0) * p.stock), 0);
   const potentialProfit = potentialRev - totalStockVal;
 
-  // أكثر 5 منتجات مبيعاً
   const productSales: Record<number, { name: string; count: number; revenue: number }> = {};
   allOrders.forEach(o => {
     if (o.status !== 'delivered') return;
@@ -245,7 +236,6 @@ export default function StatsTab() {
   const top5Products = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
   const maxProdCount = top5Products[0]?.count || 1;
 
-  // السحوبات
   const ws = withdrawals as any[];
   const pendingW = ws.filter(w => w.status === 'pending');
   const approvedW = ws.filter(w => w.status === 'approved');
@@ -254,16 +244,24 @@ export default function StatsTab() {
   const paidAmt = paidW.reduce((s, w) => s + (w.amount || 0), 0);
   const pendingAmt = [...pendingW, ...approvedW].reduce((s, w) => s + (w.amount || 0), 0);
 
+  // الفترات السريعة
+  const quickStats = [
+    { icon: 'today-outline', label: 'طلبات اليوم', value: todayOrders.length, color: INFO, bg: '#eff6ff' },
+    { icon: 'calendar-outline', label: 'طلبات الأسبوع', value: weekOrders.length, color: PRIMARY, bg: PRIMARY + '15' },
+    { icon: 'calendar-outline', label: 'طلبات الشهر', value: monthOrders.length, color: PURPLE, bg: '#f5f3ff' },
+    { icon: 'stats-chart', label: 'طلبات السنة', value: yearOrders.length, color: SUCCESS, bg: '#ecfdf5' },
+  ];
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}>
 
-      {/* الملخص السريع */}
+      {/* الملخص السريع - 6 بطاقات */}
       <SectionTitle icon="stats-chart" title="الملخص السريع" color={PRIMARY} />
       <View style={s.grid2}>
-        <KpiCard icon="cash-outline" color={SUCCESS} bg="#ecfdf5" label="إيرادات كلية" value={`${fmt(totalRev.revenue)} د.ع`} />
+        <KpiCard icon="cash-outline" color={SUCCESS} bg="#ecfdf5" label="الإيرادات الكلية" value={`${fmt(totalRev.revenue)} د.ع`} />
         <KpiCard icon="trending-up-outline" color={PRIMARY} bg={PRIMARY + '15'} label="أرباح الشركة" value={`${fmt(totalRev.companyProfit)} د.ع`} />
         <KpiCard icon="bag-outline" color={INFO} bg="#eff6ff" label="إجمالي الطلبات" value={allOrders.length} />
         <KpiCard icon="checkmark-circle-outline" color={SUCCESS} bg="#ecfdf5" label="نسبة التسليم" value={`${deliveryRate}%`} />
@@ -271,9 +269,8 @@ export default function StatsTab() {
         <KpiCard icon="cube-outline" color={SECONDARY} bg="#fffbeb" label="المنتجات" value={allProducts.length} />
       </View>
 
-      {/* الإيرادات والأرباح */}
+      {/* الإيرادات والأرباح - مع تبويبات */}
       <SectionTitle icon="cash" title="الإيرادات والأرباح" color={SUCCESS} />
-
       <View style={s.tabs}>
         {(['day', 'week', 'month', 'year'] as const).map((k) => {
           const labels = { day: 'اليوم', week: 'الأسبوع', month: 'الشهر', year: 'السنة' };
@@ -342,13 +339,18 @@ export default function StatsTab() {
         </View>
       </View>
 
-      {/* إحصائيات الطلبات */}
-      <SectionTitle icon="bag-handle" title="إحصائيات الطلبات" color={INFO} />
+      {/* إحصائيات الطلبات السريعة */}
+      <SectionTitle icon="bag-handle" title="الطلبات" color={INFO} />
       <View style={s.grid2}>
-        <KpiCard icon="today-outline" color={INFO} bg="#eff6ff" label="طلبات اليوم" value={todayOrders.length} />
-        <KpiCard icon="calendar-outline" color={PRIMARY} bg={PRIMARY + '15'} label="طلبات الأسبوع" value={weekOrders.length} />
-        <KpiCard icon="calendar-outline" color={PURPLE} bg="#f5f3ff" label="طلبات الشهر" value={monthOrders.length} />
-        <KpiCard icon="stats-chart" color={SUCCESS} bg="#ecfdf5" label="طلبات السنة" value={yearOrders.length} />
+        {quickStats.map((item, i) => (
+          <View key={i} style={[s.kpiCard, { borderTopColor: item.color }]}>
+            <View style={[s.kpiIcon, { backgroundColor: item.bg }]}>
+              <Ionicons name={item.icon as any} size={20} color={item.color} />
+            </View>
+            <Text style={[s.kpiVal, { color: item.color }]}>{item.value}</Text>
+            <Text style={s.kpiLabel}>{item.label}</Text>
+          </View>
+        ))}
       </View>
 
       {/* توزيع الطلبات حسب الحالة */}
@@ -356,13 +358,13 @@ export default function StatsTab() {
         <Text style={s.cardTitle}>📦 توزيع الطلبات حسب الحالة</Text>
         {[
           { label: 'مسلّم', count: delivered.length, color: SUCCESS },
-          { label: 'نشط', count: active.length, color: INFO },
+          { label: 'نشط', count: activeOrders.length, color: INFO },
           { label: 'ملغي', count: cancelled.length, color: DANGER },
           { label: 'مرتجع', count: returned.length, color: WARNING },
           { label: 'مؤجل', count: postponed.length, color: PURPLE },
         ].map((item, i) => (
           <BarRow key={i} label={item.label} count={item.count}
-            max={Math.max(delivered.length, active.length, cancelled.length, returned.length, postponed.length, 1)}
+            max={Math.max(delivered.length, activeOrders.length, cancelled.length, returned.length, postponed.length, 1)}
             color={item.color} />
         ))}
         <View style={s.divider} />
@@ -408,7 +410,7 @@ export default function StatsTab() {
       </View>
 
       {/* إحصائيات المنتجات */}
-      <SectionTitle icon="cube" title="إحصائيات المنتجات" color={SECONDARY} />
+      <SectionTitle icon="cube" title="المنتجات والمخزون" color={SECONDARY} />
       <View style={s.grid2}>
         <KpiCard icon="cube-outline" color={PRIMARY} bg={PRIMARY + '15'} label="إجمالي المنتجات" value={allProducts.length} />
         <KpiCard icon="checkmark-outline" color={SUCCESS} bg="#ecfdf5" label="متوفر بالمخزون" value={activeProducts.length} />
@@ -431,7 +433,7 @@ export default function StatsTab() {
       )}
 
       {/* إحصائيات التجار */}
-      <SectionTitle icon="storefront" title="إحصائيات التجار" color={PURPLE} />
+      <SectionTitle icon="storefront" title="التجار" color={PURPLE} />
       <View style={s.grid2}>
         <KpiCard icon="people-outline" color={PURPLE} bg="#f5f3ff" label="إجمالي التجار" value={merchants.length} />
         <KpiCard icon="person-add-outline" color={SECONDARY} bg="#fffbeb" label="جدد هذا الشهر" value={newThisMonth.length} />
@@ -440,7 +442,7 @@ export default function StatsTab() {
       </View>
 
       {/* إحصائيات السحوبات */}
-      <SectionTitle icon="wallet" title="إحصائيات السحوبات" color={WARNING} />
+      <SectionTitle icon="wallet" title="السحوبات" color={WARNING} />
       <View style={s.card}>
         <View style={s.wGrid}>
           {[
