@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+// app/admin-components/MerchantsTab.tsx
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Clipboard, Alert, Modal, TextInput,
@@ -16,7 +17,8 @@ const SECONDARY = '#f5a006';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
-type FilterType = 'all' | 'active' | 'inactive' | 'top_balance';
+// أنواع الفلترة
+type FilterType = 'all' | 'active' | 'inactive' | 'high_orders' | 'low_orders' | 'has_balance' | 'no_balance';
 
 export default function MerchantsTab() {
   const qc = useQueryClient();
@@ -26,6 +28,7 @@ export default function MerchantsTab() {
   const [showPass, setShowPass] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
@@ -100,37 +103,68 @@ export default function MerchantsTab() {
     updateUser.mutate({ id: editUser.id, data: editForm });
   };
 
-  // المعالجة والفلترة
-  const merchants = (users as any[])
-    .filter((u: any) => u.role !== 'admin');
+  // ✅ دالة الفلترة المحسنة
+  const getFilteredMerchants = () => {
+    let filtered = (users as any[])
+      .filter((u: any) => u.role !== 'admin');
 
-  // البحث (بما في ذلك merchantId و id)
-  const searched = merchants.filter((u: any) =>
-    !search ||
-    u.storeName?.includes(search) ||
-    u.phone?.includes(search) ||
-    String(u.merchantId)?.includes(search) ||
-    String(u.id)?.includes(search)
-  );
+    // البحث (رقم التاجر، الاسم، الهاتف)
+    if (search.trim()) {
+      const query = search.trim().toLowerCase();
+      filtered = filtered.filter((u: any) =>
+        u.storeName?.toLowerCase().includes(query) ||
+        u.phone?.includes(query) ||
+        String(u.merchantId || u.id).includes(query)
+      );
+    }
 
-  // الفلترة
-  const filtered = useMemo(() => {
+    // ✅ الفلاتر المخصصة
     switch (filter) {
       case 'active':
-        return searched.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0);
+        filtered = filtered.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0);
+        break;
       case 'inactive':
-        return searched.filter((u: any) => (u.balance || 0) === 0 && (u.pendingBalance || 0) === 0);
-      case 'top_balance':
-        return [...searched].sort((a, b) => (b.balance || 0) - (a.balance || 0));
+        filtered = filtered.filter((u: any) => (u.balance || 0) === 0 && (u.pendingBalance || 0) === 0);
+        break;
+      case 'high_orders':
+        // نأخذ التجار الذين لديهم أكثر من 10 طلبات (نحسبها من الـ orders في الـ API)
+        // مؤقتاً نستخدم الـ balance كمعيار
+        filtered = filtered.filter((u: any) => (u.balance || 0) > 50000);
+        break;
+      case 'low_orders':
+        filtered = filtered.filter((u: any) => (u.balance || 0) < 10000);
+        break;
+      case 'has_balance':
+        filtered = filtered.filter((u: any) => (u.balance || 0) > 0);
+        break;
+      case 'no_balance':
+        filtered = filtered.filter((u: any) => (u.balance || 0) === 0);
+        break;
       default:
-        return searched;
+        break;
     }
-  }, [searched, filter]);
+
+    // ترتيب حسب الأحدث
+    return filtered.sort((a: any, b: any) => b.id - a.id);
+  };
+
+  const merchants = getFilteredMerchants();
+
+  // أسماء الفلاتر للعرض
+  const filterLabels: Record<FilterType, string> = {
+    all: 'الكل',
+    active: 'نشط',
+    inactive: 'غير نشط',
+    high_orders: 'طلبات عالية',
+    low_orders: 'طلبات قليلة',
+    has_balance: 'لديه رصيد',
+    no_balance: 'رصيد صفر',
+  };
 
   // إحصائيات سريعة
-  const totalMerchants = merchants.length;
-  const activeMerchants = merchants.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0).length;
-  const totalBalance = merchants.reduce((sum: number, u: any) => sum + (u.balance || 0), 0);
+  const totalMerchants = (users as any[]).filter((u: any) => u.role !== 'admin').length;
+  const activeMerchants = (users as any[]).filter((u: any) => u.role !== 'admin' && (u.balance || 0) > 0).length;
+  const totalBalance = (users as any[]).filter((u: any) => u.role !== 'admin').reduce((s, u) => s + (u.balance || 0), 0);
 
   if (isLoading) {
     return (
@@ -144,175 +178,280 @@ export default function MerchantsTab() {
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* بطاقة الإحصائيات السريعة */}
-      <View style={s.statsRow}>
-        <View style={s.statsItem}>
-          <Text style={s.statsNum}>{totalMerchants}</Text>
-          <Text style={s.statsLabel}>إجمالي التجار</Text>
+      {/* شريط البحث والفلترة */}
+      <View style={s.topBar}>
+        <View style={s.searchWrap}>
+          <Ionicons name="search-outline" size={17} color="#9ca3af" />
+          <TextInput
+            style={s.searchInput}
+            placeholder="ابحث بالاسم، الهاتف، أو رقم التاجر..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor="#9ca3af"
+            textAlign="right"
+          />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={17} color="#9ca3af" />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <View style={s.statsDivider} />
-        <View style={s.statsItem}>
-          <Text style={[s.statsNum, { color: SUCCESS }]}>{activeMerchants}</Text>
-          <Text style={s.statsLabel}>نشط</Text>
-        </View>
-        <View style={s.statsDivider} />
-        <View style={s.statsItem}>
-          <Text style={[s.statsNum, { color: PRIMARY }]}>{totalBalance.toLocaleString()}</Text>
-          <Text style={s.statsLabel}>إجمالي الأرصدة</Text>
-        </View>
-      </View>
 
-      {/* شريط البحث والفلتر */}
-      <View style={s.searchWrap}>
-        <Ionicons name="search-outline" size={17} color="#9ca3af" />
-        <TextInput
-          style={s.searchInput}
-          placeholder="ابحث باسم المتجر، الهاتف، أو ID..."
-          value={search}
-          onChangeText={setSearch}
-          placeholderTextColor="#9ca3af"
-          textAlign="right"
-        />
-        {search ? (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={17} color="#9ca3af" />
-          </TouchableOpacity>
-        ) : null}
-        
-        {/* زر الفلتر */}
-        <TouchableOpacity style={s.filterBtn} onPress={() => {
-          const nextFilter: Record<FilterType, FilterType> = {
-            all: 'active',
-            active: 'inactive',
-            inactive: 'top_balance',
-            top_balance: 'all',
-          };
-          setFilter(nextFilter[filter]);
-        }}>
-          <Ionicons name="options-outline" size={18} color={PRIMARY} />
-        </TouchableOpacity>
-      </View>
-
-      {/* عرض الفلتر الحالي */}
-      <View style={s.filterTagRow}>
-        <Text style={s.filterTagLabel}>الفلتر:</Text>
-        <View style={s.filterTag}>
-          <Text style={s.filterTagText}>
-            {filter === 'all' ? 'الكل' :
-             filter === 'active' ? 'نشط' :
-             filter === 'inactive' ? 'غير نشط' :
-             'أعلى رصيد'}
+        {/* زر الفلترة مع عرض الفلتر الحالي */}
+        <TouchableOpacity
+          style={[s.filterBtn, filter !== 'all' && s.filterBtnActive]}
+          onPress={() => setShowFilterModal(true)}
+        >
+          <Ionicons
+            name="options-outline"
+            size={18}
+            color={filter !== 'all' ? PRIMARY : '#6b7280'}
+          />
+          <Text style={[s.filterBtnText, filter !== 'all' && s.filterBtnTextActive]}>
+            {filterLabels[filter]}
           </Text>
-        </View>
-        <TouchableOpacity onPress={() => setFilter('all')} style={s.clearFilterBtn}>
-          <Ionicons name="close-circle" size={14} color="#9ca3af" />
         </TouchableOpacity>
+      </View>
+
+      {/* إحصائيات سريعة */}
+      <View style={s.quickStats}>
+        <View style={s.statItem}>
+          <Text style={s.statNumber}>{totalMerchants}</Text>
+          <Text style={s.statLabel}>إجمالي التجار</Text>
+        </View>
+        <View style={s.statDivider} />
+        <View style={s.statItem}>
+          <Text style={[s.statNumber, { color: SUCCESS }]}>{activeMerchants}</Text>
+          <Text style={s.statLabel}>نشط</Text>
+        </View>
+        <View style={s.statDivider} />
+        <View style={s.statItem}>
+          <Text style={[s.statNumber, { color: PRIMARY }]}>{totalMerchants - activeMerchants}</Text>
+          <Text style={s.statLabel}>غير نشط</Text>
+        </View>
+        <View style={s.statDivider} />
+        <View style={s.statItem}>
+          <Text style={[s.statNumber, { color: '#8b5cf6' }]}>
+            {totalBalance.toLocaleString()}
+          </Text>
+          <Text style={s.statLabel}>إجمالي الرصيد</Text>
+        </View>
       </View>
 
       {/* قائمة التجار */}
       <FlatList
-        data={filtered}
+        data={merchants}
         keyExtractor={(item: any) => item.id.toString()}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={s.center}>
             <Ionicons name="people-outline" size={52} color="#d1d5db" />
-            <Text style={s.emptyTxt}>لا يوجد تجار</Text>
+            <Text style={s.emptyTxt}>
+              {search ? 'لا توجد نتائج مطابقة للبحث' : 'لا يوجد تجار'}
+            </Text>
           </View>
         }
-        renderItem={({ item: u }: any) => {
-          const isActive = (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0;
-          return (
-            <TouchableOpacity
-              style={s.card}
-              activeOpacity={0.9}
-              onPress={() => router.push(`/admin/merchant/${u.id}`)}
-            >
-              {/* رأس الكارد */}
-              <View style={s.cardHeader}>
-                <View style={s.avatarRow}>
-                  <View style={[s.avatar, isActive && s.avatarActive]}>
-                    <Text style={s.avatarTxt}>{u.storeName?.charAt(0) || '؟'}</Text>
-                  </View>
-                  <View style={s.merchantInfo}>
-                    <View style={s.nameRow}>
-                      <Text style={s.storeName}>{u.storeName}</Text>
-                      <View style={[s.statusDot, isActive ? s.statusDotActive : s.statusDotInactive]} />
-                    </View>
-                    <Text style={s.merchantId}>ID: #{u.merchantId || u.id}</Text>
+        renderItem={({ item: u }: any) => (
+          <TouchableOpacity
+            style={s.card}
+            activeOpacity={0.9}
+            onPress={() => router.push(`/admin/merchant/${u.id}`)}
+          >
+            <View style={s.cardHeader}>
+              <View style={s.avatarRow}>
+                <View style={s.avatar}>
+                  <Text style={s.avatarTxt}>{u.storeName?.charAt(0) || '؟'}</Text>
+                </View>
+                <View style={s.merchantInfo}>
+                  <Text style={s.storeName}>{u.storeName}</Text>
+                  <View style={s.idRow}>
+                    <Text style={s.merchantId}>#{u.merchantId || u.id}</Text>
+                    <TouchableOpacity
+                      style={s.copyIdBtn}
+                      onPress={() => copy(String(u.merchantId || u.id), 'رقم التاجر')}
+                    >
+                      <Ionicons name="copy-outline" size={12} color="#9ca3af" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
-
-              {/* أزرار الإجراءات */}
-              <View style={s.actionsRow}>
-                <TouchableOpacity
-                  style={s.deleteBtn}
-                  onPress={(e) => { e.stopPropagation(); confirmDelete(u); }}
-                >
-                  <Ionicons name="trash-outline" size={14} color={DANGER} />
-                  <Text style={s.deleteBtnTxt}>حذف</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.editBtn}
-                  onPress={(e) => { e.stopPropagation(); openEdit(u); }}
-                >
-                  <Ionicons name="create-outline" size={14} color={PRIMARY} />
-                  <Text style={s.editBtnTxt}>تعديل</Text>
-                </TouchableOpacity>
+              <View style={s.statusDot}>
+                <View style={[s.dot, (u.balance || 0) > 0 ? s.dotActive : s.dotInactive]} />
+                <Text style={[s.statusText, (u.balance || 0) > 0 ? s.statusActive : s.statusInactive]}>
+                  {(u.balance || 0) > 0 ? 'نشط' : 'غير نشط'}
+                </Text>
               </View>
+            </View>
 
-              <View style={s.divider} />
+            <View style={s.actionsRow}>
+              <TouchableOpacity
+                style={s.deleteBtn}
+                onPress={(e) => { e.stopPropagation(); confirmDelete(u); }}
+              >
+                <Ionicons name="trash-outline" size={14} color={DANGER} />
+                <Text style={s.deleteBtnTxt}>حذف</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.editBtn}
+                onPress={(e) => { e.stopPropagation(); openEdit(u); }}
+              >
+                <Ionicons name="create-outline" size={14} color={PRIMARY} />
+                <Text style={s.editBtnTxt}>تعديل</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.detailsBtn}
+                onPress={(e) => { e.stopPropagation(); router.push(`/admin/merchant/${u.id}`); }}
+              >
+                <Ionicons name="eye-outline" size={14} color={PRIMARY} />
+                <Text style={s.detailsBtnTxt}>تفاصيل</Text>
+              </TouchableOpacity>
+            </View>
 
-              {/* معلومات التواصل */}
-              <View style={s.section}>
+            <View style={s.divider} />
+
+            <View style={s.section}>
+              <View style={s.infoLine}>
+                <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.phone, 'رقم الهاتف')}>
+                  <Ionicons name="copy-outline" size={13} color={PRIMARY} />
+                </TouchableOpacity>
+                <View style={s.infoRight}>
+                  <Text style={s.infoLabel}>رقم الهاتف</Text>
+                  <Text style={s.infoVal}>{u.phone || '—'}</Text>
+                </View>
+                <Ionicons name="call-outline" size={15} color="#9ca3af" />
+              </View>
+              {u.address && (
                 <View style={s.infoLine}>
-                  <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.phone, 'رقم الهاتف')}>
+                  <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.address, 'العنوان')}>
                     <Ionicons name="copy-outline" size={13} color={PRIMARY} />
                   </TouchableOpacity>
                   <View style={s.infoRight}>
-                    <Text style={s.infoLabel}>رقم الهاتف</Text>
-                    <Text style={s.infoVal}>{u.phone || '—'}</Text>
+                    <Text style={s.infoLabel}>العنوان</Text>
+                    <Text style={s.infoVal}>{u.address}</Text>
                   </View>
-                  <Ionicons name="call-outline" size={15} color="#9ca3af" />
+                  <Ionicons name="location-outline" size={15} color="#9ca3af" />
                 </View>
-                {u.address && (
-                  <View style={s.infoLine}>
-                    <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.address, 'العنوان')}>
-                      <Ionicons name="copy-outline" size={13} color={PRIMARY} />
-                    </TouchableOpacity>
-                    <View style={s.infoRight}>
-                      <Text style={s.infoLabel}>العنوان</Text>
-                      <Text style={s.infoVal}>{u.address}</Text>
-                    </View>
-                    <Ionicons name="location-outline" size={15} color="#9ca3af" />
-                  </View>
-                )}
-              </View>
+              )}
+            </View>
 
-              <View style={s.divider} />
+            <View style={s.divider} />
 
-              {/* الأرباح والرصيد */}
-              <View style={s.balanceRow}>
-                <View style={s.balanceBox}>
-                  <Text style={s.balanceLabel}>الرصيد المتاح</Text>
-                  <Text style={[s.balanceVal, { color: SUCCESS }]}>
-                    {u.balance?.toLocaleString() ?? '0'} د.ع
-                  </Text>
-                </View>
-                <View style={s.balanceDivider} />
-                <View style={s.balanceBox}>
-                  <Text style={s.balanceLabel}>الرصيد المعلق</Text>
-                  <Text style={[s.balanceVal, { color: SECONDARY }]}>
-                    {u.pendingBalance?.toLocaleString() ?? '0'} د.ع
-                  </Text>
-                </View>
+            <View style={s.balanceRow}>
+              <View style={s.balanceBox}>
+                <Text style={s.balanceLabel}>الرصيد المتاح</Text>
+                <Text style={[s.balanceVal, { color: SUCCESS }]}>
+                  {u.balance?.toLocaleString() ?? '0'} د.ع
+                </Text>
               </View>
-            </TouchableOpacity>
-          );
-        }}
+              <View style={s.balanceDivider} />
+              <View style={s.balanceBox}>
+                <Text style={s.balanceLabel}>الرصيد المعلق</Text>
+                <Text style={[s.balanceVal, { color: SECONDARY }]}>
+                  {u.pendingBalance?.toLocaleString() ?? '0'} د.ع
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
       />
+
+      {/* ✅ Modal الفلترة المحسّن */}
+      <Modal visible={showFilterModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.filterModalContent}>
+            <View style={s.filterModalHeader}>
+              <Text style={s.filterModalTitle}>فلترة التجار</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={s.filterSectionTitle}>حسب النشاط</Text>
+              <View style={s.filterGrid}>
+                {(['all', 'active', 'inactive'] as FilterType[]).map((key) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[s.filterOption, filter === key && s.filterOptionActive]}
+                    onPress={() => {
+                      setFilter(key);
+                      setShowFilterModal(false);
+                    }}
+                  >
+                    <Ionicons
+                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={18}
+                      color={filter === key ? PRIMARY : '#d1d5db'}
+                    />
+                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
+                      {filterLabels[key]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={s.filterSectionTitle}>حسب الرصيد</Text>
+              <View style={s.filterGrid}>
+                {(['has_balance', 'no_balance'] as FilterType[]).map((key) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[s.filterOption, filter === key && s.filterOptionActive]}
+                    onPress={() => {
+                      setFilter(key);
+                      setShowFilterModal(false);
+                    }}
+                  >
+                    <Ionicons
+                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={18}
+                      color={filter === key ? PRIMARY : '#d1d5db'}
+                    />
+                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
+                      {filterLabels[key]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={s.filterSectionTitle}>حسب الطلبات</Text>
+              <View style={s.filterGrid}>
+                {(['high_orders', 'low_orders'] as FilterType[]).map((key) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[s.filterOption, filter === key && s.filterOptionActive]}
+                    onPress={() => {
+                      setFilter(key);
+                      setShowFilterModal(false);
+                    }}
+                  >
+                    <Ionicons
+                      name={filter === key ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={18}
+                      color={filter === key ? PRIMARY : '#d1d5db'}
+                    />
+                    <Text style={[s.filterOptionText, filter === key && s.filterOptionTextActive]}>
+                      {filterLabels[key]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={s.clearFilterBtn}
+                onPress={() => {
+                  setFilter('all');
+                  setSearch('');
+                  setShowFilterModal(false);
+                }}
+              >
+                <Ionicons name="refresh-outline" size={16} color={PRIMARY} />
+                <Text style={s.clearFilterText}>إعادة تعيين الفلتر</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal التعديل - نفس الكود */}
       <Modal visible={!!editUser} transparent animationType="slide">
@@ -419,30 +558,22 @@ const s = StyleSheet.create({
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
   emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
 
-  // إحصائيات سريعة
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 6,
-    borderRadius: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-  },
-  statsItem: { flex: 1, alignItems: 'center' },
-  statsDivider: { width: 1, backgroundColor: '#e8edf2' },
-  statsNum: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  statsLabel: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
-
-  // البحث والفلتر
-  searchWrap: {
+  // ── شريط البحث والفلترة ──
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  searchWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
     paddingHorizontal: 12,
     gap: 8,
@@ -450,26 +581,36 @@ const s = StyleSheet.create({
     borderColor: '#e8edf2',
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
-  filterBtn: { padding: 6, borderRadius: 8, backgroundColor: PRIMARY + '12' },
-
-  filterTagRow: {
+  filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 6,
-    gap: 6,
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
   },
-  filterTagLabel: { fontSize: 12, color: '#9ca3af', fontWeight: '600' },
-  filterTag: {
-    backgroundColor: PRIMARY + '12',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  filterTagText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-  clearFilterBtn: { padding: 4 },
+  filterBtnActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  filterBtnText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  filterBtnTextActive: { color: PRIMARY },
 
-  // بطاقة التاجر
+  // ── إحصائيات سريعة ──
+  quickStats: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statDivider: { width: 1, backgroundColor: '#e8edf2' },
+  statNumber: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  statLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+
+  // ── الكارد ──
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -488,12 +629,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 14,
+    paddingBottom: 8,
   },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: {
     width: 46,
     height: 46,
@@ -502,22 +640,27 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarActive: { backgroundColor: SUCCESS + '20' },
   avatarTxt: { fontSize: 20, fontWeight: 'bold', color: PRIMARY },
-  merchantInfo: { alignItems: 'flex-end', flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  merchantInfo: { alignItems: 'flex-end' },
   storeName: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
-  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#d1d5db' },
-  statusDotActive: { backgroundColor: SUCCESS },
-  statusDotInactive: { backgroundColor: '#d1d5db' },
-  merchantId: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  idRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  merchantId: { fontSize: 11, color: '#9ca3af' },
+  copyIdBtn: { padding: 2 },
+  statusDot: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  dotActive: { backgroundColor: SUCCESS },
+  dotInactive: { backgroundColor: '#d1d5db' },
+  statusText: { fontSize: 11, fontWeight: '600' },
+  statusActive: { color: SUCCESS },
+  statusInactive: { color: '#9ca3af' },
 
   actionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12 },
   editBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
-    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     backgroundColor: PRIMARY + '12',
@@ -526,10 +669,11 @@ const s = StyleSheet.create({
   },
   editBtnTxt: { fontSize: 12, fontWeight: '700', color: PRIMARY },
   deleteBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
-    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     backgroundColor: DANGER + '12',
@@ -537,12 +681,25 @@ const s = StyleSheet.create({
     borderColor: DANGER + '30',
   },
   deleteBtnTxt: { fontSize: 12, fontWeight: '700', color: DANGER },
+  detailsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: PRIMARY + '10',
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
+  },
+  detailsBtnTxt: { fontSize: 12, fontWeight: '700', color: PRIMARY },
 
   divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
 
   section: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   infoLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoRight: { alignItems: 'flex-end' },
+  infoRight: { alignItems: 'flex-end', flex: 1 },
   infoLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600', textAlign: 'right' },
   infoVal: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right' },
   copyBtn: {
@@ -565,7 +722,63 @@ const s = StyleSheet.create({
   balanceLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
   balanceVal: { fontSize: 14, fontWeight: 'bold' },
 
-  // Modal
+  // ── Modal الفلترة ──
+  filterModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  filterModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  filterSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 14,
+    marginBottom: 10,
+    textAlign: 'right',
+  },
+  filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    minWidth: '30%',
+  },
+  filterOptionActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
+  filterOptionText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  filterOptionTextActive: { color: PRIMARY },
+  clearFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: PRIMARY + '10',
+    borderWidth: 1,
+    borderColor: PRIMARY + '30',
+  },
+  clearFilterText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
+
+  // ── Modal التعديل ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#fff',
