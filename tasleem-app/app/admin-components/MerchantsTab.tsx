@@ -1,3 +1,4 @@
+// app/admin-components/MerchantsTab.tsx
 import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
@@ -6,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -17,6 +19,7 @@ const BG = '#f2f6f9';
 
 export default function MerchantsTab() {
   const qc = useQueryClient();
+  const router = useRouter();
   const [editUser, setEditUser] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [showPass, setShowPass] = useState(false);
@@ -135,7 +138,7 @@ export default function MerchantsTab() {
         ) : null}
       </View>
 
-      {/* قائمة التجار */}
+      {/* قائمة التجار - الآن قابلة للنقر */}
       <FlatList
         data={merchants}
         keyExtractor={(item: any) => item.id.toString()}
@@ -148,8 +151,11 @@ export default function MerchantsTab() {
           </View>
         }
         renderItem={({ item: u }: any) => (
-          <View style={s.card}>
-
+          <TouchableOpacity
+            style={s.card}
+            activeOpacity={0.9}
+            onPress={() => router.push(`/admin/merchant/${u.id}`)}
+          >
             {/* رأس الكارد */}
             <View style={s.cardHeader}>
               <View style={s.avatarRow}>
@@ -163,13 +169,19 @@ export default function MerchantsTab() {
               </View>
             </View>
 
-            {/* أزرار الإجراءات */}
+            {/* أزرار الإجراءات (تعديل/حذف - لا تمنع الانتقال) */}
             <View style={s.actionsRow}>
-              <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(u)}>
+              <TouchableOpacity
+                style={s.deleteBtn}
+                onPress={(e) => { e.stopPropagation(); confirmDelete(u); }}
+              >
                 <Ionicons name="trash-outline" size={14} color={DANGER} />
                 <Text style={s.deleteBtnTxt}>حذف</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.editBtn} onPress={() => openEdit(u)}>
+              <TouchableOpacity
+                style={s.editBtn}
+                onPress={(e) => { e.stopPropagation(); openEdit(u); }}
+              >
                 <Ionicons name="create-outline" size={14} color={PRIMARY} />
                 <Text style={s.editBtnTxt}>تعديل</Text>
               </TouchableOpacity>
@@ -221,11 +233,11 @@ export default function MerchantsTab() {
                 </Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       />
 
-      {/* Modal التعديل */}
+      {/* Modal التعديل - نفس الكود */}
       <Modal visible={!!editUser} transparent animationType="slide">
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modalOverlay}>
