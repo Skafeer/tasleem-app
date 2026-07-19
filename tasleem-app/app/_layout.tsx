@@ -1,4 +1,3 @@
-// tasleem-app/app/_layout.tsx
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +7,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../src/lib/api';
 import { useNotifications } from './hooks/useNotifications';
 import { useFonts } from 'expo-font';
-import * as Notifications from 'expo-notifications';
 import {
   Cairo_400Regular,
   Cairo_500Medium,
@@ -27,6 +25,15 @@ if (Platform.OS !== 'web') {
 
 // ✅ تطبيق Cairo على كل النصوص تلقائياً
 const DEFAULT_FONT = 'Cairo_400Regular';
+const OLD_TEXT_RENDER = (Text as any).render;
+if (OLD_TEXT_RENDER) {
+  const applyDefaultProps = (props: any) => ({
+    ...props,
+    style: [{ fontFamily: DEFAULT_FONT }, ...(Array.isArray(props.style) ? props.style : [props.style])],
+  });
+  // نستخدم defaultProps بدلاً من override
+}
+// الطريقة الأضمن في React Native:
 (Text as any).defaultProps = (Text as any).defaultProps || {};
 (Text as any).defaultProps.style = { fontFamily: 'Cairo_400Regular' };
 (TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
@@ -41,70 +48,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const [isReady, setIsReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useNotifications(isLoggedIn);
 
-  // ── دالة التنقل من الإشعار ──
-  const handleNotificationPress = (data: any) => {
-    if (!data) return;
-
-    const { type, id } = data;
-    if (!id) {
-      console.warn('الإشعار لا يحتوي على معرف (id)');
-      return;
-    }
-
-    console.log(`🔔 التنقل إلى ${type} برقم ${id}`);
-
-    // هنا يمكنك إضافة التحقق من المسار الحالي لتجنب التكرار
-    // لكننا سننقل مباشرة
-    switch (type) {
-      case 'order':
-        router.push(`/order-details/${id}`);
-        break;
-      case 'product':
-        router.push(`/products/${id}`);
-        break;
-      case 'merchant':
-        router.push(`/admin/merchant/${id}`);
-        break;
-      case 'chat':
-        router.push(`/chat/${id}`);
-        break;
-      // أضف أي حالات أخرى حسب تطبيقك
-      default:
-        console.warn(`نوع الإشعار غير معروف: ${type}`);
-        // يمكن توجيه المستخدم إلى الصفحة الرئيسية أو عرض تنبيه
-        router.push('/(tabs)');
-    }
-  };
-
-  // ── استخدام هوك الإشعارات مع تمرير دالة المعالجة ──
-  useNotifications(isLoggedIn, handleNotificationPress);
-
-  // ── التحقق من الإشعار الأولي عند فتح التطبيق (من الخلفية) ──
-  useEffect(() => {
-    const checkInitialNotification = async () => {
-      if (!isLoggedIn) return;
-      try {
-        const response = await Notifications.getLastNotificationResponseAsync();
-        if (response?.notification?.request?.content?.data) {
-          const data = response.notification.request.content.data;
-          console.log('📲 إشعار أولي عند فتح التطبيق:', data);
-          // تأخير بسيط لضمان تهيئة الملاح
-          setTimeout(() => {
-            handleNotificationPress(data);
-          }, 500);
-        }
-      } catch (error) {
-        console.error('خطأ في جلب الإشعار الأولي:', error);
-      }
-    };
-
-    if (isReady && isLoggedIn) {
-      checkInitialNotification();
-    }
-  }, [isReady, isLoggedIn]);
-
-  // ── التحقق من حالة المصادقة ──
   useEffect(() => {
     checkAuth();
   }, []);
@@ -150,6 +95,13 @@ export default function RootLayout() {
     Cairo_900Black,
   });
 
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      // لا نخفي الـ splash هنا — AuthGuard يتكفل بذلك
+    }
+  }, [fontsLoaded, fontError]);
+
+  // انتظر تحميل الخط قبل عرض أي شيء
   if (!fontsLoaded && !fontError) return null;
 
   return (
@@ -162,10 +114,6 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="cart" />
             <Stack.Screen name="products/[id]" />
-            {/* أضف أي شاشات أخرى مثل order-details, admin/merchant, chat... */}
-            <Stack.Screen name="order-details/[id]" />
-            <Stack.Screen name="admin/merchant/[id]" />
-            <Stack.Screen name="chat/[id]" />
           </Stack>
         </AuthGuard>
       </ToastProvider>
