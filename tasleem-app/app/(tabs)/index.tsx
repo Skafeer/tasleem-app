@@ -1,3 +1,4 @@
+// app/(tabs)/index.tsx
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -296,6 +297,7 @@ export default function HomeScreen() {
   const banners = rawBanners as any[];
   const products = allProducts as any[];
 
+  // ── الفلترة والترتيب (مع إضافة خيارات المخزون) ──────────────
   const filtered = useMemo(() => {
     let result = [...products];
 
@@ -335,11 +337,17 @@ export default function HomeScreen() {
       case 'popular':
         result.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
         break;
-      default:
+      case 'stock_desc':   // ✅ الأكثر توفراً
+        result.sort((a, b) => (b.stock || 0) - (a.stock || 0));
+        break;
+      case 'stock_asc':    // ✅ الأقل توفراً
+        result.sort((a, b) => (a.stock || 0) - (b.stock || 0));
+        break;
+      default: // 'newest'
         result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return result;
-  }, [products, activeCategoryId, searchQuery, filters, categories]);
+  }, [products, activeCategoryId, searchQuery, filters, categories, bestSellerIds]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -532,11 +540,12 @@ export default function HomeScreen() {
                   <BannerSlider banners={banners} containerWidth={Math.max(0, width - 32)} />
                 </View>
                 
+                {/* ✅ تم حذف عرض عدد المنتجات هنا */}
                 <View style={s.resultHeader}>
-                    <TouchableOpacity onPress={resetFilters}>
-                        <Text style={s.resetFilterText}>إعادة تعيين</Text>
-                          </TouchableOpacity>
-                          </View>
+                  <TouchableOpacity onPress={resetFilters}>
+                    <Text style={s.resetFilterText}>إعادة تعيين</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             }
             ListEmptyComponent={
@@ -606,6 +615,9 @@ export default function HomeScreen() {
                   { id: 'price_asc', label: 'السعر: من الأقل للأعلى' },
                   { id: 'price_desc', label: 'السعر: من الأعلى للأقل' },
                   { id: 'popular', label: 'الأكثر شهرة' },
+                  // ✅ خيارات جديدة للترتيب حسب المخزون
+                  { id: 'stock_desc', label: 'الأكثر توفراً' },
+                  { id: 'stock_asc', label: 'الأقل توفراً' },
                 ].map(option => (
                   <TouchableOpacity
                     key={option.id}
@@ -780,12 +792,11 @@ const s = StyleSheet.create({
   },
   resultHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end', // ✅ الزر في الجهة اليمنى
     alignItems: 'center',
     paddingHorizontal: 12,
     marginBottom: 12,
   },
-  resultCount: { fontSize: 13, color: '#64748b', fontWeight: '500' },
   resetFilterText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
   card: {
     backgroundColor: '#fff',
