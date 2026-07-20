@@ -533,11 +533,10 @@ export default function HomeScreen() {
                 </View>
                 
                 <View style={s.resultHeader}>
-                  <Text style={s.resultCount}>{filtered.length} منتج</Text>
-                  <TouchableOpacity onPress={resetFilters}>
-                    <Text style={s.resetFilterText}>إعادة تعيين</Text>
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity onPress={resetFilters}>
+                        <Text style={s.resetFilterText}>إعادة تعيين</Text>
+                          </TouchableOpacity>
+                          </View>
               </>
             }
             ListEmptyComponent={
