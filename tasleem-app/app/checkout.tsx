@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Modal, RefreshControl
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -46,6 +47,8 @@ export default function CheckoutScreen() {
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [showProvinces, setShowProvinces] = useState(false);
+  // ── السلايدر: خصم التوصيل من ربح التاجر ──
+  const [shippingSubsidy, setShippingSubsidy] = useState(0); // 0 → shipping كامل على الزبون
 
   const loadCart = useCallback(async () => {
     if (userLoading) return;
@@ -197,15 +200,32 @@ export default function CheckoutScreen() {
       address: fullAddress,
       notes: notes || '',
       promoCode: promoDiscount > 0 ? promoCode : '',
+      shippingSubsidy: safeSubsidy,  // ✅ خصم التوصيل من ربح التاجر
     });
   };
 
   const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
-  const costTotal = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
-  const discount = Math.floor((sellingTotal * promoDiscount) / 100);
-  const shipping = province === 'البصرة' ? 3000 : 5000;
-  const total = sellingTotal - discount + shipping;
-  const profit = sellingTotal - costTotal;
+  const costTotal    = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
+  const minTotal     = cart.reduce((s, i) => s + (i.sellingPriceMin || i.wholesalePrice) * i.quantity, 0);
+  const discount     = Math.floor((sellingTotal * promoDiscount) / 100);
+  const shipping     = province === 'البصرة' ? 3000 : 5000;
+
+  // السلايدر: خطوة 500 دينار — الحد الأقصى = سعر التوصيل كامل
+  const sliderMax    = shipping;
+  const sliderStep   = 500;
+
+  // هل يمكن تفعيل السلايدر؟ سعر البيع لازم > حد أدنى + توصيل
+  const sliderEnabled = (sellingTotal - discount) > (minTotal + shipping);
+
+  // الخصم الفعلي — لا يتجاوز sliderMax ولا يتجاوز الربح
+  const rawProfit     = sellingTotal - costTotal - discount;
+  const maxSubsidy    = Math.min(sliderMax, Math.max(0, rawProfit - 1));
+  const safeSubsidy   = Math.min(shippingSubsidy, maxSubsidy);
+
+  const customerShipping = Math.max(0, shipping - safeSubsidy);
+  const total            = sellingTotal - discount + customerShipping;
+  const profit           = rawProfit - safeSubsidy;
+  const isFreeShipping   = safeSubsidy >= shipping;
 
   if (loading || userLoading) {
     return (
@@ -397,7 +417,55 @@ export default function CheckoutScreen() {
 
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>التوصيل</Text>
-            <Text style={s.summaryValue}>{shipping.toLocaleString()} د.ع</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              {isFreeShipping ? (
+                <View style={s.freeBadge}>
+                  <Text style={s.freeBadgeText}>🚚 مجاني</Text>
+                </View>
+              ) : (
+                <Text style={s.summaryValue}>{customerShipping.toLocaleString()} د.ع</Text>
+              )}
+            </View>
+          </View>
+
+          {/* ── السلايدر ── */}
+          <View style={[s.sliderCard, !sliderEnabled && { opacity: 0.45 }]}>
+            <View style={s.sliderHeader}>
+              <Ionicons name="car-outline" size={18} color={PRIMARY} />
+              <Text style={s.sliderTitle}>ادفع كلفة التوصيل من ربحك</Text>
+            </View>
+            <Text style={s.sliderHint}>
+              {!sliderEnabled
+                ? 'ارفع سعر البيع لتفعيل هذه الميزة'
+                : safeSubsidy === 0
+                ? 'اسحب للخصم من ربحك وتوفير التوصيل للزبون'
+                : isFreeShipping
+                ? `✅ التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`
+                : `خصمت ${safeSubsidy.toLocaleString()} د.ع — تبقى ${(shipping - safeSubsidy).toLocaleString()} د.ع على الزبون`}
+            </Text>
+            <Slider
+              style={{ width: '100%', height: 40 }}
+              minimumValue={0}
+              maximumValue={sliderMax}
+              step={sliderStep}
+              value={safeSubsidy}
+              onValueChange={v => sliderEnabled && setShippingSubsidy(v)}
+              minimumTrackTintColor={PRIMARY}
+              maximumTrackTintColor="#e5e7eb"
+              thumbTintColor={sliderEnabled ? PRIMARY : '#9ca3af'}
+              disabled={!sliderEnabled}
+            />
+            <View style={s.sliderLabels}>
+              <Text style={s.sliderLabelEnd}>مجاني كلياً</Text>
+              <Text style={s.sliderLabelStart}>بدون خصم</Text>
+            </View>
+            {safeSubsidy > 0 && (
+              <View style={s.sliderImpact}>
+                <Text style={s.sliderImpactText}>
+                  ربحك بعد الخصم: <Text style={{ color: profit > 0 ? '#10b981' : '#ef4444', fontWeight: '700' }}>{profit.toLocaleString()} د.ع</Text>
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={s.divider} />
@@ -457,6 +525,62 @@ export default function CheckoutScreen() {
 }
 
 const s = StyleSheet.create({
+  // ── Slider ──
+  sliderCard: {
+    backgroundColor: '#f0f9fa',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  sliderTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+  sliderHint: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: -4,
+  },
+  sliderLabelStart: { fontSize: 10, color: '#9ca3af' },
+  sliderLabelEnd:   { fontSize: 10, color: '#9ca3af' },
+  sliderImpact: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  sliderImpactText: {
+    fontSize: 12,
+    color: '#374151',
+  },
+  freeBadge: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  freeBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  // ── End Slider ──
+
   container: { flex: 1, backgroundColor: BG },
 
   header: {
