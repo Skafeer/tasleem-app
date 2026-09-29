@@ -14,6 +14,7 @@ import OrdersTab      from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab   from '../admin-components/MerchantsTab';
 import PromosTab      from '../admin-components/PromosTab';
+import CampaignsTab   from '../admin-components/CampaignsTab'; // ✅ جديد
 import StatsTab       from '../admin-components/StatsTab';
 import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
@@ -40,6 +41,7 @@ const TABS = [
   { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',         component: CategoriesTab },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',       component: BannersTab },
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',     component: PromosTab },
+  { key: 'campaigns',   label: 'التحديات',  icon: 'trophy-outline',       component: CampaignsTab }, // ✅ جديد
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',  component: AdminsTab },
 ];
 
@@ -53,7 +55,6 @@ export default function AdminScreen() {
   const translateX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  // 🔓 فتح السلايد
   const openDrawer = () => {
     setIsDrawerOpen(true);
     Animated.parallel([
@@ -72,7 +73,6 @@ export default function AdminScreen() {
     ]).start();
   };
 
-  // 🔒 إغلاق السلايد
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     Animated.parallel([
@@ -104,7 +104,6 @@ export default function AdminScreen() {
     closeDrawer();
   };
 
-  // PanResponder
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
@@ -127,7 +126,7 @@ export default function AdminScreen() {
     })
   ).current;
 
-  // بيانات الصلاحيات والإحصائيات
+  // ─── البيانات ───
   const { data: user } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
@@ -178,6 +177,16 @@ export default function AdminScreen() {
     },
   });
 
+  // ✅ إحصائيات الحملات
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['admin-campaigns'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/admin/campaigns');
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+
   const onRefresh = async () => {
     setRefreshing(true);
     await qc.invalidateQueries();
@@ -201,12 +210,22 @@ export default function AdminScreen() {
   const merchantCount = (users as any[]).filter((u: any) => u.role !== 'admin').length;
   const pendingWithdrawals = (withdrawals as any[]).filter((w: any) => w.status === 'pending').length;
 
+  // ✅ عدد الحملات النشطة
+  const activeCampaigns = (campaigns as any[]).filter((c: any) => {
+    if (!c.isActive) return false;
+    const now = Date.now();
+    const starts = new Date(c.startsAt).getTime();
+    const ends = new Date(c.endsAt).getTime();
+    return starts <= now && ends >= now;
+  }).length;
+
   const getBadge = (key: string) => {
     if (key === 'orders') return (orders as any[]).length;
     if (key === 'products') return (products as any[]).length;
     if (key === 'withdrawals') return pendingWithdrawals;
     if (key === 'merchants') return merchantCount;
     if (key === 'promos') return (promos as any[]).length;
+    if (key === 'campaigns') return activeCampaigns; // ✅
     return 0;
   };
 
@@ -245,7 +264,6 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* خلفية معتمة */}
       {isDrawerOpen && (
         <TouchableOpacity
           style={styles.overlay}
@@ -254,7 +272,6 @@ export default function AdminScreen() {
         />
       )}
 
-      {/* المحتوى الرئيسي */}
       <View style={styles.mainContent} {...panResponder.panHandlers}>
         <View style={styles.header}>
           <TouchableOpacity onPress={toggleDrawer} style={styles.hamburgerBtn}>
@@ -276,7 +293,6 @@ export default function AdminScreen() {
         </ScrollView>
       </View>
 
-      {/* السلايد الجانبي */}
       <Animated.View
         style={[
           styles.drawer,
@@ -338,18 +354,13 @@ const styles = StyleSheet.create({
   },
   overlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
     zIndex: 10,
   },
   drawer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
+    top: 0, left: 0, bottom: 0,
     width: DRAWER_WIDTH,
     backgroundColor: '#fff',
     zIndex: 20,
@@ -373,66 +384,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   drawerHeaderIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 56, height: 56, borderRadius: 28,
     backgroundColor: PRIMARY + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center',
     marginBottom: 8,
   },
-  drawerHeaderTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  drawerHeaderSub: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
+  drawerHeaderTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  drawerHeaderSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   drawerItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 10,
-    borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 12,
+    marginHorizontal: 10, borderRadius: 12,
   },
-  drawerItemActive: {
-    backgroundColor: PRIMARY + '12',
-  },
+  drawerItemActive: { backgroundColor: PRIMARY + '12' },
   drawerItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   drawerItemLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'right',
+    flex: 1, fontSize: 14, fontWeight: '600',
+    color: '#374151', textAlign: 'right',
   },
-  drawerItemLabelActive: {
-    color: PRIMARY,
-  },
+  drawerItemLabelActive: { color: PRIMARY },
   drawerBadge: {
     backgroundColor: '#e5e7eb',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 10, minWidth: 18, height: 18,
+    justifyContent: 'center', alignItems: 'center',
     paddingHorizontal: 4,
   },
-  drawerBadgeActive: {
-    backgroundColor: PRIMARY,
-  },
-  drawerBadgeText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: 'bold',
-  },
-  drawerBadgeTextActive: {
-    color: '#fff',
-  },
+  drawerBadgeActive: { backgroundColor: PRIMARY },
+  drawerBadgeText: { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
+  drawerBadgeTextActive: { color: '#fff' },
 });
