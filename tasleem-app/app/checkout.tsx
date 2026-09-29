@@ -180,6 +180,7 @@ export default function CheckoutScreen() {
   };
 
   // ─── الحسابات المالية ─────────────────────────────────────────
+  // ✅ التاجر لا يتحمل الخصم — الشركة تتحمّله من هامش سعر الجملة
   const discount     = promoDiscount; // المبلغ الفعلي المحسوب من السيرفر
   const shipping     = province === 'البصرة' ? 3000 : 5000;
 
@@ -187,7 +188,8 @@ export default function CheckoutScreen() {
   const sliderStep   = 500;
   const sliderEnabled = (sellingTotal - discount) > (minTotal + shipping);
 
-  const rawProfit     = sellingTotal - costTotal - discount;
+  // ✅ ربح التاجر لا يُخصم منه الكود
+  const rawProfit     = sellingTotal - costTotal;
   const maxSubsidy    = Math.min(sliderMax, Math.max(0, rawProfit - 1));
   const safeSubsidy   = Math.min(shippingSubsidy, maxSubsidy);
 
@@ -557,7 +559,7 @@ export default function CheckoutScreen() {
             {safeSubsidy > 0 && (
               <View style={s.sliderImpact}>
                 <Text style={s.sliderImpactText}>
-                  ربحك بعد الخصم:{' '}
+                  ربحك بعد خصم التوصيل:{' '}
                   <Text style={{ color: profit > 0 ? SUCCESS : DANGER, fontWeight: '700' }}>
                     {profit.toLocaleString()} د.ع
                   </Text>
