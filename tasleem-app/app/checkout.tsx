@@ -186,7 +186,8 @@ export default function CheckoutScreen() {
 
   const sliderMax    = shipping;
   const sliderStep   = 500;
-  const sliderEnabled = (sellingTotal - discount) > (minTotal + shipping);
+  // ✅ الشرط لا يتأثر بكود الخصم — التاجر يقدر يستخدم الاثنين معاً
+  const sliderEnabled = sellingTotal > (minTotal + shipping);
 
   // ✅ ربح التاجر لا يُخصم منه الكود
   const rawProfit     = sellingTotal - costTotal;
