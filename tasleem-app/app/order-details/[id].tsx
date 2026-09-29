@@ -1,3 +1,4 @@
+// tasleem-app/app/order-details/[id].tsx
 import React, { useRef, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../src/lib/api';
 
 const PRIMARY = '#0c6679';
+const SECONDARY = '#f5a006';
+const SUCCESS = '#10b981';
+const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
 const STATUS: any = {
@@ -112,10 +116,22 @@ export default function OrderDetailsScreen() {
 
   const status = STATUS[order.status] || STATUS.pending;
 
+  // ─── حساب المجاميع ──────────────────────────────────────────
+  const itemsTotal = order.items?.reduce(
+    (sum: number, i: any) => sum + (i.price * i.quantity), 0
+  ) || 0;
+
+  const promoDiscount = order.promoDiscount || 0;
+  const shippingCost  = order.shippingCost || 0;
+  const hasPromo      = !!order.promoCode && promoDiscount > 0;
+
+  // المجموع قبل الخصم = مجموع المنتجات + التوصيل
+  const subtotalBeforeDiscount = itemsTotal + shippingCost;
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* Header - بدون تدرج لوني */}
+      {/* Header */}
       <View style={s.header}>
         <View style={s.headerRow}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
@@ -127,7 +143,7 @@ export default function OrderDetailsScreen() {
           </View>
         </View>
 
-        {/* بطاقة المبلغ والحالة - بدون تدرج */}
+        {/* بطاقة المبلغ والحالة */}
         <View style={s.summaryCard}>
           <View style={s.summaryLeft}>
             <Text style={s.summaryLabel}>المبلغ الإجمالي</Text>
@@ -145,6 +161,47 @@ export default function OrderDetailsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}>
+
+        {/* ─── كود الخصم (يظهر فقط لو موجود) ─── */}
+        {hasPromo && (
+          <View style={s.promoCard}>
+            <View style={s.promoHeader}>
+              <View style={s.promoIconBox}>
+                <Ionicons name="pricetag" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={s.promoLabel}>كود الخصم المطبق</Text>
+                <View style={s.promoCodeRow}>
+                  <View style={s.promoBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                    <Text style={s.promoBadgeTxt}>تم التطبيق</Text>
+                  </View>
+                  <Text style={s.promoCodeText}>{order.promoCode}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={s.promoDivider} />
+
+            <View style={s.promoDetailsRow}>
+              <View style={s.promoDetailItem}>
+                <Text style={s.promoDetailLabel}>قيمة التوفير</Text>
+                <Text style={s.promoDetailVal}>
+                  {promoDiscount.toLocaleString()} د.ع
+                </Text>
+              </View>
+              <View style={s.promoDetailDivider} />
+              <View style={s.promoDetailItem}>
+                <Text style={s.promoDetailLabel}>نسبة الخصم من المنتجات</Text>
+                <Text style={s.promoDetailVal}>
+                  {itemsTotal > 0
+                    ? `${Math.round((promoDiscount / itemsTotal) * 100)}%`
+                    : '—'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* معلومات الزبون */}
         <View style={s.card}>
@@ -167,7 +224,6 @@ export default function OrderDetailsScreen() {
             </View>
           </View>
 
-          {/* ✅ رقم الهاتف الاحتياطي - يظهر فقط إذا كان موجوداً */}
           {order.backupPhone && (
             <>
               <View style={s.separator} />
@@ -233,7 +289,7 @@ export default function OrderDetailsScreen() {
           ))}
         </View>
 
-        {/* ملخص مالي - بدون تدرج لوني */}
+        {/* ملخص مالي */}
         <View style={s.darkCard}>
           <View style={s.cardHeader}>
             <View style={[s.cardIconBox, { backgroundColor: '#f3f4f6' }]}>
@@ -242,32 +298,63 @@ export default function OrderDetailsScreen() {
             <Text style={[s.cardTitle, { color: '#374151' }]}>ملخص التكاليف والربح</Text>
           </View>
 
+          {/* سعر المنتجات */}
           <View style={s.darkRow}>
-            <Text style={s.darkVal}>{(order.totalAmount - (order.shippingCost || 0))?.toLocaleString()} د.ع</Text>
-            <Text style={s.darkLabel}>سعر البيع</Text>
+            <Text style={s.darkVal}>{itemsTotal.toLocaleString()} د.ع</Text>
+            <Text style={s.darkLabel}>سعر المنتجات</Text>
           </View>
-          
+
+          {/* الخصم */}
+          {hasPromo && (
+            <View style={s.discountRow}>
+              <Text style={s.discountVal}>
+                -{promoDiscount.toLocaleString()} د.ع
+              </Text>
+              <View style={s.discountLabelWrap}>
+                <Ionicons name="pricetag" size={13} color={SUCCESS} />
+                <Text style={s.discountLabel}>
+                  خصم ({order.promoCode})
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* التوصيل */}
           <View style={s.darkRow}>
-            <Text style={s.darkVal}>{order.shippingCost?.toLocaleString()} د.ع</Text>
+            <Text style={s.darkVal}>{shippingCost.toLocaleString()} د.ع</Text>
             <Text style={s.darkLabel}>أجرة التوصيل</Text>
           </View>
 
           <View style={s.darkDivider} />
 
+          {/* المبلغ الإجمالي */}
           <View style={s.darkRow}>
             <Text style={[s.darkVal, { fontSize: 18, fontWeight: 'bold', color: '#111827' }]}>
               {order.totalAmount?.toLocaleString()} د.ع
             </Text>
-            <Text style={[s.darkLabel, { fontWeight: 'bold', color: '#374151' }]}>المبلغ المستحق من الزبون</Text>
+            <Text style={[s.darkLabel, { fontWeight: 'bold', color: '#374151' }]}>
+              المبلغ المستحق من الزبون
+            </Text>
           </View>
-          
+
+          {/* ربح التاجر */}
           <View style={s.profitRow}>
             <View style={s.profitContent}>
-              <Ionicons name="trending-up-outline" size={18} color="#10b981" />
+              <Ionicons name="trending-up-outline" size={18} color={SUCCESS} />
               <Text style={s.profitLabel}>ربحك من هذا الطلب</Text>
             </View>
             <Text style={s.profitVal}>+{order.totalProfit?.toLocaleString()} د.ع 🎉</Text>
           </View>
+
+          {/* تنبيه لو الخصم قلل الربح */}
+          {hasPromo && order.totalProfit <= 0 && (
+            <View style={s.warningBox}>
+              <Ionicons name="warning-outline" size={16} color={DANGER} />
+              <Text style={s.warningTxt}>
+                الخصم المطبق جعل ربحك صفر أو بالسالب لهذا الطلب
+              </Text>
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -295,7 +382,7 @@ const s = StyleSheet.create({
   },
   backBtnEmptyText: { color: '#fff', fontWeight: '600' },
 
-  // ── Header (بدون تدرج) ──
+  // ── Header ──
   header: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
@@ -359,6 +446,93 @@ const s = StyleSheet.create({
   statusText: { fontSize: 13, fontWeight: 'bold' },
 
   scroll: { padding: 16, paddingBottom: 40 },
+
+  // ── Promo Card (جديد) ──
+  promoCard: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+    shadowColor: SUCCESS,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  promoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  promoIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: SUCCESS,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoLabel: {
+    fontSize: 11,
+    color: '#065f46',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  promoCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  promoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: SUCCESS,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  promoBadgeTxt: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  promoCodeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#065f46',
+    letterSpacing: 1.5,
+  },
+  promoDivider: {
+    height: 1,
+    backgroundColor: '#86efac',
+    marginVertical: 12,
+  },
+  promoDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  promoDetailItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  promoDetailDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#86efac',
+  },
+  promoDetailLabel: {
+    fontSize: 10,
+    color: '#065f46',
+    fontWeight: '600',
+  },
+  promoDetailVal: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#065f46',
+  },
 
   // ── Cards ──
   card: {
@@ -424,7 +598,7 @@ const s = StyleSheet.create({
   productMeta: { fontSize: 11, color: '#9ca3af', textAlign: 'right' },
   productTotal: { fontSize: 14, fontWeight: 'bold', color: PRIMARY },
 
-  // ── Financial Summary (بدون تدرج) ──
+  // ── Financial Summary ──
   darkCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -453,6 +627,36 @@ const s = StyleSheet.create({
     backgroundColor: '#e8edf2',
     marginVertical: 8,
   },
+
+  // ── Discount Row (جديد) ──
+  discountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#ecfdf5',
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginVertical: 4,
+  },
+  discountLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  discountLabel: {
+    fontSize: 13,
+    color: SUCCESS,
+    fontWeight: '700',
+  },
+  discountVal: {
+    fontSize: 14,
+    color: SUCCESS,
+    fontWeight: 'bold',
+  },
+
+  // ── Profit Row ──
   profitRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -471,11 +675,31 @@ const s = StyleSheet.create({
   profitVal: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#10b981',
+    color: SUCCESS,
   },
   profitLabel: {
     fontSize: 12,
-    color: '#10b981',
+    color: SUCCESS,
     fontWeight: '600',
+  },
+
+  // ── Warning Box (جديد) ──
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  warningTxt: {
+    flex: 1,
+    fontSize: 11,
+    color: DANGER,
+    fontWeight: '600',
+    textAlign: 'right',
   },
 });

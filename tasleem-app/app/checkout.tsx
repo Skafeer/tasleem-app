@@ -1,3 +1,4 @@
+// tasleem-app/app/checkout.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -13,6 +14,9 @@ import api from '../src/lib/api';
 import { toast } from '../src/lib/toast';
 
 const PRIMARY = '#0c6679';
+const SECONDARY = '#f5a006';
+const SUCCESS = '#10b981';
+const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
 const PROVINCES = [
@@ -22,6 +26,16 @@ const PROVINCES = [
 ];
 
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
+
+// ─── نوع الكود المطبق ──────────────────────────────────────────
+type AppliedPromo = {
+  code: string;
+  title: string;
+  description?: string;
+  discountType: 'percentage' | 'fixed';
+  discountPercent?: number;
+  discountAmount?: number;
+};
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -44,6 +58,7 @@ export default function CheckoutScreen() {
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [showProvinces, setShowProvinces] = useState(false);
   const [shippingSubsidy, setShippingSubsidy] = useState(0);
@@ -88,17 +103,36 @@ export default function CheckoutScreen() {
     }, [CART_KEY, loadCart, userLoading])
   );
 
+  // ─── حساب المجاميع أولاً (مطلوب للتحقق من الكود) ───────────────
+  const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
+  const costTotal    = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
+  const minTotal     = cart.reduce((s, i) => s + (i.sellingPriceMin || i.wholesalePrice) * i.quantity, 0);
+
+  // ─── التحقق من الكود (يرسل cartAmount) ────────────────────────
   const verifyPromo = useMutation({
     mutationFn: async (code: string) => {
-      const { data } = await api.post('/api/promo-codes/verify', { code });
+      const { data } = await api.post('/api/promo-codes/verify', {
+        code: code.trim().toUpperCase(),
+        cartAmount: sellingTotal,
+      });
       return data;
     },
     onSuccess: (data) => {
-      setPromoDiscount(data.discountPercent);
-      toast.success(`تم تطبيق خصم ${data.discountPercent}%`);
+      if (!data.valid) {
+        toast.error(data.message || 'كود غير صحيح');
+        setAppliedPromo(null);
+        setPromoDiscount(0);
+        return;
+      }
+
+      setAppliedPromo(data.promo);
+      setPromoDiscount(data.discount || 0);
+      toast.success(`تم تطبيق الخصم: ${data.discount.toLocaleString()} د.ع`);
     },
-    onError: () => {
-      toast.error('كود خصم غير صحيح');
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message || 'كود خصم غير صحيح';
+      toast.error(msg);
+      setAppliedPromo(null);
       setPromoDiscount(0);
     },
   });
@@ -145,10 +179,8 @@ export default function CheckoutScreen() {
     return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
   };
 
-  const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
-  const costTotal    = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
-  const minTotal     = cart.reduce((s, i) => s + (i.sellingPriceMin || i.wholesalePrice) * i.quantity, 0);
-  const discount     = Math.floor((sellingTotal * promoDiscount) / 100);
+  // ─── الحسابات المالية ─────────────────────────────────────────
+  const discount     = promoDiscount; // المبلغ الفعلي المحسوب من السيرفر
   const shipping     = province === 'البصرة' ? 3000 : 5000;
 
   const sliderMax    = shipping;
@@ -213,16 +245,31 @@ export default function CheckoutScreen() {
       province,
       address: fullAddress,
       notes: notes || '',
-      promoCode: promoDiscount > 0 ? promoCode : '',
+      promoCode: appliedPromo ? appliedPromo.code : '',
       shippingSubsidy: safeSubsidy,
     });
   };
 
-  // محتوى تلميح السلايدر مع أيقونة
+  const clearPromo = () => {
+    setPromoCode('');
+    setAppliedPromo(null);
+    setPromoDiscount(0);
+  };
+
+  // ─── نص الخصم المعروض ──────────────────────────────────────────
+  const promoDisplayText = (() => {
+    if (!appliedPromo) return '';
+    if (appliedPromo.discountType === 'percentage') {
+      return `${appliedPromo.discountPercent}%`;
+    }
+    return `${(appliedPromo.discountAmount || 0).toLocaleString()} د.ع`;
+  })();
+
+  // ─── تلميح السلايدر ────────────────────────────────────────────
   const sliderHint = (() => {
     if (!sliderEnabled) return { text: 'ارفع سعر البيع لتفعيل هذه الميزة', icon: 'information-circle-outline', color: '#9ca3af' };
     if (safeSubsidy === 0) return { text: 'اسحب للخصم من ربحك وتوفير التوصيل للزبون', icon: 'hand-left-outline', color: '#6b7280' };
-    if (isFreeShipping) return { text: `التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`, icon: 'checkmark-circle', color: '#10b981' };
+    if (isFreeShipping) return { text: `التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`, icon: 'checkmark-circle', color: SUCCESS };
     return { text: `خصمت ${safeSubsidy.toLocaleString()} د.ع — تبقى ${(shipping - safeSubsidy).toLocaleString()} د.ع على الزبون`, icon: 'cash-outline', color: PRIMARY };
   })();
 
@@ -356,39 +403,72 @@ export default function CheckoutScreen() {
         <View style={s.card}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name="pricetag-outline" size={18} color="#f59e0b" />
+              <Ionicons name="pricetag-outline" size={18} color={SECONDARY} />
             </View>
             <Text style={s.cardTitle}>كود الخصم</Text>
           </View>
 
-          <View style={s.promoRow}>
-            <TextInput
-              style={[s.input, s.promoInput]}
-              placeholder="أدخل الكود"
-              placeholderTextColor="#9ca3af"
-              value={promoCode}
-              onChangeText={v => setPromoCode(v.toUpperCase())}
-              textAlign="right"
-            />
-            <TouchableOpacity
-              style={s.promoBtn}
-              onPress={() => promoCode.trim() && verifyPromo.mutate(promoCode)}
-              disabled={!promoCode.trim() || verifyPromo.isPending}>
-              {verifyPromo.isPending ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={s.promoBtnText}>تطبيق</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          {!appliedPromo ? (
+            <>
+              <View style={s.promoRow}>
+                <TextInput
+                  style={[s.input, s.promoInput]}
+                  placeholder="أدخل الكود"
+                  placeholderTextColor="#9ca3af"
+                  value={promoCode}
+                  onChangeText={v => setPromoCode(v.toUpperCase())}
+                  autoCapitalize="characters"
+                  textAlign="right"
+                />
+                <TouchableOpacity
+                  style={[s.promoBtn, (!promoCode.trim() || verifyPromo.isPending) && s.promoBtnOff]}
+                  onPress={() => promoCode.trim() && verifyPromo.mutate(promoCode)}
+                  disabled={!promoCode.trim() || verifyPromo.isPending}>
+                  {verifyPromo.isPending ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={s.promoBtnText}>تطبيق</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            /* ─── بطاقة الكود المطبق ─── */
+            <View style={s.appliedPromoBox}>
+              <View style={s.appliedPromoTop}>
+                <TouchableOpacity style={s.removePromoBtn} onPress={clearPromo}>
+                  <Ionicons name="close-circle" size={22} color={DANGER} />
+                </TouchableOpacity>
+                <View style={s.appliedPromoInfo}>
+                  <View style={s.appliedPromoCodeRow}>
+                    <Text style={s.appliedPromoCode}>{appliedPromo.code}</Text>
+                    <View style={s.appliedBadge}>
+                      <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                      <Text style={s.appliedBadgeTxt}>مطبق</Text>
+                    </View>
+                  </View>
+                  {!!appliedPromo.title && (
+                    <Text style={s.appliedPromoTitle}>{appliedPromo.title}</Text>
+                  )}
+                </View>
+              </View>
 
-          {promoDiscount > 0 && (
-            <TouchableOpacity
-              style={s.cancelPromo}
-              onPress={() => { setPromoCode(''); setPromoDiscount(0); }}>
-              <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
-              <Text style={s.cancelPromoText}>إلغاء الخصم</Text>
-            </TouchableOpacity>
+              <View style={s.appliedPromoDetails}>
+                <View style={s.appliedDetailItem}>
+                  <Text style={s.appliedDetailLabel}>الخصم</Text>
+                  <Text style={[s.appliedDetailVal, { color: SECONDARY }]}>
+                    {promoDisplayText}
+                  </Text>
+                </View>
+                <View style={s.appliedDetailDivider} />
+                <View style={s.appliedDetailItem}>
+                  <Text style={s.appliedDetailLabel}>قيمة التوفير</Text>
+                  <Text style={[s.appliedDetailVal, { color: SUCCESS }]}>
+                    {promoDiscount.toLocaleString()} د.ع
+                  </Text>
+                </View>
+              </View>
+            </View>
           )}
         </View>
 
@@ -396,7 +476,7 @@ export default function CheckoutScreen() {
         <View style={s.summaryCard}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: '#ecfdf5' }]}>
-              <Ionicons name="receipt-outline" size={18} color="#10b981" />
+              <Ionicons name="receipt-outline" size={18} color={SUCCESS} />
             </View>
             <Text style={s.cardTitle}>ملخص الطلب</Text>
           </View>
@@ -408,18 +488,23 @@ export default function CheckoutScreen() {
 
           <View style={s.summaryRow}>
             <View style={s.rowLabelWrap}>
-              <Ionicons name="trending-up-outline" size={14} color="#10b981" />
+              <Ionicons name="trending-up-outline" size={14} color={SUCCESS} />
               <Text style={s.summaryLabel}>ربحك المتوقع</Text>
             </View>
-            <Text style={[s.summaryValue, s.profitValue]}>
+            <Text style={[s.summaryValue, { color: SUCCESS }]}>
               {profit.toLocaleString()} د.ع
             </Text>
           </View>
 
-          {promoDiscount > 0 && (
+          {promoDiscount > 0 && appliedPromo && (
             <View style={s.summaryRow}>
-              <Text style={s.summaryLabel}>الخصم ({promoDiscount}%)</Text>
-              <Text style={[s.summaryValue, { color: '#10b981' }]}>
+              <View style={s.rowLabelWrap}>
+                <Ionicons name="pricetag-outline" size={14} color={SUCCESS} />
+                <Text style={s.summaryLabel}>
+                  الخصم ({appliedPromo.code})
+                </Text>
+              </View>
+              <Text style={[s.summaryValue, { color: SUCCESS }]}>
                 -{discount.toLocaleString()} د.ع
               </Text>
             </View>
@@ -473,7 +558,7 @@ export default function CheckoutScreen() {
               <View style={s.sliderImpact}>
                 <Text style={s.sliderImpactText}>
                   ربحك بعد الخصم:{' '}
-                  <Text style={{ color: profit > 0 ? '#10b981' : '#ef4444', fontWeight: '700' }}>
+                  <Text style={{ color: profit > 0 ? SUCCESS : DANGER, fontWeight: '700' }}>
                     {profit.toLocaleString()} د.ع
                   </Text>
                 </Text>
@@ -546,11 +631,10 @@ export default function CheckoutScreen() {
  *  Styles
  * ============================================================ */
 const s = StyleSheet.create({
-  /* ── Layout ── */
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { padding: 16, paddingBottom: 100 },
 
-  /* ── Header ── */
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -573,11 +657,11 @@ const s = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
 
-  /* ── Loading ── */
+  // Loading
   centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   loadingText: { fontSize: 14, color: '#9ca3af' },
 
-  /* ── Cards ── */
+  // Cards
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -619,7 +703,7 @@ const s = StyleSheet.create({
   },
   cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
 
-  /* ── Form ── */
+  // Form
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -654,27 +738,75 @@ const s = StyleSheet.create({
   },
   selectText: { fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  /* ── Promo ── */
+  // Promo
   promoRow: { flexDirection: 'row', gap: 10 },
   promoInput: { flex: 1, marginBottom: 0 },
   promoBtn: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: SECONDARY,
     borderRadius: 12,
     paddingHorizontal: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  promoBtnOff: { opacity: 0.5 },
   promoBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  cancelPromo: {
+
+  // Applied Promo Card
+  appliedPromoBox: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+    gap: 12,
+  },
+  appliedPromoTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    marginTop: 10,
+    gap: 10,
   },
-  cancelPromoText: { color: '#ef4444', fontSize: 12, fontWeight: '600' },
+  removePromoBtn: { padding: 2 },
+  appliedPromoInfo: { flex: 1, alignItems: 'flex-end' },
+  appliedPromoCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  appliedPromoCode: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#065f46',
+    letterSpacing: 1,
+  },
+  appliedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: SUCCESS,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  appliedBadgeTxt: { fontSize: 9, color: '#fff', fontWeight: 'bold' },
+  appliedPromoTitle: {
+    fontSize: 12,
+    color: '#065f46',
+    marginTop: 3,
+    textAlign: 'right',
+  },
+  appliedPromoDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 10,
+  },
+  appliedDetailItem: { flex: 1, alignItems: 'center', gap: 3 },
+  appliedDetailDivider: { width: 1, height: 30, backgroundColor: '#e8edf2' },
+  appliedDetailLabel: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+  appliedDetailVal: { fontSize: 14, fontWeight: 'bold' },
 
-  /* ── Summary ── */
+  // Summary
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -688,7 +820,6 @@ const s = StyleSheet.create({
   },
   summaryLabel: { fontSize: 13, color: '#6b7280' },
   summaryValue: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  profitValue: { color: '#10b981' },
   divider: { height: 1, backgroundColor: '#e8edf2', marginVertical: 10 },
 
   totalRow: {
@@ -700,7 +831,7 @@ const s = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   totalValue: { fontSize: 22, fontWeight: 'bold', color: PRIMARY },
 
-  /* ── Free shipping badge ── */
+  // Free shipping badge
   freeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -714,7 +845,7 @@ const s = StyleSheet.create({
   },
   freeBadgeText: { fontSize: 12, fontWeight: '700', color: '#059669' },
 
-  /* ── Slider ── */
+  // Slider
   sliderCard: {
     backgroundColor: '#f0f9fa',
     borderRadius: 14,
@@ -752,7 +883,7 @@ const s = StyleSheet.create({
   sliderImpact: { marginTop: 8, alignItems: 'center' },
   sliderImpactText: { fontSize: 12, color: '#374151' },
 
-  /* ── Footer ── */
+  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -778,7 +909,7 @@ const s = StyleSheet.create({
   },
   submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
-  /* ── Modal ── */
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
