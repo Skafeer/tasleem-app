@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Modal, RefreshControl
+  TextInput, ActivityIndicator, Modal
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -20,20 +21,19 @@ const PROVINCES = [
   'صلاح الدين', 'المثنى', 'كركوك', 'دهوك', 'أربيل', 'السليمانية'
 ];
 
-// دالة مفتاح السلة
 const getCartKey = (userId?: number) => userId ? `cart_${userId}` : null;
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const qc = useQueryClient();
-  
+
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user'],
     queryFn: async () => { const { data } = await api.get('/api/auth/me'); return data; },
   });
 
   const CART_KEY = getCartKey(user?.id);
-  
+
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerName, setCustomerName] = useState('');
@@ -46,16 +46,17 @@ export default function CheckoutScreen() {
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [showProvinces, setShowProvinces] = useState(false);
+  const [shippingSubsidy, setShippingSubsidy] = useState(0);
 
   const loadCart = useCallback(async () => {
     if (userLoading) return;
-    
+
     if (!CART_KEY) {
       toast.warning('الرجاء تسجيل الدخول أولاً');
       router.back();
       return;
     }
-    
+
     try {
       const data = await AsyncStorage.getItem(CART_KEY);
       const parsed = data ? JSON.parse(data) : [];
@@ -128,7 +129,7 @@ export default function CheckoutScreen() {
       return data;
     },
     onSuccess: async () => {
-      toast.success('تم إرسال الطلب بنجاح! 🎉');
+      toast.success('تم إرسال الطلب بنجاح');
       if (CART_KEY) {
         await AsyncStorage.removeItem(CART_KEY);
       }
@@ -139,32 +140,49 @@ export default function CheckoutScreen() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل إرسال الطلب'),
   });
 
-  // دالة التحقق من رقم الهاتف
   const isValidPhone = (phone: string) => {
     if (!phone) return false;
     return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
   };
+
+  const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
+  const costTotal    = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
+  const minTotal     = cart.reduce((s, i) => s + (i.sellingPriceMin || i.wholesalePrice) * i.quantity, 0);
+  const discount     = Math.floor((sellingTotal * promoDiscount) / 100);
+  const shipping     = province === 'البصرة' ? 3000 : 5000;
+
+  const sliderMax    = shipping;
+  const sliderStep   = 500;
+  const sliderEnabled = (sellingTotal - discount) > (minTotal + shipping);
+
+  const rawProfit     = sellingTotal - costTotal - discount;
+  const maxSubsidy    = Math.min(sliderMax, Math.max(0, rawProfit - 1));
+  const safeSubsidy   = Math.min(shippingSubsidy, maxSubsidy);
+
+  const customerShipping = Math.max(0, shipping - safeSubsidy);
+  const total            = sellingTotal - discount + customerShipping;
+  const profit           = rawProfit - safeSubsidy;
+  const isFreeShipping   = safeSubsidy >= shipping;
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
       toast.warning('يرجى إدخال اسم الزبون');
       return;
     }
-    
+
     const cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-    
+
     if (!isValidPhone(cleanPhone)) {
       toast.warning('رقم الهاتف يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
-    
-    // تنظيف الرقم الاحتياطي
+
     const cleanBackup = backupPhone ? backupPhone.replace(/[^0-9]/g, '') : '';
     if (cleanBackup && !isValidPhone(cleanBackup)) {
       toast.warning('رقم الهاتف الاحتياطي يجب أن يبدأ بـ 07 ويكون 11 رقم');
       return;
     }
-    
+
     if (!province.trim()) {
       toast.warning('يرجى اختيار المحافظة');
       return;
@@ -187,7 +205,6 @@ export default function CheckoutScreen() {
 
     const fullAddress = `${province} - ${area} - ${address}`;
 
-    // ✅ إرسال الرقمين بشكل منفصل
     submitOrder.mutate({
       items,
       customerName,
@@ -197,15 +214,17 @@ export default function CheckoutScreen() {
       address: fullAddress,
       notes: notes || '',
       promoCode: promoDiscount > 0 ? promoCode : '',
+      shippingSubsidy: safeSubsidy,
     });
   };
 
-  const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
-  const costTotal = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
-  const discount = Math.floor((sellingTotal * promoDiscount) / 100);
-  const shipping = province === 'البصرة' ? 3000 : 5000;
-  const total = sellingTotal - discount + shipping;
-  const profit = sellingTotal - costTotal;
+  // محتوى تلميح السلايدر مع أيقونة
+  const sliderHint = (() => {
+    if (!sliderEnabled) return { text: 'ارفع سعر البيع لتفعيل هذه الميزة', icon: 'information-circle-outline', color: '#9ca3af' };
+    if (safeSubsidy === 0) return { text: 'اسحب للخصم من ربحك وتوفير التوصيل للزبون', icon: 'hand-left-outline', color: '#6b7280' };
+    if (isFreeShipping) return { text: `التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`, icon: 'checkmark-circle', color: '#10b981' };
+    return { text: `خصمت ${safeSubsidy.toLocaleString()} د.ع — تبقى ${(shipping - safeSubsidy).toLocaleString()} د.ع على الزبون`, icon: 'cash-outline', color: PRIMARY };
+  })();
 
   if (loading || userLoading) {
     return (
@@ -228,6 +247,7 @@ export default function CheckoutScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
+      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -240,7 +260,7 @@ export default function CheckoutScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}>
 
-        {/* معلومات الزبون */}
+        {/* ── معلومات الزبون ── */}
         <View style={s.card}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: '#eff6ff' }]}>
@@ -332,7 +352,7 @@ export default function CheckoutScreen() {
           />
         </View>
 
-        {/* كود الخصم */}
+        {/* ── كود الخصم ── */}
         <View style={s.card}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: '#fef3c7' }]}>
@@ -363,13 +383,16 @@ export default function CheckoutScreen() {
           </View>
 
           {promoDiscount > 0 && (
-            <TouchableOpacity style={s.cancelPromo} onPress={() => { setPromoCode(''); setPromoDiscount(0); }}>
-              <Text style={s.cancelPromoText}>إلغاء الخصم ✕</Text>
+            <TouchableOpacity
+              style={s.cancelPromo}
+              onPress={() => { setPromoCode(''); setPromoDiscount(0); }}>
+              <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+              <Text style={s.cancelPromoText}>إلغاء الخصم</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* ملخص الطلب */}
+        {/* ── ملخص الطلب ── */}
         <View style={s.summaryCard}>
           <View style={s.cardHeader}>
             <View style={[s.iconBox, { backgroundColor: '#ecfdf5' }]}>
@@ -384,32 +407,94 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={s.summaryRow}>
-            <Text style={s.summaryLabel}>ربحك المتوقع</Text>
-            <Text style={[s.summaryValue, s.profitValue]}>{profit.toLocaleString()} د.ع</Text>
+            <View style={s.rowLabelWrap}>
+              <Ionicons name="trending-up-outline" size={14} color="#10b981" />
+              <Text style={s.summaryLabel}>ربحك المتوقع</Text>
+            </View>
+            <Text style={[s.summaryValue, s.profitValue]}>
+              {profit.toLocaleString()} د.ع
+            </Text>
           </View>
 
           {promoDiscount > 0 && (
             <View style={s.summaryRow}>
               <Text style={s.summaryLabel}>الخصم ({promoDiscount}%)</Text>
-              <Text style={[s.summaryValue, { color: '#10b981' }]}>-{discount.toLocaleString()} د.ع</Text>
+              <Text style={[s.summaryValue, { color: '#10b981' }]}>
+                -{discount.toLocaleString()} د.ع
+              </Text>
             </View>
           )}
 
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>التوصيل</Text>
-            <Text style={s.summaryValue}>{shipping.toLocaleString()} د.ع</Text>
+            {isFreeShipping ? (
+              <View style={s.freeBadge}>
+                <Ionicons name="car-sport" size={13} color="#059669" />
+                <Text style={s.freeBadgeText}>مجاني</Text>
+              </View>
+            ) : (
+              <Text style={s.summaryValue}>
+                {customerShipping.toLocaleString()} د.ع
+              </Text>
+            )}
+          </View>
+
+          {/* ── السلايدر ── */}
+          <View style={[s.sliderCard, !sliderEnabled && { opacity: 0.45 }]}>
+            <View style={s.sliderHeader}>
+              <Ionicons name="car-outline" size={18} color={PRIMARY} />
+              <Text style={s.sliderTitle}>ادفع كلفة التوصيل من ربحك</Text>
+            </View>
+
+            <View style={s.sliderHintRow}>
+              <Ionicons name={sliderHint.icon as any} size={14} color={sliderHint.color} />
+              <Text style={s.sliderHint}>{sliderHint.text}</Text>
+            </View>
+
+            <Slider
+              style={s.slider}
+              minimumValue={0}
+              maximumValue={sliderMax}
+              step={sliderStep}
+              value={safeSubsidy}
+              onValueChange={v => sliderEnabled && setShippingSubsidy(v)}
+              minimumTrackTintColor={PRIMARY}
+              maximumTrackTintColor="#e5e7eb"
+              thumbTintColor={sliderEnabled ? PRIMARY : '#9ca3af'}
+              disabled={!sliderEnabled}
+            />
+
+            <View style={s.sliderLabels}>
+              <Text style={s.sliderLabel}>مجاني كلياً</Text>
+              <Text style={s.sliderLabel}>بدون خصم</Text>
+            </View>
+
+            {safeSubsidy > 0 && (
+              <View style={s.sliderImpact}>
+                <Text style={s.sliderImpactText}>
+                  ربحك بعد الخصم:{' '}
+                  <Text style={{ color: profit > 0 ? '#10b981' : '#ef4444', fontWeight: '700' }}>
+                    {profit.toLocaleString()} د.ع
+                  </Text>
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={s.divider} />
 
           <View style={s.totalRow}>
-            <Text style={s.totalLabel}>المجموع الكلي</Text>
+            <View style={s.rowLabelWrap}>
+              <Ionicons name="wallet-outline" size={18} color={PRIMARY} />
+              <Text style={s.totalLabel}>المجموع الكلي</Text>
+            </View>
             <Text style={s.totalValue}>{total.toLocaleString()} د.ع</Text>
           </View>
         </View>
 
       </ScrollView>
 
+      {/* ── Footer ── */}
       <View style={s.footer}>
         <TouchableOpacity
           style={s.submitBtn}
@@ -426,6 +511,7 @@ export default function CheckoutScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Modal المحافظات ── */}
       <Modal visible={showProvinces} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={s.modalContent}>
@@ -456,9 +542,15 @@ export default function CheckoutScreen() {
   );
 }
 
+/* ============================================================
+ *  Styles
+ * ============================================================ */
 const s = StyleSheet.create({
+  /* ── Layout ── */
   container: { flex: 1, backgroundColor: BG },
+  scrollContent: { padding: 16, paddingBottom: 100 },
 
+  /* ── Header ── */
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -479,45 +571,44 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
 
-  centerLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
+  /* ── Loading ── */
+  centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  loadingText: { fontSize: 14, color: '#9ca3af' },
 
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-
+  /* ── Cards ── */
   card: {
     backgroundColor: '#fff',
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e8edf2',
-    shadowColor: '#000',
+    shadowColor: '#0f172a',
     shadowOpacity: 0.04,
     shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   iconBox: {
     width: 34,
@@ -526,12 +617,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
+  cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
 
+  /* ── Form ── */
   label: {
     fontSize: 12,
     fontWeight: '600',
@@ -549,12 +637,9 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: '#111827',
     backgroundColor: '#f8fafc',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  textarea: {
-    height: 70,
-    textAlignVertical: 'top',
-  },
+  textarea: { height: 70, textAlignVertical: 'top' },
   selectBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -563,98 +648,111 @@ const s = StyleSheet.create({
     borderColor: '#e8edf2',
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: '#f8fafc',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  selectText: {
-    fontSize: 14,
-    color: '#111827',
-    textAlign: 'right',
-  },
+  selectText: { fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  promoRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  promoInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
+  /* ── Promo ── */
+  promoRow: { flexDirection: 'row', gap: 10 },
+  promoInput: { flex: 1, marginBottom: 0 },
   promoBtn: {
     backgroundColor: '#f59e0b',
     borderRadius: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  promoBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
+  promoBtnText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
   cancelPromo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 8,
+    gap: 4,
+    marginTop: 10,
   },
-  cancelPromoText: {
-    color: '#ef4444',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  cancelPromoText: { color: '#ef4444', fontSize: 12, fontWeight: '600' },
 
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: '#e8edf2',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
+  /* ── Summary ── */
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
   },
-  summaryLabel: {
-    fontSize: 13,
-    color: '#6b7280',
+  rowLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  profitValue: {
-    color: '#10b981',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e8edf2',
-    marginVertical: 10,
-  },
+  summaryLabel: { fontSize: 13, color: '#6b7280' },
+  summaryValue: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  profitValue: { color: '#10b981' },
+  divider: { height: 1, backgroundColor: '#e8edf2', marginVertical: 10 },
+
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 4,
   },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: PRIMARY,
-  },
+  totalLabel: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
+  totalValue: { fontSize: 22, fontWeight: 'bold', color: PRIMARY },
 
+  /* ── Free shipping badge ── */
+  freeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  freeBadgeText: { fontSize: 12, fontWeight: '700', color: '#059669' },
+
+  /* ── Slider ── */
+  sliderCard: {
+    backgroundColor: '#f0f9fa',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#d4eef3',
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  sliderTitle: { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  sliderHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  sliderHint: {
+    flex: 1,
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'right',
+  },
+  slider: { width: '100%', height: 40 },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: -4,
+  },
+  sliderLabel: { fontSize: 10, color: '#9ca3af' },
+  sliderImpact: { marginTop: 8, alignItems: 'center' },
+  sliderImpactText: { fontSize: 12, color: '#374151' },
+
+  /* ── Footer ── */
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -678,12 +776,9 @@ const s = StyleSheet.create({
     borderRadius: 14,
     height: 50,
   },
-  submitText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
+  /* ── Modal ── */
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -705,11 +800,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   provinceItem: {
     flexDirection: 'row',
     alignItems: 'center',
