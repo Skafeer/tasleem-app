@@ -35,6 +35,7 @@ type AppliedPromo = {
   discountType: 'percentage' | 'fixed';
   discountPercent?: number;
   discountAmount?: number;
+  appliesTo: 'subtotal' | 'shipping';  // ✅ جديد
 };
 
 export default function CheckoutScreen() {
@@ -103,17 +104,21 @@ export default function CheckoutScreen() {
     }, [CART_KEY, loadCart, userLoading])
   );
 
-  // ─── حساب المجاميع أولاً (مطلوب للتحقق من الكود) ───────────────
+  // ─── حساب المجاميع أولاً ────────────────────────────────────────
   const sellingTotal = cart.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
   const costTotal    = cart.reduce((s, i) => s + i.wholesalePrice * i.quantity, 0);
   const minTotal     = cart.reduce((s, i) => s + (i.sellingPriceMin || i.wholesalePrice) * i.quantity, 0);
 
-  // ─── التحقق من الكود (يرسل cartAmount) ────────────────────────
+  // ─── التوصيل الأساسي (قبل الخصم) ────────────────────────────────
+  const baseShipping = province === 'البصرة' ? 3000 : 5000;
+
+  // ─── التحقق من الكود (يرسل cartAmount + shippingCost) ────────────
   const verifyPromo = useMutation({
     mutationFn: async (code: string) => {
       const { data } = await api.post('/api/promo-codes/verify', {
         code: code.trim().toUpperCase(),
         cartAmount: sellingTotal,
+        shippingCost: baseShipping,
       });
       return data;
     },
@@ -127,7 +132,9 @@ export default function CheckoutScreen() {
 
       setAppliedPromo(data.promo);
       setPromoDiscount(data.discount || 0);
-      toast.success(`تم تطبيق الخصم: ${data.discount.toLocaleString()} د.ع`);
+
+      const scopeLabel = data.promo?.appliesTo === 'shipping' ? 'على التوصيل' : 'على المنتجات';
+      toast.success(`تم تطبيق الخصم ${scopeLabel}: ${data.discount.toLocaleString()} د.ع`);
     },
     onError: (e: any) => {
       const msg = e?.response?.data?.message || 'كود خصم غير صحيح';
@@ -179,25 +186,38 @@ export default function CheckoutScreen() {
     return phone.startsWith('07') && phone.length === 11 && /^[0-9]+$/.test(phone);
   };
 
-  // ─── الحسابات المالية ─────────────────────────────────────────
-  // ✅ التاجر لا يتحمل الخصم — الشركة تتحمّله من هامش سعر الجملة
-  const discount     = promoDiscount; // المبلغ الفعلي المحسوب من السيرفر
-  const shipping     = province === 'البصرة' ? 3000 : 5000;
+  // ═══════════════════════════════════════════════════════════════
+  // ─── الحسابات المالية ───
+  // ✅ التاجر لا يتحمل الخصم — الشركة تتحمّله
+  // ✅ الخصم قد يكون على المنتجات أو على التوصيل
+  // ═══════════════════════════════════════════════════════════════
+  const promoAppliesTo = appliedPromo?.appliesTo || 'subtotal';
 
-  const sliderMax    = shipping;
+  // خصم المنتجات vs خصم التوصيل
+  const productsDiscount = promoAppliesTo === 'subtotal' ? promoDiscount : 0;
+  const shippingDiscount = promoAppliesTo === 'shipping' ? promoDiscount : 0;
+
+  // ─── السلايدر: إعانة التاجر للتوصيل ───
+  const sliderMax    = baseShipping;
   const sliderStep   = 500;
-  // ✅ الشرط لا يتأثر بكود الخصم — التاجر يقدر يستخدم الاثنين معاً
-  const sliderEnabled = sellingTotal > (minTotal + shipping);
+  const sliderEnabled = sellingTotal > (minTotal + baseShipping);
 
-  // ✅ ربح التاجر لا يُخصم منه الكود
+  // ربح التاجر: لا يُخصم منه الكود (فقط السلايدر)
   const rawProfit     = sellingTotal - costTotal;
   const maxSubsidy    = Math.min(sliderMax, Math.max(0, rawProfit - 1));
   const safeSubsidy   = Math.min(shippingSubsidy, maxSubsidy);
 
-  const customerShipping = Math.max(0, shipping - safeSubsidy);
-  const total            = sellingTotal - discount + customerShipping;
-  const profit           = rawProfit - safeSubsidy;
-  const isFreeShipping   = safeSubsidy >= shipping;
+  // التوصيل النهائي على العميل = التوصيل الأساسي - إعانة التاجر - خصم التوصيل من الكود
+  const shippingAfterSubsidy = Math.max(0, baseShipping - safeSubsidy);
+  const customerShipping = Math.max(0, shippingAfterSubsidy - shippingDiscount);
+
+  // الإجمالي = المنتجات + التوصيل - خصم المنتجات
+  const total = sellingTotal - productsDiscount + customerShipping;
+
+  // ربح التاجر النهائي = الربح الأساسي - إعانة السلايدر
+  const profit = rawProfit - safeSubsidy;
+
+  const isFreeShipping = customerShipping === 0;
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
@@ -268,12 +288,15 @@ export default function CheckoutScreen() {
     return `${(appliedPromo.discountAmount || 0).toLocaleString()} د.ع`;
   })();
 
+  // ─── تسمية نوع الكود ──────────────────────────────────────────
+  const promoScopeLabel = promoAppliesTo === 'shipping' ? 'توصيل' : 'منتجات';
+
   // ─── تلميح السلايدر ────────────────────────────────────────────
   const sliderHint = (() => {
     if (!sliderEnabled) return { text: 'ارفع سعر البيع لتفعيل هذه الميزة', icon: 'information-circle-outline', color: '#9ca3af' };
     if (safeSubsidy === 0) return { text: 'اسحب للخصم من ربحك وتوفير التوصيل للزبون', icon: 'hand-left-outline', color: '#6b7280' };
-    if (isFreeShipping) return { text: `التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`, icon: 'checkmark-circle', color: SUCCESS };
-    return { text: `خصمت ${safeSubsidy.toLocaleString()} د.ع — تبقى ${(shipping - safeSubsidy).toLocaleString()} د.ع على الزبون`, icon: 'cash-outline', color: PRIMARY };
+    if (baseShipping - safeSubsidy <= 0) return { text: `التوصيل مجاني — خصمت ${safeSubsidy.toLocaleString()} د.ع من ربحك`, icon: 'checkmark-circle', color: SUCCESS };
+    return { text: `خصمت ${safeSubsidy.toLocaleString()} د.ع — تبقى ${(baseShipping - safeSubsidy).toLocaleString()} د.ع على الزبون`, icon: 'cash-outline', color: PRIMARY };
   })();
 
   if (loading || userLoading) {
@@ -458,6 +481,13 @@ export default function CheckoutScreen() {
 
               <View style={s.appliedPromoDetails}>
                 <View style={s.appliedDetailItem}>
+                  <Text style={s.appliedDetailLabel}>النوع</Text>
+                  <Text style={[s.appliedDetailVal, { color: PRIMARY }]}>
+                    {promoScopeLabel}
+                  </Text>
+                </View>
+                <View style={s.appliedDetailDivider} />
+                <View style={s.appliedDetailItem}>
                   <Text style={s.appliedDetailLabel}>الخصم</Text>
                   <Text style={[s.appliedDetailVal, { color: SECONDARY }]}>
                     {promoDisplayText}
@@ -465,7 +495,7 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={s.appliedDetailDivider} />
                 <View style={s.appliedDetailItem}>
-                  <Text style={s.appliedDetailLabel}>قيمة التوفير</Text>
+                  <Text style={s.appliedDetailLabel}>التوفير</Text>
                   <Text style={[s.appliedDetailVal, { color: SUCCESS }]}>
                     {promoDiscount.toLocaleString()} د.ع
                   </Text>
@@ -499,16 +529,17 @@ export default function CheckoutScreen() {
             </Text>
           </View>
 
-          {promoDiscount > 0 && appliedPromo && (
+          {/* ─── خصم المنتجات (لو كان على المنتجات) ─── */}
+          {productsDiscount > 0 && appliedPromo && (
             <View style={s.summaryRow}>
               <View style={s.rowLabelWrap}>
                 <Ionicons name="pricetag-outline" size={14} color={SUCCESS} />
                 <Text style={s.summaryLabel}>
-                  الخصم ({appliedPromo.code})
+                  خصم منتجات ({appliedPromo.code})
                 </Text>
               </View>
               <Text style={[s.summaryValue, { color: SUCCESS }]}>
-                -{discount.toLocaleString()} د.ع
+                -{productsDiscount.toLocaleString()} د.ع
               </Text>
             </View>
           )}
@@ -526,6 +557,21 @@ export default function CheckoutScreen() {
               </Text>
             )}
           </View>
+
+          {/* ─── خصم التوصيل (لو كان على التوصيل) ─── */}
+          {shippingDiscount > 0 && appliedPromo && (
+            <View style={s.summaryRow}>
+              <View style={s.rowLabelWrap}>
+                <Ionicons name="bicycle-outline" size={14} color={SUCCESS} />
+                <Text style={s.summaryLabel}>
+                  خصم توصيل ({appliedPromo.code})
+                </Text>
+              </View>
+              <Text style={[s.summaryValue, { color: SUCCESS }]}>
+                -{shippingDiscount.toLocaleString()} د.ع
+              </Text>
+            </View>
+          )}
 
           {/* ── السلايدر ── */}
           <View style={[s.sliderCard, !sliderEnabled && { opacity: 0.45 }]}>
@@ -807,7 +853,7 @@ const s = StyleSheet.create({
   appliedDetailItem: { flex: 1, alignItems: 'center', gap: 3 },
   appliedDetailDivider: { width: 1, height: 30, backgroundColor: '#e8edf2' },
   appliedDetailLabel: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
-  appliedDetailVal: { fontSize: 14, fontWeight: 'bold' },
+  appliedDetailVal: { fontSize: 13, fontWeight: 'bold' },
 
   // Summary
   summaryRow: {

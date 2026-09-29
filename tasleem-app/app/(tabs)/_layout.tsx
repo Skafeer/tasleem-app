@@ -50,14 +50,14 @@ export default function TabsLayout() {
           <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
         ),
       }} />
-      
+
       <Tabs.Screen name="orders" options={{
         title: 'طلباتي',
         tabBarIcon: ({ color, focused }) => (
           <Ionicons name={focused ? 'bag' : 'bag-outline'} size={24} color={color} />
         ),
       }} />
-      
+
       <Tabs.Screen name="admin" options={{
         title: 'الإدارة',
         tabBarIcon: ({ color, focused }) => (
@@ -65,14 +65,22 @@ export default function TabsLayout() {
         ),
         href: isAdmin ? undefined : null, // ✅ إخفاء التبويب إذا لم يكن أدمن
       }} />
-      
+
+      {/* ✅ تاب جديد: التحديات */}
+      <Tabs.Screen name="rewards" options={{
+        title: 'التحديات',
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={focused ? 'trophy' : 'trophy-outline'} size={24} color={color} />
+        ),
+      }} />
+
       <Tabs.Screen name="wallet" options={{
         title: 'المحفظة',
         tabBarIcon: ({ color, focused }) => (
           <Ionicons name={focused ? 'card' : 'card-outline'} size={24} color={color} />
         ),
       }} />
-      
+
       <Tabs.Screen name="profile" options={{
         title: 'حسابي',
         tabBarIcon: ({ color, focused }) => (
