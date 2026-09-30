@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 
@@ -22,15 +22,19 @@ import { toast } from '../../src/lib/toast';
 const PRIMARY = '#0c6679';
 const SECONDARY = '#f5a006';
 const SUCCESS = '#10b981';
+const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const qc = useQueryClient();
   const { width } = useWindowDimensions();
   const [activeImg, setActiveImg] = useState(0);
   const [showCart, setShowCart] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
+  const [showAddToStore, setShowAddToStore] = useState(false);
+  const [storePrice, setStorePrice] = useState('');
   const [saving, setSaving] = useState(false);
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -49,6 +53,52 @@ export default function ProductDetailScreen() {
       const { data } = await api.get(`/api/products/${id}`);
       return data;
     },
+  });
+
+  // ✅ جلب بيانات المتجر
+  const { data: storeData } = useQuery({
+    queryKey: ['my-store'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/store/my');
+      return data as { store: any | null; products?: any[] };
+    },
+    staleTime: 60000,
+  });
+
+  const myStore = storeData?.store || null;
+  const storeProducts = storeData?.products || [];
+  const productInStore = storeProducts.find((sp: any) => sp.productId === Number(id));
+
+  // ✅ Mutation: إضافة منتج للمتجر
+  const addToStoreMutation = useMutation({
+    mutationFn: async (price: number) => {
+      const { data } = await api.post('/api/store/products', {
+        productId: Number(id),
+        price,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-store'] });
+      toast.success('تم إضافة المنتج لمتجرك ✅');
+      setShowAddToStore(false);
+      setStorePrice('');
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل الإضافة'),
+  });
+
+  // ✅ Mutation: حذف منتج من المتجر
+  const removeFromStoreMutation = useMutation({
+    mutationFn: async () => {
+      await api.delete(`/api/store/products/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-store'] });
+      toast.success('تم حذف المنتج من متجرك');
+      setShowAddToStore(false);
+      setStorePrice('');
+    },
+    onError: () => toast.error('فشل الحذف'),
   });
 
   // ✅ الترتيب الطبيعي: الصورة الأولى = 1/7
@@ -104,6 +154,63 @@ export default function ProductDetailScreen() {
     } catch {
       toast.error('فشل الإضافة إلى السلة');
     }
+  };
+
+  // ✅ فتح مودال إضافة المتجر
+  const openStoreModal = () => {
+    if (!myStore) {
+      // ما عنده متجر → ينقل لإنشاء متجر
+      Alert.alert(
+        'لا يوجد متجر',
+        'لا يمكنك إضافة المنتجات قبل إنشاء متجرك الإلكتروني',
+        [
+          { text: 'لاحقاً', style: 'cancel' },
+          {
+            text: 'إنشاء متجر',
+            onPress: () => router.push('/settings/store-settings'),
+          },
+        ]
+      );
+      return;
+    }
+
+    // عنده متجر → يفتح المودال
+    if (productInStore) {
+      setStorePrice(String(productInStore.price));
+    } else {
+      setStorePrice(String(Math.round(discountedPrice)));
+    }
+    setShowAddToStore(true);
+  };
+
+  // ✅ حفظ في المتجر
+  const handleSaveToStore = () => {
+    const price = Number(storePrice);
+    if (!price || price <= 0) {
+      toast.warning('أدخل السعر');
+      return;
+    }
+    if (price < discountedPrice) {
+      toast.warning(`السعر يجب أن يكون ${Math.round(discountedPrice).toLocaleString()} د.ع أو أكثر`);
+      return;
+    }
+    addToStoreMutation.mutate(price);
+  };
+
+  // ✅ حذف من المتجر
+  const handleRemoveFromStore = () => {
+    Alert.alert(
+      'حذف من المتجر',
+      'هل تريد حذف هذا المنتج من متجرك؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: () => removeFromStoreMutation.mutate(),
+        },
+      ]
+    );
   };
 
   const copyText = (text: string) => {
@@ -257,6 +364,13 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
+          {productInStore && (
+            <View style={s.inStoreBadge}>
+              <Ionicons name="storefront" size={12} color="#fff" />
+              <Text style={s.inStoreText}>في متجرك</Text>
+            </View>
+          )}
+
           <View style={s.imgCounter}>
             <Ionicons name="images-outline" size={12} color="#fff" />
             <Text style={s.imgCounterText}>{activeImg + 1}/{images.length}</Text>
@@ -315,6 +429,46 @@ export default function ProductDetailScreen() {
               )}
             </View>
           </View>
+
+          {/* ═══ بطاقة المتجر ═══ */}
+          <TouchableOpacity
+            style={[
+              s.storeCard,
+              productInStore
+                ? { borderColor: SUCCESS + '40', backgroundColor: SUCCESS + '08' }
+                : { borderColor: PRIMARY + '30', backgroundColor: PRIMARY + '06' },
+            ]}
+            onPress={openStoreModal}
+            activeOpacity={0.85}>
+            <View style={[
+              s.storeIconBox,
+              { backgroundColor: productInStore ? SUCCESS + '20' : PRIMARY + '15' },
+            ]}>
+              <Ionicons
+                name={productInStore ? 'checkmark-circle' : 'storefront-outline'}
+                size={22}
+                color={productInStore ? SUCCESS : PRIMARY}
+              />
+            </View>
+            <View style={s.storeInfo}>
+              <Text style={[
+                s.storeTitle,
+                { color: productInStore ? SUCCESS : PRIMARY },
+              ]}>
+                {productInStore ? 'المنتج في متجرك' : 'أضف إلى متجرك'}
+              </Text>
+              <Text style={s.storeSub}>
+                {productInStore
+                  ? `يُباع بسعر ${Math.round(productInStore.price).toLocaleString()} د.ع`
+                  : 'أضف هذا المنتج لمتجرك الإلكتروني'}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-back"
+              size={18}
+              color={productInStore ? SUCCESS : PRIMARY}
+            />
+          </TouchableOpacity>
 
           {/* Ad Links */}
           {adLinks.length > 0 && (
@@ -437,6 +591,117 @@ export default function ProductDetailScreen() {
               <Ionicons name="cart-outline" size={20} color="#fff" />
               <Text style={s.addBtnText}>إضافة إلى السلة</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ═══ Add to Store Modal ═══ */}
+      <Modal visible={showAddToStore} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <View style={s.modalHeader}>
+              <TouchableOpacity onPress={() => setShowAddToStore(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+              <Text style={s.modalTitle}>
+                {productInStore ? 'إدارة منتجك في المتجر' : 'إضافة إلى المتجر'}
+              </Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {productInStore && (
+                <View style={s.storeInfoBox}>
+                  <View style={[s.storeInfoIconBox, { backgroundColor: SUCCESS + '15' }]}>
+                    <Ionicons name="checkmark-circle" size={20} color={SUCCESS} />
+                  </View>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={[s.storeInfoTitle, { color: SUCCESS }]}>
+                      المنتج موجود في متجرك
+                    </Text>
+                    <Text style={s.storeInfoSub}>
+                      السعر الحالي: {Math.round(productInStore.price).toLocaleString()} د.ع
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <Text style={s.inputLabel}>
+                {productInStore ? 'تعديل السعر (د.ع) *' : 'سعر البيع في متجرك (د.ع) *'}
+              </Text>
+              <TextInput
+                style={s.input}
+                placeholder={`الحد الأدنى: ${Math.round(discountedPrice).toLocaleString()}`}
+                value={storePrice}
+                onChangeText={v => setStorePrice(v.replace(/[^0-9.]/g, ''))}
+                keyboardType="numeric"
+                textAlign="right"
+                placeholderTextColor="#9ca3af"
+              />
+
+              {/* معلومات إضافية */}
+              <View style={s.infoBoxAlt}>
+                <View style={s.infoRowAlt}>
+                  <Text style={s.infoValAlt}>
+                    {Math.round(discountedPrice).toLocaleString()} د.ع
+                  </Text>
+                  <Text style={s.infoLabelAlt}>سعر الجملة</Text>
+                </View>
+                <View style={s.infoRowAlt}>
+                  <Text style={s.infoValAlt}>
+                    {(product.suggestedPrice || product.wholesalePrice).toLocaleString()} د.ع
+                  </Text>
+                  <Text style={s.infoLabelAlt}>السعر المقترح</Text>
+                </View>
+                {storePrice && Number(storePrice) > 0 && (
+                  <View style={[s.infoRowAlt, s.infoRowTotal]}>
+                    <Text style={[s.infoValAlt, { color: SUCCESS, fontWeight: 'bold', fontSize: 15 }]}>
+                      {(Number(storePrice) - discountedPrice).toLocaleString()} د.ع
+                    </Text>
+                    <Text style={[s.infoLabelAlt, { fontWeight: 'bold' }]}>
+                      ربحك من كل قطعة
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* حفظ */}
+              <TouchableOpacity
+                style={[s.addBtn, addToStoreMutation.isPending && { opacity: 0.7 }]}
+                onPress={handleSaveToStore}
+                disabled={addToStoreMutation.isPending}>
+                {addToStoreMutation.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={productInStore ? 'save-outline' : 'add-circle-outline'}
+                      size={20}
+                      color="#fff"
+                    />
+                    <Text style={s.addBtnText}>
+                      {productInStore ? 'حفظ السعر الجديد' : 'إضافة للمتجر'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* حذف (فقط إذا كان المنتج بالمتجر) */}
+              {productInStore && (
+                <TouchableOpacity
+                  style={[s.removeBtn, removeFromStoreMutation.isPending && { opacity: 0.7 }]}
+                  onPress={handleRemoveFromStore}
+                  disabled={removeFromStoreMutation.isPending}>
+                  {removeFromStoreMutation.isPending ? (
+                    <ActivityIndicator color={DANGER} />
+                  ) : (
+                    <>
+                      <Ionicons name="trash-outline" size={18} color={DANGER} />
+                      <Text style={s.removeBtnTxt}>حذف من المتجر</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -564,7 +829,7 @@ const s = StyleSheet.create({
   },
   dlCancelText: { fontSize: 14, fontWeight: '700', color: '#64748b' },
 
-  // ── Header RTL ──
+  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -642,6 +907,19 @@ const s = StyleSheet.create({
     gap: 4,
   },
   discountText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  inStoreBadge: {
+    position: 'absolute',
+    top: 84,
+    right: 12,
+    backgroundColor: '#10b981',
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  inStoreText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   imgCounter: {
     position: 'absolute',
     bottom: 12,
@@ -716,6 +994,24 @@ const s = StyleSheet.create({
   infoLabel: { fontSize: 11, color: '#9ca3af', marginTop: 4, marginBottom: 2 },
   infoVal: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   oldPrice: { fontSize: 10, color: '#9ca3af', textDecorationLine: 'line-through', marginTop: 2 },
+
+  // ── Store Card ──
+  storeCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+  },
+  storeIconBox: {
+    width: 44, height: 44, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  storeInfo: { flex: 1, alignItems: 'flex-end' },
+  storeTitle: { fontSize: 14, fontWeight: 'bold' },
+  storeSub: { fontSize: 11, color: '#6b7280', marginTop: 2 },
 
   section: {
     backgroundColor: '#fff',
@@ -802,6 +1098,15 @@ const s = StyleSheet.create({
     marginTop: 10,
     fontWeight: '600',
   },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#e8edf2',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: '#111827',
+    backgroundColor: '#f8fafc',
+  },
   priceInputBox: { flexDirection: 'row', gap: 9 },
   priceInput: {
     flex: 1,
@@ -854,4 +1159,58 @@ const s = StyleSheet.create({
     marginTop: 14,
   },
   addBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+
+  // ── Store Modal Extra ──
+  storeInfoBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    backgroundColor: SUCCESS + '08',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: SUCCESS + '30',
+    marginBottom: 12,
+  },
+  storeInfoIconBox: {
+    width: 44, height: 44, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  storeInfoTitle: { fontSize: 14, fontWeight: 'bold' },
+  storeInfoSub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+
+  infoBoxAlt: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 14,
+    gap: 10,
+  },
+  infoRowAlt: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoRowTotal: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  infoLabelAlt: { fontSize: 12, color: '#6b7280' },
+  infoValAlt: { fontSize: 13, color: '#111827', fontWeight: '600' },
+
+  removeBtn: {
+    borderRadius: 14,
+    height: 48,
+    flexDirection: 'row-reverse',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    backgroundColor: DANGER + '10',
+    borderWidth: 1.5,
+    borderColor: DANGER + '30',
+  },
+  removeBtnTxt: { color: DANGER, fontSize: 14, fontWeight: 'bold' },
 });

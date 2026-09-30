@@ -28,6 +28,17 @@ export default function ProfileScreen() {
     },
   });
 
+  const { data: storeData } = useQuery({
+    queryKey: ['my-store'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/store/my');
+      return data;
+    },
+    staleTime: 60000,
+  });
+
+  const hasStore = !!storeData?.store;
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
@@ -35,6 +46,16 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
+    // ✅ عنصر جديد: إعدادات الموقع الإلكتروني
+    {
+      key: 'store-settings',
+      label: hasStore ? 'متجري الإلكتروني' : 'إنشاء متجر إلكتروني',
+      icon: 'storefront-outline',
+      gradient: ['#0c6679', '#0a8a9f'],
+      route: '/settings/store-settings',
+      badge: hasStore ? 'نشط' : 'جديد',
+      badgeColor: hasStore ? '#10b981' : '#f59e0b',
+    },
     { key: 'profile-edit', label: 'الملف الشخصي',        icon: 'person-outline',           gradient: ['#3b82f6', '#2563eb'], route: '/profile-edit' },
     { key: 'favorites',    label: 'المنتجات المفضلة',     icon: 'heart-outline',            gradient: ['#ef4444', '#dc2626'], route: '/favorites' },
     { key: 'withdrawals',  label: 'سجل السحوبات',         icon: 'time-outline',             gradient: ['#8b5cf6', '#7c3aed'], route: '/withdraw-history' },
@@ -117,7 +138,6 @@ export default function ProfileScreen() {
           >
             <View style={s.tariqToggleLeft}>
               <View style={s.tariqIconBox}>
-                {/* ── صورة طارق بدل الإيموجي ── */}
                 <Image source={TARIQ_IMG} style={s.tariqImg} />
               </View>
               <View>
@@ -141,7 +161,7 @@ export default function ProfileScreen() {
         {/* ── قائمة الخيارات ── */}
         <View style={s.menuSection}>
           <Text style={s.menuSectionTitle}>القائمة</Text>
-          {menuItems.map((item, idx) => (
+          {menuItems.map((item: any, idx) => (
             <TouchableOpacity
               key={item.key}
               style={[s.menuItem, idx === menuItems.length - 1 && { borderBottomWidth: 0 }]}
@@ -153,7 +173,16 @@ export default function ProfileScreen() {
                 style={s.menuIconGradient}>
                 <Ionicons name={item.icon as any} size={18} color="#fff" />
               </LinearGradient>
-              <Text style={s.menuLabel}>{item.label}</Text>
+              <View style={s.menuLabelWrap}>
+                <Text style={s.menuLabel}>{item.label}</Text>
+                {item.badge && (
+                  <View style={[s.menuBadge, { backgroundColor: item.badgeColor + '20' }]}>
+                    <Text style={[s.menuBadgeTxt, { color: item.badgeColor }]}>
+                      {item.badge}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Ionicons name="chevron-back" size={16} color="#d1d5db" />
             </TouchableOpacity>
           ))}
@@ -205,7 +234,6 @@ const s = StyleSheet.create({
   statValue:       { fontSize: 20, fontWeight: 'bold', textAlign: 'center' },
   statCurrency:    { fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' },
 
-  // ── طارق ──
   tariqSection: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 20, overflow: 'hidden',
     borderWidth: 1, borderColor: '#1e3a5f22',
@@ -222,7 +250,6 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     overflow: 'hidden',
   },
-  // ── صورة طارق داخل الأيقونة ──
   tariqImg: { width: 40, height: 40, borderRadius: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tariqToggleTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
@@ -234,7 +261,10 @@ const s = StyleSheet.create({
   menuSectionTitle: { fontSize: 13, fontWeight: '600', color: '#9ca3af', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, textAlign: 'right' },
   menuItem:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6', gap: 12 },
   menuIconGradient: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  menuLabel:        { flex: 1, fontSize: 14, fontWeight: '500', color: '#374151', textAlign: 'right' },
+  menuLabelWrap:    { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'flex-start', gap: 8 },
+  menuLabel:        { fontSize: 14, fontWeight: '500', color: '#374151', textAlign: 'right' },
+  menuBadge:        { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  menuBadgeTxt:     { fontSize: 10, fontWeight: 'bold' },
 
   logoutBtn:      { marginHorizontal: 16, marginTop: 8, marginBottom: 16, borderRadius: 16, overflow: 'hidden' },
   logoutGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
