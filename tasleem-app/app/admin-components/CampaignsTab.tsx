@@ -16,6 +16,7 @@ const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
 const PURPLE = '#8b5cf6';
 const BG = '#f2f6f9';
+const BORDER = '#e8edf2';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ar-IQ');
 const fmtDate = (d: string | null | undefined) => {
@@ -24,22 +25,22 @@ const fmtDate = (d: string | null | undefined) => {
 };
 
 const REWARD_TYPES = [
-  { key: 'cashback',      label: 'كاش باك',       icon: 'cash',        color: SUCCESS,  desc: 'يُضاف المبلغ لرصيد التاجر' },
-  { key: 'shipping_code', label: 'كود خصم توصيل', icon: 'bicycle',     color: PRIMARY,  desc: 'كود بنسبة على التوصيل' },
-  { key: 'free_shipping', label: 'توصيل مجاني',   icon: 'car-sport',   color: PURPLE,   desc: 'كود بتوصيل مجاني' },
-  { key: 'product_code',  label: 'كود خصم منتج',  icon: 'pricetag',    color: SECONDARY, desc: 'كود بنسبة على المنتجات' },
+  { key: 'cashback',      label: 'كاش باك',        icon: 'cash-outline',        color: SUCCESS,   bg: '#ecfdf5', desc: 'يُضاف لرصيد التاجر' },
+  { key: 'shipping_code', label: 'خصم توصيل',      icon: 'bicycle-outline',     color: PRIMARY,   bg: '#f0f9fa', desc: 'نسبة على التوصيل' },
+  { key: 'free_shipping', label: 'توصيل مجاني',    icon: 'car-sport-outline',   color: PURPLE,    bg: '#f5f3ff', desc: 'توصيل مجاني كامل' },
+  { key: 'product_code',  label: 'خصم منتج',       icon: 'pricetag-outline',    color: SECONDARY, bg: '#fffbeb', desc: 'نسبة على المنتجات' },
 ];
 
-type FilterKey = 'active' | 'upcoming' | 'ended' | 'all';
+type FilterKey = 'active' | 'upcoming' | 'ended';
 
-function getCampaignStatus(c: any): { key: FilterKey | 'active' | 'upcoming' | 'ended'; label: string; color: string; bg: string } {
-  if (!c.isActive) return { key: 'ended', label: 'معطل', color: '#6b7280', bg: '#f3f4f6' };
+function getCampaignStatus(c: any): { key: FilterKey; label: string; color: string; icon: string } {
+  if (!c.isActive) return { key: 'ended', label: 'معطل', color: '#6b7280', icon: 'close-circle-outline' };
   const now = new Date();
   const starts = new Date(c.startsAt);
   const ends = new Date(c.endsAt);
-  if (now < starts) return { key: 'upcoming', label: 'قادم', color: PRIMARY, bg: PRIMARY + '15' };
-  if (now > ends) return { key: 'ended', label: 'منتهي', color: '#6b7280', bg: '#f3f4f6' };
-  return { key: 'active', label: 'نشط', color: SUCCESS, bg: '#ecfdf5' };
+  if (now < starts) return { key: 'upcoming', label: 'قادم', color: PRIMARY, icon: 'time-outline' };
+  if (now > ends) return { key: 'ended', label: 'منتهي', color: '#6b7280', icon: 'time-outline' };
+  return { key: 'active', label: 'نشط', color: SUCCESS, icon: 'flash' };
 }
 
 function getProductImage(product: any): string | null {
@@ -50,10 +51,10 @@ function getProductImage(product: any): string | null {
 
 function getRewardText(c: any): string {
   if (!c) return '';
-  if (c.rewardType === 'cashback') return `${fmt(c.rewardValue)} د.ع`;
-  if (c.rewardType === 'shipping_code') return `خصم ${c.rewardValue}% توصيل`;
-  if (c.rewardType === 'free_shipping') return 'توصيل مجاني';
-  if (c.rewardType === 'product_code') return `خصم ${c.rewardValue}% منتج`;
+  if (c.rewardType === 'cashback')      return `${fmt(c.rewardValue)} د.ع`;
+  if (c.rewardType === 'shipping_code') return `خصم ${c.rewardValue}%`;
+  if (c.rewardType === 'free_shipping') return 'مجاني';
+  if (c.rewardType === 'product_code')  return `خصم ${c.rewardValue}%`;
   return '';
 }
 
@@ -63,6 +64,8 @@ export default function CampaignsTab() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [detailsCampaign, setDetailsCampaign] = useState<any>(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   // ─── النموذج ───
   const [form, setForm] = useState<any>({
@@ -80,9 +83,6 @@ export default function CampaignsTab() {
       maxDiscount: '',
     },
   });
-
-  const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
 
   // ─── الجلب ───
   const { data: campaigns = [], isLoading } = useQuery({
@@ -102,23 +102,23 @@ export default function CampaignsTab() {
     },
   });
 
-  // ─── الإحصائيات ───
+  // ─── Stats ───
   const stats = useMemo(() => {
     const now = new Date();
     const list = campaigns as any[];
-    const active = list.filter((c: any) => c.isActive && new Date(c.startsAt) <= now && new Date(c.endsAt) >= now).length;
+    const active   = list.filter((c: any) => c.isActive && new Date(c.startsAt) <= now && new Date(c.endsAt) >= now).length;
     const upcoming = list.filter((c: any) => c.isActive && new Date(c.startsAt) > now).length;
-    const ended = list.filter((c: any) => !c.isActive || new Date(c.endsAt) < now).length;
-    return { active, upcoming, ended, total: list.length };
+    const ended    = list.filter((c: any) => !c.isActive || new Date(c.endsAt) < now).length;
+    return { active, upcoming, ended };
   }, [campaigns]);
 
-  // ─── الفلترة ───
+  // ─── Filter ───
   const filtered = useMemo(() => {
     const now = new Date();
     return (campaigns as any[]).filter((c: any) => {
-      if (filter === 'active') return c.isActive && new Date(c.startsAt) <= now && new Date(c.endsAt) >= now;
+      if (filter === 'active')   return c.isActive && new Date(c.startsAt) <= now && new Date(c.endsAt) >= now;
       if (filter === 'upcoming') return c.isActive && new Date(c.startsAt) > now;
-      if (filter === 'ended') return !c.isActive || new Date(c.endsAt) < now;
+      if (filter === 'ended')    return !c.isActive || new Date(c.endsAt) < now;
       return true;
     }).sort((a: any, b: any) => b.id - a.id);
   }, [campaigns, filter]);
@@ -135,7 +135,7 @@ export default function CampaignsTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-campaigns'] });
-      toast.success(editing ? 'تم تعديل الحملة ✅' : 'تم إنشاء الحملة ✅');
+      toast.success(editing ? 'تم تعديل التحدي' : 'تم إنشاء التحدي');
       closeModal();
     },
     onError: (e: any) => toast.error(e?.response?.data?.message || 'فشل الحفظ'),
@@ -147,13 +147,13 @@ export default function CampaignsTab() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-campaigns'] });
-      toast.success('تم حذف الحملة');
+      toast.success('تم حذف التحدي');
       setDetailsCampaign(null);
     },
     onError: () => toast.error('فشل الحذف'),
   });
 
-  // ─── دوال المودال ───
+  // ─── Modal ───
   const openAdd = () => {
     setEditing(null);
     const today = new Date();
@@ -167,11 +167,7 @@ export default function CampaignsTab() {
       endsAt: nextWeek.toISOString().split('T')[0],
       rewardType: 'cashback',
       rewardValue: '',
-      rewardData: {
-        codePrefix: 'GIFT',
-        expiresInDays: 30,
-        maxDiscount: '',
-      },
+      rewardData: { codePrefix: 'GIFT', expiresInDays: 30, maxDiscount: '' },
     });
     setShowModal(true);
   };
@@ -204,10 +200,10 @@ export default function CampaignsTab() {
   };
 
   const handleSave = () => {
-    if (!form.title.trim()) return toast.warning('أدخل عنوان الحملة');
+    if (!form.title.trim()) return toast.warning('أدخل عنوان التحدي');
     if (!form.productId) return toast.warning('اختر المنتج');
-    if (!form.targetCount || Number(form.targetCount) <= 0) return toast.warning('أدخل عدد الطلبات المطلوبة');
-    if (!form.startsAt || !form.endsAt) return toast.warning('أدخل فترة الحملة');
+    if (!form.targetCount || Number(form.targetCount) <= 0) return toast.warning('أدخل عدد الطلبات');
+    if (!form.startsAt || !form.endsAt) return toast.warning('أدخل الفترة');
     if (new Date(form.endsAt) <= new Date(form.startsAt)) return toast.warning('تاريخ النهاية يجب أن يكون بعد البداية');
     if (!form.rewardValue || Number(form.rewardValue) <= 0) return toast.warning('أدخل قيمة المكافأة');
 
@@ -231,14 +227,13 @@ export default function CampaignsTab() {
         maxDiscount: Number(form.rewardData.maxDiscount) || 0,
       }),
     };
-
     saveMutation.mutate(payload);
   };
 
   const confirmDelete = (c: any) => {
     Alert.alert(
-      'حذف الحملة',
-      `هل تريد حذف حملة "${c.title}" نهائياً؟\nسيتم حذف كل المشاركات والمكافآت المرتبطة.`,
+      'حذف التحدي',
+      `هل تريد حذف "${c.title}" نهائياً؟\nسيتم حذف كل المشاركات والمكافآت.`,
       [
         { text: 'إلغاء', style: 'cancel' },
         { text: 'حذف', style: 'destructive', onPress: () => deleteMutation.mutate(c.id) },
@@ -246,9 +241,8 @@ export default function CampaignsTab() {
     );
   };
 
-  // ─── اختيار المنتج ───
   const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return products.slice(0, 30);
+    if (!productSearch.trim()) return (products as any[]).slice(0, 30);
     const q = productSearch.trim().toLowerCase();
     return (products as any[]).filter((p: any) => p.name?.toLowerCase().includes(q)).slice(0, 30);
   }, [products, productSearch]);
@@ -269,60 +263,60 @@ export default function CampaignsTab() {
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* ─── الإحصائيات ─── */}
-      <View style={s.statsGrid}>
-        <View style={[s.statCard, { borderTopColor: SUCCESS }]}>
+      {/* ─── Stats ─── */}
+      <View style={s.statsRow}>
+        <View style={s.statBox}>
           <Text style={[s.statVal, { color: SUCCESS }]}>{stats.active}</Text>
-          <Text style={s.statLabel}>نشطة</Text>
+          <Text style={s.statLbl}>نشطة</Text>
         </View>
-        <View style={[s.statCard, { borderTopColor: PRIMARY }]}>
+        <View style={s.statDivider} />
+        <View style={s.statBox}>
           <Text style={[s.statVal, { color: PRIMARY }]}>{stats.upcoming}</Text>
-          <Text style={s.statLabel}>قادمة</Text>
+          <Text style={s.statLbl}>قادمة</Text>
         </View>
-        <View style={[s.statCard, { borderTopColor: '#6b7280' }]}>
+        <View style={s.statDivider} />
+        <View style={s.statBox}>
           <Text style={[s.statVal, { color: '#6b7280' }]}>{stats.ended}</Text>
-          <Text style={s.statLabel}>منتهية</Text>
-        </View>
-        <View style={[s.statCard, { borderTopColor: SECONDARY }]}>
-          <Text style={[s.statVal, { color: SECONDARY }]}>{stats.total}</Text>
-          <Text style={s.statLabel}>الكل</Text>
+          <Text style={s.statLbl}>منتهية</Text>
         </View>
       </View>
 
-      {/* ─── الفلاتر ─── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filtersScroll}>
+      {/* ─── Filters ─── */}
+      <View style={s.filtersWrap}>
         {([
           ['active', 'نشطة'],
           ['upcoming', 'قادمة'],
           ['ended', 'منتهية'],
-          ['all', 'الكل'],
         ] as [FilterKey, string][]).map(([key, label]) => (
           <TouchableOpacity
             key={key}
             style={[s.chip, filter === key && s.chipActive]}
-            onPress={() => setFilter(key)}>
+            onPress={() => setFilter(key)}
+            activeOpacity={0.7}>
             <Text style={[s.chipTxt, filter === key && s.chipTxtActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
-      {/* ─── زر الإضافة ─── */}
-      <TouchableOpacity style={s.addBtn} onPress={openAdd}>
-        <Ionicons name="add-circle-outline" size={20} color="#fff" />
+      {/* ─── Add Button ─── */}
+      <TouchableOpacity style={s.addBtn} onPress={openAdd} activeOpacity={0.85}>
+        <Ionicons name="add-circle-outline" size={18} color="#fff" />
         <Text style={s.addBtnTxt}>إنشاء تحدي جديد</Text>
       </TouchableOpacity>
 
-      {/* ─── القائمة ─── */}
+      {/* ─── List ─── */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={s.center}>
-            <Ionicons name="trophy-outline" size={52} color="#d1d5db" />
-            <Text style={s.emptyTxt}>لا توجد تحديات</Text>
-            <Text style={s.emptySubTxt}>اضغط "إنشاء تحدي جديد" للبدء</Text>
+          <View style={s.emptyBox}>
+            <View style={s.emptyIconWrap}>
+              <Ionicons name="trophy-outline" size={36} color={PRIMARY} />
+            </View>
+            <Text style={s.emptyTitle}>لا توجد تحديات</Text>
+            <Text style={s.emptySub}>اضغط "إنشاء تحدي جديد" للبدء</Text>
           </View>
         }
         renderItem={({ item: c }) => {
@@ -336,13 +330,8 @@ export default function CampaignsTab() {
               activeOpacity={0.85}
               onPress={() => setDetailsCampaign(c)}>
 
-              {/* الحالة */}
-              <View style={[s.statusPill, { backgroundColor: st.bg }]}>
-                <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
-              </View>
-
-              {/* المنتج */}
-              <View style={s.cardHeader}>
+              {/* Top: Image + Info + Status */}
+              <View style={s.cardTop}>
                 {productImg ? (
                   <Image source={{ uri: productImg }} style={s.productImg} resizeMode="cover" />
                 ) : (
@@ -350,7 +339,12 @@ export default function CampaignsTab() {
                     <Ionicons name="cube-outline" size={24} color="#d1d5db" />
                   </View>
                 )}
-                <View style={s.productInfo}>
+
+                <View style={s.infoWrap}>
+                  <View style={[s.statusBadge, { backgroundColor: st.color + '15' }]}>
+                    <Ionicons name={st.icon as any} size={10} color={st.color} />
+                    <Text style={[s.statusTxt, { color: st.color }]}>{st.label}</Text>
+                  </View>
                   <Text style={s.campaignTitle} numberOfLines={1}>{c.title}</Text>
                   <Text style={s.productName} numberOfLines={1}>
                     {c.product?.name || `منتج #${c.productId}`}
@@ -358,27 +352,28 @@ export default function CampaignsTab() {
                 </View>
               </View>
 
-              {/* التفاصيل */}
+              {/* Details Row */}
               <View style={s.detailsRow}>
                 <View style={s.detailItem}>
-                  <Text style={s.detailLabel}>الهدف</Text>
-                  <Text style={s.detailVal}>{c.targetCount} طلب</Text>
+                  <Ionicons name="flag-outline" size={12} color="#9ca3af" />
+                  <Text style={s.detailVal}>{c.targetCount}</Text>
+                  <Text style={s.detailLbl}>طلب</Text>
                 </View>
                 <View style={s.detailDivider} />
                 <View style={s.detailItem}>
-                  <Text style={s.detailLabel}>المكافأة</Text>
+                  <Ionicons name={rewardMeta.icon as any} size={12} color={rewardMeta.color} />
                   <Text style={[s.detailVal, { color: rewardMeta.color }]} numberOfLines={1}>
                     {getRewardText(c)}
                   </Text>
                 </View>
                 <View style={s.detailDivider} />
                 <View style={s.detailItem}>
-                  <Text style={s.detailLabel}>ينتهي</Text>
-                  <Text style={s.detailVal}>{fmtDate(c.endsAt)}</Text>
+                  <Ionicons name="calendar-outline" size={12} color="#9ca3af" />
+                  <Text style={s.detailVal} numberOfLines={1}>{fmtDate(c.endsAt)}</Text>
                 </View>
               </View>
 
-              {/* الأزرار */}
+              {/* Actions */}
               <View style={s.actionsRow}>
                 <TouchableOpacity
                   style={s.actionBtn}
@@ -393,15 +388,22 @@ export default function CampaignsTab() {
                   <Ionicons name="trash-outline" size={14} color={DANGER} />
                   <Text style={[s.actionBtnTxt, { color: DANGER }]}>حذف</Text>
                 </TouchableOpacity>
+                <View style={s.actionDivider} />
+                <TouchableOpacity
+                  style={s.actionBtn}
+                  onPress={(e) => { e.stopPropagation(); setDetailsCampaign(c); }}>
+                  <Ionicons name="stats-chart-outline" size={14} color={PRIMARY} />
+                  <Text style={[s.actionBtnTxt, { color: PRIMARY }]}>تفاصيل</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           );
         }}
       />
 
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* ─── مودال إنشاء / تعديل ─── */}
-      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* ─── Modal: Create / Edit ─── */}
+      {/* ══════════════════════════════════════════════════════ */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={closeModal}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modalOverlay}>
@@ -412,15 +414,18 @@ export default function CampaignsTab() {
                   <Ionicons name="close" size={22} color="#6b7280" />
                 </TouchableOpacity>
                 <Text style={s.modalTitle}>
-                  {editing ? 'تعديل الحملة' : 'إنشاء تحدي جديد'}
+                  {editing ? 'تعديل التحدي' : 'إنشاء تحدي جديد'}
                 </Text>
-                <Ionicons name="trophy" size={22} color={SECONDARY} />
+                <View style={{ width: 22 }} />
               </View>
 
-              <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                contentContainerStyle={s.modalBody}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
 
-                {/* العنوان */}
-                <Text style={s.inputLabel}>عنوان التحدي *</Text>
+                {/* Title */}
+                <Text style={s.inputLabel}>عنوان التحدي</Text>
                 <TextInput
                   style={s.input}
                   placeholder="مثال: بِع 7 قطع واحصل على كاش باك"
@@ -430,7 +435,7 @@ export default function CampaignsTab() {
                   placeholderTextColor="#9ca3af"
                 />
 
-                {/* الوصف */}
+                {/* Description */}
                 <Text style={s.inputLabel}>الوصف (اختياري)</Text>
                 <TextInput
                   style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]}
@@ -442,19 +447,22 @@ export default function CampaignsTab() {
                   multiline
                 />
 
-                {/* المنتج */}
-                <Text style={s.inputLabel}>المنتج *</Text>
+                {/* Product Picker */}
+                <Text style={s.inputLabel}>المنتج</Text>
                 <TouchableOpacity
-                  style={s.productPicker}
-                  onPress={() => setProductPickerOpen(true)}>
+                  style={s.pickerBtn}
+                  onPress={() => setProductPickerOpen(true)}
+                  activeOpacity={0.7}>
                   <Ionicons name="chevron-down" size={18} color="#6b7280" />
-                  <Text style={[s.productPickerTxt, !selectedProduct && { color: '#9ca3af' }]} numberOfLines={1}>
+                  <Text
+                    style={[s.pickerTxt, !selectedProduct && { color: '#9ca3af' }]}
+                    numberOfLines={1}>
                     {selectedProduct ? selectedProduct.name : 'اختر المنتج'}
                   </Text>
                 </TouchableOpacity>
 
-                {/* عدد الطلبات */}
-                <Text style={s.inputLabel}>عدد الطلبات المطلوبة *</Text>
+                {/* Target Count */}
+                <Text style={s.inputLabel}>عدد الطلبات المطلوبة</Text>
                 <TextInput
                   style={s.input}
                   placeholder="7"
@@ -465,10 +473,10 @@ export default function CampaignsTab() {
                   placeholderTextColor="#9ca3af"
                 />
 
-                {/* الفترة */}
+                {/* Period */}
                 <View style={s.row}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.inputLabel}>تاريخ البداية *</Text>
+                    <Text style={s.inputLabel}>تاريخ البداية</Text>
                     <TextInput
                       style={s.input}
                       placeholder="2026-10-01"
@@ -479,7 +487,7 @@ export default function CampaignsTab() {
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.inputLabel}>تاريخ النهاية *</Text>
+                    <Text style={s.inputLabel}>تاريخ النهاية</Text>
                     <TextInput
                       style={s.input}
                       placeholder="2026-10-07"
@@ -491,27 +499,36 @@ export default function CampaignsTab() {
                   </View>
                 </View>
 
-                {/* نوع المكافأة */}
-                <Text style={s.sectionTitle}>المكافأة</Text>
-                <View style={s.rewardTypeGrid}>
-                  {REWARD_TYPES.map(rt => (
-                    <TouchableOpacity
-                      key={rt.key}
-                      style={[s.rewardTypeBtn, form.rewardType === rt.key && { borderColor: rt.color, backgroundColor: rt.color + '10' }]}
-                      onPress={() => setForm((p: any) => ({ ...p, rewardType: rt.key }))}>
-                      <Ionicons name={rt.icon as any} size={22} color={form.rewardType === rt.key ? rt.color : '#6b7280'} />
-                      <Text style={[s.rewardTypeLabel, form.rewardType === rt.key && { color: rt.color }]}>
-                        {rt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                {/* Reward Type */}
+                <Text style={s.sectionTitle}>نوع المكافأة</Text>
+                <View style={s.rewardGrid}>
+                  {REWARD_TYPES.map(rt => {
+                    const isActive = form.rewardType === rt.key;
+                    return (
+                      <TouchableOpacity
+                        key={rt.key}
+                        style={[
+                          s.rewardTypeBtn,
+                          isActive && { borderColor: rt.color, backgroundColor: rt.color + '10' },
+                        ]}
+                        onPress={() => setForm((p: any) => ({ ...p, rewardType: rt.key }))}
+                        activeOpacity={0.7}>
+                        <Ionicons
+                          name={rt.icon as any}
+                          size={20}
+                          color={isActive ? rt.color : '#6b7280'}
+                        />
+                        <Text style={[s.rewardTypeLbl, isActive && { color: rt.color }]}>
+                          {rt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
-                {/* قيمة المكافأة */}
+                {/* Reward Value */}
                 <Text style={s.inputLabel}>
-                  {form.rewardType === 'cashback' ? 'قيمة الكاش باك (د.ع) *' :
-                   form.rewardType === 'free_shipping' ? 'قيمة (اتركها 100)' :
-                   'نسبة الخصم (%) *'}
+                  {form.rewardType === 'cashback' ? 'قيمة الكاش باك (د.ع)' : 'نسبة الخصم (%)'}
                 </Text>
                 <TextInput
                   style={s.input}
@@ -521,18 +538,9 @@ export default function CampaignsTab() {
                   keyboardType="numeric"
                   textAlign="right"
                   placeholderTextColor="#9ca3af"
-                  editable={form.rewardType !== 'free_shipping'}
                 />
-                {form.rewardType === 'free_shipping' && (
-                  <TouchableOpacity
-                    style={s.autoFillBtn}
-                    onPress={() => setForm((p: any) => ({ ...p, rewardValue: '100' }))}>
-                    <Ionicons name="flash" size={14} color={PRIMARY} />
-                    <Text style={s.autoFillTxt}>استخدم 100% (توصيل مجاني)</Text>
-                  </TouchableOpacity>
-                )}
 
-                {/* خيارات الكود */}
+                {/* Code Options */}
                 {(form.rewardType === 'shipping_code' || form.rewardType === 'product_code' || form.rewardType === 'free_shipping') && (
                   <>
                     <View style={s.row}>
@@ -549,7 +557,7 @@ export default function CampaignsTab() {
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.inputLabel}>صلاحية الكود (أيام)</Text>
+                        <Text style={s.inputLabel}>الصلاحية (أيام)</Text>
                         <TextInput
                           style={s.input}
                           placeholder="30"
@@ -600,9 +608,9 @@ export default function CampaignsTab() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* ─── مودال اختيار المنتج ─── */}
-      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* ─── Modal: Product Picker ─── */}
+      {/* ══════════════════════════════════════════════════════ */}
       <Modal visible={productPickerOpen} transparent animationType="slide">
         <View style={s.modalOverlay}>
           <View style={[s.modalCard, { maxHeight: '85%' }]}>
@@ -611,7 +619,7 @@ export default function CampaignsTab() {
                 <Ionicons name="close" size={22} color="#6b7280" />
               </TouchableOpacity>
               <Text style={s.modalTitle}>اختر المنتج</Text>
-              <Ionicons name="cube" size={22} color={PRIMARY} />
+              <View style={{ width: 22 }} />
             </View>
 
             <View style={s.searchWrap}>
@@ -641,7 +649,8 @@ export default function CampaignsTab() {
                         setForm((prev: any) => ({ ...prev, productId: p.id }));
                         setProductPickerOpen(false);
                         setProductSearch('');
-                      }}>
+                      }}
+                      activeOpacity={0.7}>
                       {img ? (
                         <Image source={{ uri: img }} style={s.productRowImg} resizeMode="cover" />
                       ) : (
@@ -656,7 +665,7 @@ export default function CampaignsTab() {
                         </Text>
                       </View>
                       {isSelected && (
-                        <Ionicons name="checkmark-circle" size={22} color={SUCCESS} />
+                        <Ionicons name="checkmark-circle" size={20} color={SUCCESS} />
                       )}
                     </TouchableOpacity>
                   );
@@ -667,24 +676,24 @@ export default function CampaignsTab() {
         </View>
       </Modal>
 
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* ─── مودال تفاصيل الحملة ─── */}
-      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* ─── Modal: Campaign Details ─── */}
+      {/* ══════════════════════════════════════════════════════ */}
       {detailsCampaign && (
         <CampaignDetailsModal
           campaign={detailsCampaign}
           onClose={() => setDetailsCampaign(null)}
-          onDeleted={() => setDetailsCampaign(null)}
+          onEdit={() => { setDetailsCampaign(null); openEdit(detailsCampaign); }}
         />
       )}
     </View>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-// ─── مودال تفاصيل الحملة ───
-// ══════════════════════════════════════════════════════════════════
-function CampaignDetailsModal({ campaign, onClose }: any) {
+// ══════════════════════════════════════════════════════════════
+// ─── Campaign Details Modal ───
+// ══════════════════════════════════════════════════════════════
+function CampaignDetailsModal({ campaign, onClose, onEdit }: any) {
   const { data, isLoading } = useQuery({
     queryKey: ['campaign-details', campaign.id],
     queryFn: async () => {
@@ -706,41 +715,52 @@ function CampaignDetailsModal({ campaign, onClose }: any) {
               <Ionicons name="close" size={22} color="#6b7280" />
             </TouchableOpacity>
             <Text style={s.modalTitle}>تفاصيل التحدي</Text>
-            <Ionicons name="stats-chart" size={22} color={PRIMARY} />
+            <TouchableOpacity onPress={onEdit}>
+              <Ionicons name="create-outline" size={20} color={SECONDARY} />
+            </TouchableOpacity>
           </View>
 
           {isLoading ? (
-            <View style={s.center}>
+            <View style={{ padding: 40, alignItems: 'center' }}>
               <ActivityIndicator color={PRIMARY} />
             </View>
           ) : (
             <ScrollView contentContainerStyle={s.modalBody}>
 
-              {/* العنوان */}
-              <View style={s.detailsHeader}>
+              {/* Header Card */}
+              <View style={s.detailsHeaderCard}>
                 <Text style={s.detailsTitle}>{campaign.title}</Text>
                 {!!campaign.description && (
                   <Text style={s.detailsDesc}>{campaign.description}</Text>
                 )}
               </View>
 
-              {/* الإحصائيات */}
-              <View style={s.detailsStats}>
-                <View style={s.detailsStatItem}>
+              {/* Stats Grid */}
+              <View style={s.detailsStatsGrid}>
+                <View style={s.detailsStatBox}>
+                  <View style={[s.detailsStatIcon, { backgroundColor: PRIMARY + '15' }]}>
+                    <Ionicons name="people-outline" size={16} color={PRIMARY} />
+                  </View>
                   <Text style={[s.detailsStatVal, { color: PRIMARY }]}>
                     {stats.participantsCount || 0}
                   </Text>
                   <Text style={s.detailsStatLbl}>مشارك</Text>
                 </View>
-                <View style={s.detailsStatDivider} />
-                <View style={s.detailsStatItem}>
+
+                <View style={s.detailsStatBox}>
+                  <View style={[s.detailsStatIcon, { backgroundColor: SUCCESS + '15' }]}>
+                    <Ionicons name="checkmark-done-outline" size={16} color={SUCCESS} />
+                  </View>
                   <Text style={[s.detailsStatVal, { color: SUCCESS }]}>
                     {stats.countedOrders || 0}
                   </Text>
                   <Text style={s.detailsStatLbl}>طلب محتسب</Text>
                 </View>
-                <View style={s.detailsStatDivider} />
-                <View style={s.detailsStatItem}>
+
+                <View style={s.detailsStatBox}>
+                  <View style={[s.detailsStatIcon, { backgroundColor: SECONDARY + '15' }]}>
+                    <Ionicons name="trophy-outline" size={16} color={SECONDARY} />
+                  </View>
                   <Text style={[s.detailsStatVal, { color: SECONDARY }]}>
                     {stats.winnersCount || 0}
                   </Text>
@@ -748,8 +768,11 @@ function CampaignDetailsModal({ campaign, onClose }: any) {
                 </View>
               </View>
 
-              {/* قائمة المشاركين */}
-              <Text style={s.sectionTitle}>المشاركون ({participants.length})</Text>
+              {/* Participants List */}
+              <View style={s.sectionTitleRow}>
+                <Ionicons name="people-outline" size={16} color={PRIMARY} />
+                <Text style={s.sectionTitle}>المشاركون ({participants.length})</Text>
+              </View>
 
               {participants.length === 0 ? (
                 <Text style={s.emptySmall}>لا يوجد مشاركون بعد</Text>
@@ -758,7 +781,7 @@ function CampaignDetailsModal({ campaign, onClose }: any) {
                   const progress = Math.min(100, Math.round((p.progressCount / campaign.targetCount) * 100));
                   return (
                     <View key={p.id} style={s.participantRow}>
-                      <View style={s.participantInfo}>
+                      <View style={s.participantRight}>
                         <Text style={s.participantName}>{p.user?.storeName || `#${p.userId}`}</Text>
                         <View style={s.progressTrack}>
                           <View
@@ -772,9 +795,9 @@ function CampaignDetailsModal({ campaign, onClose }: any) {
                           />
                         </View>
                       </View>
-                      <View style={s.participantStats}>
+                      <View style={s.participantLeft}>
                         <Text style={[s.participantCount, p.targetReached && { color: SUCCESS }]}>
-                          {p.progressCount} / {campaign.targetCount}
+                          {p.progressCount}/{campaign.targetCount}
                         </Text>
                         {p.targetReached && (
                           <Ionicons name="checkmark-circle" size={14} color={SUCCESS} />
@@ -799,186 +822,393 @@ function CampaignDetailsModal({ campaign, onClose }: any) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
 // ─── الأنماط ───
-// ══════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTxt: { fontSize: 16, color: '#374151', fontWeight: '600' },
-  emptySubTxt: { fontSize: 13, color: '#9ca3af' },
+  emptyTitle: { fontSize: 16, color: '#374151', fontWeight: '600' },
+  emptySub: { fontSize: 13, color: '#9ca3af' },
   emptySmall: { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingVertical: 20 },
 
-  // Stats
-  statsGrid: { flexDirection: 'row', padding: 10, gap: 8 },
-  statCard: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 10,
-    alignItems: 'center', borderTopWidth: 3,
-    borderWidth: 1, borderColor: '#e8edf2', gap: 2,
+  // ─── Stats ───
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
-  statVal: { fontSize: 18, fontWeight: 'bold' },
-  statLabel: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+  statBox: { flex: 1, alignItems: 'center', gap: 3 },
+  statDivider: { width: 1, backgroundColor: BORDER },
+  statVal: { fontSize: 20, fontWeight: 'bold' },
+  statLbl: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
 
-  // Filters
-  filtersScroll: { maxHeight: 46, paddingHorizontal: 12, marginBottom: 6 },
+  // ─── Filters ───
+  filtersWrap: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
   chip: {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16,
-    backgroundColor: '#f3f4f6', marginRight: 7,
-    borderWidth: 1.5, borderColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
   },
-  chipActive: { backgroundColor: PRIMARY + '12', borderColor: PRIMARY },
-  chipTxt: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
-  chipTxtActive: { color: PRIMARY },
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipTxt: { fontSize: 12, color: '#6b7280', fontWeight: '700' },
+  chipTxtActive: { color: '#fff' },
 
-  // Add
+  // ─── Add Button ───
   addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14,
-    marginHorizontal: 12, marginBottom: 12, paddingVertical: 13,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingVertical: 13,
   },
   addBtnTxt: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  // Card
+  // ─── List ───
   listContent: { paddingHorizontal: 12, paddingBottom: 40 },
+
+  // ─── Card ───
   card: {
-    backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 12,
-    borderWidth: 1, borderColor: '#e8edf2',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  statusPill: {
-    position: 'absolute', top: 12, left: 12,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, zIndex: 2,
+  cardTop: {
+    flexDirection: 'row-reverse',
+    gap: 12,
+    marginBottom: 12,
   },
-  statusTxt: { fontSize: 10, fontWeight: 'bold' },
-  cardHeader: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  productImg: { width: 54, height: 54, borderRadius: 12, backgroundColor: '#f3f4f6' },
+  productImg: {
+    width: 60, height: 60, borderRadius: 14,
+    backgroundColor: '#f3f4f6',
+  },
   productImgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  productInfo: { flex: 1, alignItems: 'flex-end' },
-  campaignTitle: { fontSize: 14, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  productName: { fontSize: 11, color: '#6b7280', textAlign: 'right', marginTop: 3 },
-
-  detailsRow: {
-    flexDirection: 'row', backgroundColor: '#f8fafc',
-    borderRadius: 12, padding: 10, marginBottom: 10,
+  infoWrap: {
+    flex: 1, alignItems: 'flex-end', justifyContent: 'center', gap: 4,
   },
-  detailItem: { flex: 1, alignItems: 'center', gap: 2 },
-  detailDivider: { width: 1, backgroundColor: '#e8edf2' },
-  detailLabel: { fontSize: 9, color: '#9ca3af', fontWeight: '600' },
-  detailVal: { fontSize: 11, fontWeight: 'bold', color: '#111827' },
+  statusBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusTxt: { fontSize: 9, fontWeight: 'bold' },
+  campaignTitle: {
+    fontSize: 14, fontWeight: 'bold', color: '#111827',
+    textAlign: 'right',
+  },
+  productName: {
+    fontSize: 11, color: '#6b7280',
+    textAlign: 'right',
+  },
 
+  // ─── Details Row ───
+  detailsRow: {
+    flexDirection: 'row-reverse',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+  },
+  detailItem: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  detailDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
+  detailVal: { fontSize: 11, fontWeight: 'bold', color: '#111827' },
+  detailLbl: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+
+  // ─── Actions ───
   actionsRow: {
     flexDirection: 'row',
-    borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 8,
   },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6 },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 6,
+  },
   actionBtnTxt: { fontSize: 12, fontWeight: '600' },
   actionDivider: { width: 1, backgroundColor: '#e5e7eb', marginVertical: 6 },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' },
+  // ─── Empty ───
+  emptyBox: { alignItems: 'center', paddingVertical: 60, gap: 10 },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: PRIMARY + '10',
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 6,
+  },
+
+  // ─── Modal ───
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+  },
   modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
   modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   modalBody: { padding: 20, paddingBottom: 10 },
-  modalFooter: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
 
-  // Inputs
-  inputLabel: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginBottom: 6, marginTop: 12, fontWeight: '600' },
+  // ─── Inputs ───
+  inputLabel: {
+    fontSize: 12, color: '#6b7280',
+    textAlign: 'right',
+    marginBottom: 6, marginTop: 12,
+    fontWeight: '600',
+  },
   input: {
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    padding: 11, fontSize: 14, color: '#111827', backgroundColor: '#f9fafb',
+    borderWidth: 1.5, borderColor: '#e5e7eb',
+    borderRadius: 12, padding: 11,
+    fontSize: 14, color: '#111827',
+    backgroundColor: '#f9fafb',
   },
   row: { flexDirection: 'row', gap: 10 },
   sectionTitle: {
-    fontSize: 13, fontWeight: 'bold', color: PRIMARY, textAlign: 'right',
+    fontSize: 13, fontWeight: 'bold', color: PRIMARY,
+    textAlign: 'right',
     marginTop: 18, marginBottom: 8,
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 6,
+    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    paddingBottom: 6,
   },
 
-  // Product picker
-  productPicker: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#f9fafb',
+  // ─── Picker ───
+  pickerBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5, borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 12,
+    backgroundColor: '#f9fafb',
   },
-  productPickerTxt: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
+  pickerTxt: {
+    flex: 1, fontSize: 14, color: '#111827',
+    textAlign: 'right',
+  },
 
-  // Reward type grid
-  rewardTypeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // ─── Reward Grid ───
+  rewardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   rewardTypeBtn: {
-    width: '48%', paddingVertical: 14, borderRadius: 12,
-    borderWidth: 2, borderColor: '#e5e7eb', backgroundColor: '#f9fafb',
-    alignItems: 'center', gap: 6,
+    width: '48%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2, borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    alignItems: 'center',
+    gap: 6,
   },
-  rewardTypeLabel: { fontSize: 11, fontWeight: '700', color: '#6b7280', textAlign: 'center' },
-
-  autoFillBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 12, paddingVertical: 8, marginTop: 6,
-    backgroundColor: PRIMARY + '10', borderRadius: 10, alignSelf: 'flex-start',
+  rewardTypeLbl: {
+    fontSize: 11, fontWeight: '700',
+    color: '#6b7280',
   },
-  autoFillTxt: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 
-  // Buttons
+  // ─── Footer Buttons ───
   cancelBtn: {
     flex: 1, height: 48, borderRadius: 12,
-    backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center', alignItems: 'center',
   },
   cancelBtnTxt: { fontSize: 14, color: '#6b7280', fontWeight: '700' },
   saveBtn: {
-    flex: 2, height: 48, borderRadius: 12, backgroundColor: PRIMARY,
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
+    flex: 2, height: 48, borderRadius: 12,
+    backgroundColor: PRIMARY,
+    flexDirection: 'row-reverse',
+    justifyContent: 'center', alignItems: 'center',
+    gap: 8,
   },
   saveBtnTxt: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
-  // Search
+  // ─── Search ───
   searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 16, marginTop: 12,
-    backgroundColor: '#f8fafc', borderRadius: 12,
-    paddingHorizontal: 12, height: 42,
-    borderWidth: 1.5, borderColor: '#e8edf2',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+    borderWidth: 1.5, borderColor: BORDER,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#111827', textAlign: 'right' },
+  searchInput: {
+    flex: 1, fontSize: 14, color: '#111827',
+    textAlign: 'right',
+  },
 
-  // Product row (picker)
+  // ─── Product Row ───
   productRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, paddingHorizontal: 10,
-    borderRadius: 12, marginBottom: 6,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 6,
     backgroundColor: '#f8fafc',
   },
-  productRowActive: { backgroundColor: PRIMARY + '10', borderWidth: 1.5, borderColor: PRIMARY },
-  productRowImg: { width: 46, height: 46, borderRadius: 10, backgroundColor: '#f3f4f6' },
+  productRowActive: {
+    backgroundColor: PRIMARY + '10',
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+  },
+  productRowImg: {
+    width: 46, height: 46, borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+  },
   productRowImgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  productRowName: { fontSize: 13, fontWeight: '600', color: '#111827', textAlign: 'right' },
-  productRowPrice: { fontSize: 11, color: '#6b7280', marginTop: 2 },
-
-  // Details modal
-  detailsHeader: { alignItems: 'flex-end', marginBottom: 16 },
-  detailsTitle: { fontSize: 17, fontWeight: 'bold', color: '#111827', textAlign: 'right' },
-  detailsDesc: { fontSize: 12, color: '#6b7280', textAlign: 'right', marginTop: 4 },
-  detailsStats: {
-    flexDirection: 'row', backgroundColor: '#f8fafc',
-    borderRadius: 14, padding: 14, marginBottom: 16,
+  productRowName: {
+    fontSize: 13, fontWeight: '600',
+    color: '#111827',
+    textAlign: 'right',
   },
-  detailsStatItem: { flex: 1, alignItems: 'center', gap: 3 },
-  detailsStatDivider: { width: 1, backgroundColor: '#e8edf2' },
-  detailsStatVal: { fontSize: 20, fontWeight: 'bold' },
-  detailsStatLbl: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+  productRowPrice: {
+    fontSize: 11, color: '#6b7280',
+    marginTop: 2,
+  },
 
-  // Participants
+  // ─── Details Modal ───
+  detailsHeaderCard: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  detailsTitle: {
+    fontSize: 17, fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'right',
+  },
+  detailsDesc: {
+    fontSize: 12, color: '#6b7280',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  detailsStatsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
+  },
+  detailsStatBox: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  detailsStatIcon: {
+    width: 32, height: 32, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  detailsStatVal: {
+    fontSize: 18, fontWeight: 'bold',
+  },
+  detailsStatLbl: {
+    fontSize: 10, color: '#6b7280',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // ─── Section Title ───
+  sectionTitleRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+
+  // ─── Participant Row ───
   participantRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
-  participantInfo: { flex: 1, gap: 6 },
-  participantName: { fontSize: 13, fontWeight: '600', color: '#111827', textAlign: 'right' },
-  progressTrack: { height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' },
+  participantRight: { flex: 1, gap: 6 },
+  participantName: {
+    fontSize: 13, fontWeight: '600',
+    color: '#111827',
+    textAlign: 'right',
+  },
+  progressTrack: {
+    height: 6, backgroundColor: '#f3f4f6',
+    borderRadius: 3, overflow: 'hidden',
+  },
   progressFill: { height: 6, borderRadius: 3 },
-  participantStats: { alignItems: 'center', gap: 4 },
-  participantCount: { fontSize: 12, fontWeight: 'bold', color: PRIMARY },
+  participantLeft: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
+  participantCount: {
+    fontSize: 12, fontWeight: 'bold',
+    color: PRIMARY,
+  },
 });
