@@ -18,7 +18,7 @@ const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 const BORDER = '#e8edf2';
 
-const STORE_BASE_URL = 'https://matjari.vercel.app';
+const STORE_BASE_URL = 'https://bazari-app.vercel.app';
 
 // ─── الألوان الجاهزة (نفس أسماء الباك إند) ──────────────────
 const COLORS_LIST = [
