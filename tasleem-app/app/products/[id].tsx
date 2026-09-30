@@ -1,5 +1,5 @@
+// tasleem-app/app/products/[id].tsx
 import React, { useState, useRef } from 'react';
-
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Modal, TextInput, ActivityIndicator,
@@ -51,10 +51,10 @@ export default function ProductDetailScreen() {
     },
   });
 
-  // ✅ تم تعديل الدالة لعكس ترتيب الصور (1/6 → 2/6 → ...)
+  // ✅ الترتيب الطبيعي: الصورة الأولى = 1/7
   const getImages = (p: any) => {
     const imgs = p.images ? p.images.split(',').filter(Boolean) : [];
-    return imgs.length > 0 ? [...imgs].reverse() : (p.imageUrl ? [p.imageUrl] : []);
+    return imgs.length > 0 ? imgs : (p.imageUrl ? [p.imageUrl] : []);
   };
 
   const getAdLinks = (p: any) => {
@@ -74,7 +74,6 @@ export default function ProductDetailScreen() {
       toast.warning('السعر يجب أن يكون أكبر من سعر الجملة');
       return;
     }
-    // ✅ تحقق من توفر مفتاح السلة الخاص بالمستخدم
     if (!CART_KEY) {
       toast.error('يجب تسجيل الدخول أولاً');
       return;
@@ -117,7 +116,6 @@ export default function ProductDetailScreen() {
     toast.success('تم نسخ ID المنتج ✅');
   };
 
-  // ✅ حفظ صورة واحدة للمعرض
   const saveImage = async (url: string) => {
     setShowDownload(false);
     setSaving(true);
@@ -140,7 +138,6 @@ export default function ProductDetailScreen() {
     }
   };
 
-  // ✅ حفظ جميع الصور
   const saveAllImages = async () => {
     setShowDownload(false);
     setSaving(true);
@@ -193,7 +190,7 @@ export default function ProductDetailScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header بدون تدرج RTL ── */}
+      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
@@ -269,7 +266,6 @@ export default function ProductDetailScreen() {
         <View style={s.content}>
           <Text style={s.name}>{product.name}</Text>
 
-          {/* ✅ عرض ID المنتج من قاعدة البيانات بدلاً من الكود المتولد */}
           <View style={s.codeChip}>
             <Ionicons name="barcode-outline" size={16} color={PRIMARY} />
             <Text style={s.productCode}>ID: {product.id}</Text>
@@ -452,10 +448,8 @@ export default function ProductDetailScreen() {
           activeOpacity={1}
           onPress={() => setShowDownload(false)}>
           <View style={s.dlSheet}>
-            {/* مقبض */}
             <View style={s.dlHandle} />
 
-            {/* أيقونة + عنوان */}
             <View style={s.dlHeader}>
               <View style={s.dlIconBox}>
                 <Ionicons name="download-outline" size={22} color={PRIMARY} />
@@ -466,7 +460,6 @@ export default function ProductDetailScreen() {
               </View>
             </View>
 
-            {/* خيار ١ */}
             <TouchableOpacity
               style={s.dlOption}
               onPress={() => saveImage(images[activeImg])}>
@@ -480,7 +473,6 @@ export default function ProductDetailScreen() {
               <Ionicons name="chevron-back" size={18} color="#9ca3af" />
             </TouchableOpacity>
 
-            {/* خيار ٢ */}
             <TouchableOpacity
               style={[s.dlOption, { borderBottomWidth: 0 }]}
               onPress={saveAllImages}>
@@ -494,7 +486,6 @@ export default function ProductDetailScreen() {
               <Ionicons name="chevron-back" size={18} color="#9ca3af" />
             </TouchableOpacity>
 
-            {/* إلغاء */}
             <TouchableOpacity
               style={s.dlCancel}
               onPress={() => setShowDownload(false)}>
