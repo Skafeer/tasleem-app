@@ -907,6 +907,8 @@ export default function OrdersTab() {
                       </View>
                       {items.map((item: any, idx: number) => {
                         const imgUri = getFirstImage(item.product);
+                        // ✅ تمييز عدد القطع (2 أو أكثر)
+                        const isMulti = Number(item.quantity) >= 2;
                         return (
                           <View key={idx} style={[s.productRow, idx < items.length - 1 && s.productBorder]}>
                             {imgUri ? (
@@ -921,8 +923,19 @@ export default function OrdersTab() {
                                 {item.product?.name || `منتج #${item.productId}`}
                               </Text>
                               <View style={s.productPriceRow}>
-                                <View style={s.qtyBadge}>
-                                  <Text style={s.qtyTxt}>×{item.quantity}</Text>
+                                {/* ✅ badge العدد — مميز للكميات 2+ */}
+                                <View style={[s.qtyBadge, isMulti && s.qtyBadgeHighlight]}>
+                                  {isMulti && (
+                                    <Ionicons
+                                      name="layers"
+                                      size={11}
+                                      color="#fff"
+                                      style={{ marginRight: 2 }}
+                                    />
+                                  )}
+                                  <Text style={[s.qtyTxt, isMulti && s.qtyTxtHighlight]}>
+                                    ×{item.quantity}
+                                  </Text>
                                 </View>
                                 <View style={s.priceBadge}>
                                   <Text style={s.priceBadgeLabel}>جملة</Text>
@@ -1423,8 +1436,36 @@ const s = StyleSheet.create({
   productInfo: { flex: 1, gap: 6 },
   productName: { fontSize: 13, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 19 },
   productPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  qtyBadge: { backgroundColor: PRIMARY + '15', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+
+  // ✅ badge العدد — الحالة العادية (كمية = 1)
+  qtyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY + '15',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   qtyTxt: { fontSize: 12, color: PRIMARY, fontWeight: 'bold' },
+
+  // ✅ badge العدد — مميز (كمية >= 2)
+  qtyBadgeHighlight: {
+    backgroundColor: '#f59e0b',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  qtyTxtHighlight: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '900',
+  },
+
   priceBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#fef2f2', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
   priceBadgeLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
   priceBadgeVal: { fontSize: 12, fontWeight: 'bold' },
