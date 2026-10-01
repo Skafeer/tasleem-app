@@ -37,6 +37,22 @@ const FILTERS = [
   { key: 'postponed', label: 'مؤجل' },
 ];
 
+// ✅ مصادر الطلب
+const SOURCE: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+  app: {
+    label: 'تطبيق',
+    color: PRIMARY,
+    bg: '#e8f4f7',
+    icon: 'phone-portrait-outline',
+  },
+  store: {
+    label: 'موقع',
+    color: '#8b5cf6',
+    bg: '#f3e8ff',
+    icon: 'globe-outline',
+  },
+};
+
 const getFirstImage = (product: any) => {
   if (!product) return null;
   const imgs = product.images ? product.images.split(',').filter(Boolean) : [];
@@ -293,7 +309,6 @@ export default function OrdersTab() {
         minute: '2-digit',
       });
 
-      // ✅ ترقيم الصفحات في الطباعة
       const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -318,8 +333,6 @@ export default function OrdersTab() {
       direction: rtl;
       background: #fff;
     }
-
-    /* ═══ Header ═══ */
     .header {
       display: flex;
       justify-content: space-between;
@@ -379,8 +392,6 @@ export default function OrdersTab() {
       font-weight: 700;
       font-size: 12px;
     }
-
-    /* ═══ Summary Cards ═══ */
     .summary {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -425,8 +436,6 @@ export default function OrdersTab() {
       font-weight: 700;
       letter-spacing: 0.3px;
     }
-
-    /* ═══ Table ═══ */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -435,10 +444,7 @@ export default function OrdersTab() {
       overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-    thead {
-      background: #0c6679;
-      color: #fff;
-    }
+    thead { background: #0c6679; color: #fff; }
     th {
       padding: 10px 6px;
       text-align: center;
@@ -457,57 +463,16 @@ export default function OrdersTab() {
     tbody tr:nth-child(even) { background: #f9fafb; }
     tbody tr:nth-child(odd) { background: #fff; }
     tbody tr:hover { background: #f0f9fa; }
-
-    td.num {
-      font-family: 'Courier New', monospace;
-      font-weight: 700;
-      color: #111827;
-    }
-    td.date {
-      font-family: 'Courier New', monospace;
-      font-weight: 700;
-      color: #6b7280;
-      font-size: 9px;
-    }
-    td.order-id {
-      font-family: 'Courier New', monospace;
-      font-weight: 800;
-      color: #0c6679;
-    }
-    td.customer {
-      text-align: right;
-      font-weight: 700;
-      color: #111827;
-      padding-right: 10px;
-      font-size: 10px;
-    }
-    td.product {
-      text-align: right;
-      font-weight: 600;
-      max-width: 220px;
-      color: #374151;
-      padding-right: 10px;
-    }
+    td.num { font-family: 'Courier New', monospace; font-weight: 700; color: #111827; }
+    td.date { font-family: 'Courier New', monospace; font-weight: 700; color: #6b7280; font-size: 9px; }
+    td.order-id { font-family: 'Courier New', monospace; font-weight: 800; color: #0c6679; }
+    td.customer { text-align: right; font-weight: 700; color: #111827; padding-right: 10px; font-size: 10px; }
+    td.product { text-align: right; font-weight: 600; max-width: 220px; color: #374151; padding-right: 10px; }
     td.cost { color: #ef4444; }
     td.price { color: #0c6679; }
-    td.profit {
-      color: #059669;
-      font-weight: 800;
-      background: #ecfdf5;
-    }
-    td.status {
-      font-size: 9px;
-      font-weight: 700;
-      color: #059669;
-      background: #ecfdf5;
-    }
-    td.merchant {
-      font-weight: 700;
-      color: #8b5cf6;
-      font-size: 9.5px;
-    }
-
-    /* ═══ Footer ═══ */
+    td.profit { color: #059669; font-weight: 800; background: #ecfdf5; }
+    td.status { font-size: 9px; font-weight: 700; color: #059669; background: #ecfdf5; }
+    td.merchant { font-weight: 700; color: #8b5cf6; font-size: 9.5px; }
     .footer {
       margin-top: 22px;
       padding-top: 14px;
@@ -518,24 +483,9 @@ export default function OrdersTab() {
       font-size: 10px;
       color: #9ca3af;
     }
-    .footer-brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 700;
-      color: #0c6679;
-    }
-    .footer-brand-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #0c6679;
-    }
-    .footer-note {
-      font-family: 'Courier New', monospace;
-    }
-
-    /* ═══ Watermark ═══ */
+    .footer-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #0c6679; }
+    .footer-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #0c6679; }
+    .footer-note { font-family: 'Courier New', monospace; }
     .watermark {
       position: fixed;
       top: 50%;
@@ -552,10 +502,8 @@ export default function OrdersTab() {
   </style>
 </head>
 <body>
-
   <div class="watermark">تسليم</div>
 
-  <!-- ═══ Header ═══ -->
   <div class="header">
     <div class="header-left">
       <div class="brand">
@@ -574,7 +522,6 @@ export default function OrdersTab() {
     </div>
   </div>
 
-  <!-- ═══ Summary ═══ -->
   <div class="summary">
     <div class="sum-item blue">
       <div class="sum-val">${fmtNum(totalOrders)}</div>
@@ -594,7 +541,6 @@ export default function OrdersTab() {
     </div>
   </div>
 
-  <!-- ═══ Table ═══ -->
   <table>
     <thead>
       <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
@@ -623,7 +569,6 @@ export default function OrdersTab() {
     </tbody>
   </table>
 
-  <!-- ═══ Footer ═══ -->
   <div class="footer">
     <div class="footer-brand">
       <span class="footer-brand-dot"></span>
@@ -633,7 +578,6 @@ export default function OrdersTab() {
       عدد الصفوف: ${rows.length} — ${dateStr} ${timeStr}
     </div>
   </div>
-
 </body>
 </html>`;
 
@@ -790,15 +734,26 @@ export default function OrdersTab() {
         }
         renderItem={({ item: o }) => {
           const st = STATUS[o.status] || STATUS.processing;
+          const src = SOURCE[o.source] || SOURCE.app;
           const merchant = getMerchant(o.merchantId);
           const isOpen = expanded === o.id;
           const items = o.items || [];
+          const isStoreOrder = o.source === 'store';
 
           return (
-            <View style={s.card}>
+            <View style={[s.card, isStoreOrder && s.cardFromStore]}>
               <View style={s.cardHeader}>
                 <View style={s.orderIdRow}>
-                  <Text style={s.orderId}>#{o.id}</Text>
+                  {/* ✅ صف: رقم الطلب + badge المصدر */}
+                  <View style={s.orderIdWithSource}>
+                    <Text style={s.orderId}>#{o.id}</Text>
+                    <View style={[s.sourceBadge, { backgroundColor: src.bg }]}>
+                      <Ionicons name={src.icon} size={10} color={src.color} />
+                      <Text style={[s.sourceBadgeTxt, { color: src.color }]}>
+                        {src.label}
+                      </Text>
+                    </View>
+                  </View>
                   <View style={s.dateRow}>
                     <Ionicons name="time-outline" size={12} color="#9ca3af" />
                     <Text style={s.dateTxt}>{formatDate(o.createdAt)}</Text>
@@ -1322,7 +1277,18 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
     overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
+
+  // ✅ طلب من الموقع الإلكتروني — تمييز بنفسجي
+  cardFromStore: {
+    borderColor: '#8b5cf6',
+    backgroundColor: '#faf5ff',
+    shadowColor: '#8b5cf6',
+    shadowOpacity: 0.12,
+  },
+
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1331,6 +1297,26 @@ const s = StyleSheet.create({
     paddingBottom: 10,
   },
   orderIdRow: { alignItems: 'flex-end', gap: 4 },
+
+  // ✅ صف: رقم الطلب + badge المصدر
+  orderIdWithSource: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  sourceBadgeTxt: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+
   orderId: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateTxt: { fontSize: 11, color: '#9ca3af' },
