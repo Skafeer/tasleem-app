@@ -256,7 +256,7 @@ export default function OrdersTab() {
   };
 
   // ═══════════════════════════════════════════
-  // ✅ Export as PDF
+  // ✅ Export as PDF — تصميم احترافي
   // ═══════════════════════════════════════════
   const exportPDF = async () => {
     try {
@@ -278,110 +278,309 @@ export default function OrdersTab() {
       const totalProfit = rows.reduce((s, r) => s + (Number(r[7]) || 0), 0);
       const totalSales = rows.reduce((s, r) => s + (Number(r[6]) || 0), 0);
       const totalItems = rows.reduce((s, r) => s + (Number(r[5]) || 0), 0);
+      const totalOrders = new Set(rows.map((r) => r[1])).size;
 
       const fmtNum = (n: number) => Math.round(n).toLocaleString('en-US');
 
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-GB', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const timeStr = today.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      // ✅ ترقيم الصفحات في الطباعة
       const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
+  <title>تقرير الطلبات - تسليم</title>
   <style>
-    @page { size: A4 landscape; margin: 12mm; }
+    @page {
+      size: A4 landscape;
+      margin: 10mm 8mm;
+      @bottom-center {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font-size: 9px;
+        color: #9ca3af;
+      }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, 'Segoe UI', Tahoma, Arial, sans-serif;
-      padding: 20px;
+      padding: 24px 20px;
       color: #111827;
       direction: rtl;
+      background: #fff;
     }
+
+    /* ═══ Header ═══ */
     .header {
-      text-align: center;
-      margin-bottom: 20px;
-      padding-bottom: 14px;
-      border-bottom: 3px solid #0c6679;
-    }
-    .header h1 {
-      font-size: 22px;
-      color: #0c6679;
-      margin-bottom: 6px;
-      font-weight: 800;
-    }
-    .header p {
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .summary {
       display: flex;
-      justify-content: space-around;
-      background: #f8fafc;
-      border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 18px;
-      border: 1px solid #e5e7eb;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid #0c6679;
+      gap: 20px;
     }
-    .sum-item { text-align: center; }
-    .sum-val {
-      font-size: 18px;
-      font-weight: 800;
+    .header-left { flex: 1; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0c6679 0%, #0a5361 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: 0 4px 10px rgba(12,102,121,0.25);
+    }
+    .brand-name {
+      font-size: 22px;
+      font-weight: 900;
       color: #0c6679;
-      margin-bottom: 2px;
+      letter-spacing: -0.5px;
     }
-    .sum-lbl {
+    .brand-sub {
       font-size: 10px;
       color: #6b7280;
       font-weight: 600;
+      margin-top: 1px;
+      letter-spacing: 2px;
     }
+    .header-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #111827;
+      margin-top: 4px;
+    }
+    .header-right {
+      text-align: left;
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.7;
+    }
+    .header-right strong {
+      color: #111827;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* ═══ Summary Cards ═══ */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .sum-item {
+      padding: 14px 12px;
+      border-radius: 12px;
+      text-align: center;
+      border: 1.5px solid #e5e7eb;
+      background: #f9fafb;
+      position: relative;
+      overflow: hidden;
+    }
+    .sum-item::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 3px;
+      background: #0c6679;
+    }
+    .sum-item.green::before { background: #059669; }
+    .sum-item.blue::before { background: #3b82f6; }
+    .sum-item.orange::before { background: #f59e0b; }
+    .sum-val {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0c6679;
+      margin-bottom: 4px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: -0.5px;
+    }
+    .sum-item.green .sum-val { color: #059669; }
+    .sum-item.blue .sum-val { color: #3b82f6; }
+    .sum-item.orange .sum-val { color: #f59e0b; }
+    .sum-lbl {
+      font-size: 10px;
+      color: #6b7280;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    /* ═══ Table ═══ */
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 10px;
+      font-size: 9.5px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
     thead {
       background: #0c6679;
       color: #fff;
     }
     th {
-      padding: 8px 6px;
+      padding: 10px 6px;
       text-align: center;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 10px;
       border: 1px solid #0a5361;
+      white-space: nowrap;
     }
     td {
-      padding: 6px;
+      padding: 7px 6px;
       text-align: center;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #f3f4f6;
       vertical-align: middle;
+      color: #374151;
     }
     tbody tr:nth-child(even) { background: #f9fafb; }
     tbody tr:nth-child(odd) { background: #fff; }
-    td.num { font-family: 'Courier New', monospace; font-weight: 700; }
-    td.profit { color: #059669; font-weight: 700; }
-    td.product { text-align: right; font-weight: 600; max-width: 220px; }
-    td.customer { text-align: right; font-weight: 600; }
+    tbody tr:hover { background: #f0f9fa; }
+
+    td.num {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      color: #111827;
+    }
+    td.date {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      color: #6b7280;
+      font-size: 9px;
+    }
+    td.order-id {
+      font-family: 'Courier New', monospace;
+      font-weight: 800;
+      color: #0c6679;
+    }
+    td.customer {
+      text-align: right;
+      font-weight: 700;
+      color: #111827;
+      padding-right: 10px;
+      font-size: 10px;
+    }
+    td.product {
+      text-align: right;
+      font-weight: 600;
+      max-width: 220px;
+      color: #374151;
+      padding-right: 10px;
+    }
+    td.cost { color: #ef4444; }
+    td.price { color: #0c6679; }
+    td.profit {
+      color: #059669;
+      font-weight: 800;
+      background: #ecfdf5;
+    }
+    td.status {
+      font-size: 9px;
+      font-weight: 700;
+      color: #059669;
+      background: #ecfdf5;
+    }
+    td.merchant {
+      font-weight: 700;
+      color: #8b5cf6;
+      font-size: 9.5px;
+    }
+
+    /* ═══ Footer ═══ */
     .footer {
-      margin-top: 20px;
-      text-align: center;
+      margin-top: 22px;
+      padding-top: 14px;
+      border-top: 2px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 10px;
       color: #9ca3af;
-      padding-top: 10px;
-      border-top: 1px solid #e5e7eb;
+    }
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      color: #0c6679;
+    }
+    .footer-brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #0c6679;
+    }
+    .footer-note {
+      font-family: 'Courier New', monospace;
+    }
+
+    /* ═══ Watermark ═══ */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-size: 140px;
+      font-weight: 900;
+      color: #0c6679;
+      opacity: 0.025;
+      z-index: -1;
+      pointer-events: none;
+      letter-spacing: 10px;
     }
   </style>
 </head>
 <body>
+
+  <div class="watermark">تسليم</div>
+
+  <!-- ═══ Header ═══ -->
   <div class="header">
-    <h1>تقرير الطلبات - تم التوصيل</h1>
-    <p>التاريخ: ${new Date().toLocaleDateString('en-GB')} — بازاري</p>
+    <div class="header-left">
+      <div class="brand">
+        <div class="brand-logo">ت</div>
+        <div>
+          <div class="brand-name">تسليم</div>
+          <div class="brand-sub">TASLEEM</div>
+        </div>
+      </div>
+      <div class="header-title">تقرير الطلبات — تم التوصيل</div>
+    </div>
+    <div class="header-right">
+      <div><strong>التاريخ:</strong> ${dateStr}</div>
+      <div><strong>الوقت:</strong> ${timeStr}</div>
+      <div><strong>عدد الطلبات:</strong> ${fmtNum(totalOrders)}</div>
+    </div>
   </div>
 
+  <!-- ═══ Summary ═══ -->
   <div class="summary">
-    <div class="sum-item">
-      <div class="sum-val">${fmtNum(rows.length)}</div>
-      <div class="sum-lbl">عدد المنتجات</div>
+    <div class="sum-item blue">
+      <div class="sum-val">${fmtNum(totalOrders)}</div>
+      <div class="sum-lbl">عدد الطلبات</div>
     </div>
-    <div class="sum-item">
+    <div class="sum-item orange">
       <div class="sum-val">${fmtNum(totalItems)}</div>
       <div class="sum-lbl">عدد القطع</div>
     </div>
@@ -389,12 +588,13 @@ export default function OrdersTab() {
       <div class="sum-val">${fmtNum(totalSales)}</div>
       <div class="sum-lbl">إجمالي المبيعات (د.ع)</div>
     </div>
-    <div class="sum-item">
-      <div class="sum-val" style="color: #059669;">${fmtNum(totalProfit)}</div>
+    <div class="sum-item green">
+      <div class="sum-val">${fmtNum(totalProfit)}</div>
       <div class="sum-lbl">إجمالي الأرباح (د.ع)</div>
     </div>
   </div>
 
+  <!-- ═══ Table ═══ -->
   <table>
     <thead>
       <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
@@ -405,10 +605,16 @@ export default function OrdersTab() {
           (row) => `<tr>${row
             .map((cell, i) => {
               let cls = 'num';
+              if (i === 0) cls = 'date';
+              if (i === 1) cls = 'order-id';
               if (i === 2) cls = 'customer';
               if (i === 3) cls = 'product';
-              if (i === 7) cls = 'profit';
-              if (i === 8 || i === 9) cls = '';
+              if (i === 4) cls = 'num cost';
+              if (i === 5) cls = 'num';
+              if (i === 6) cls = 'num price';
+              if (i === 7) cls = 'num profit';
+              if (i === 8) cls = 'status';
+              if (i === 9) cls = 'merchant';
               return `<td class="${cls}">${cell ?? ''}</td>`;
             })
             .join('')}</tr>`
@@ -417,9 +623,17 @@ export default function OrdersTab() {
     </tbody>
   </table>
 
+  <!-- ═══ Footer ═══ -->
   <div class="footer">
-    عدد الصفوف: ${rows.length} — تم الإنشاء بواسطة بازاري
+    <div class="footer-brand">
+      <span class="footer-brand-dot"></span>
+      تم الإنشاء بواسطة تسليم
+    </div>
+    <div class="footer-note">
+      عدد الصفوف: ${rows.length} — ${dateStr} ${timeStr}
+    </div>
   </div>
+
 </body>
 </html>`;
 
@@ -1003,7 +1217,6 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
 
-  // ✅ Export button + menu
   exportWrap: { position: 'relative' },
   exportBtn: {
     flexDirection: 'row',
