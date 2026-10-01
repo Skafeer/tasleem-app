@@ -1,3 +1,4 @@
+// app/admin-components/OrdersTab.tsx
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -6,6 +7,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import api from '../../src/lib/api';
 import { toast } from '../../src/lib/toast';
 
@@ -14,7 +18,6 @@ const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
 
-// ✅ حالات الطلب الجديدة
 const STATUS: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   processing: { label: 'قيد المعالجة', color: '#3b82f6', bg: '#eff6ff', icon: 'sync-outline' },
   shipping: { label: 'قيد التوصيل', color: '#06b6d4', bg: '#ecfeff', icon: 'bicycle-outline' },
@@ -24,7 +27,6 @@ const STATUS: Record<string, { label: string; color: string; bg: string; icon: a
   postponed: { label: 'مؤجل', color: '#6b7280', bg: '#f9fafb', icon: 'pause-circle-outline' },
 };
 
-// ✅ الفلاتر
 const FILTERS = [
   { key: 'all', label: 'الكل' },
   { key: 'processing', label: 'معالجة' },
@@ -43,9 +45,7 @@ const getFirstImage = (product: any) => {
 
 export default function OrdersTab() {
   const qc = useQueryClient();
-  // ✅ state للبحث المؤقت (يتغير مع كل حرف)
   const [searchTerm, setSearchTerm] = useState('');
-  // ✅ state للبحث بعد debounce (يستخدم في الاستعلام)
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -53,7 +53,10 @@ export default function OrdersTab() {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
 
-  // ✅ تطبيق debounce: لا نرسل طلب البحث إلا بعد 500ms من توقف الكتابة
+  // ✅ Export states
+  const [exporting, setExporting] = useState<false | 'csv' | 'pdf'>(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -61,7 +64,6 @@ export default function OrdersTab() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // ✅ استعلام الطلبات مع debouncedSearch
   const {
     data: ordersData,
     isLoading,
@@ -197,17 +199,248 @@ export default function OrdersTab() {
     updateOrder.mutate({ id: editOrder.id, data: updateData });
   };
 
-  // ✅ عند تغيير الفلتر، إعادة تعيين البحث
   const handleFilterChange = (key: string) => {
     setFilter(key);
-    setSearchTerm(''); // مسح حقل البحث
-    // debouncedSearch سيتم تحديثه تلقائياً عبر useEffect
+    setSearchTerm('');
   };
 
-  // ✅ عند مسح البحث
   const clearSearch = () => {
     setSearchTerm('');
-    // debouncedSearch سيتم تحديثه تلقائياً عبر useEffect
+  };
+
+  // ═══════════════════════════════════════════
+  // ✅ Export as CSV (Google Sheets)
+  // ═══════════════════════════════════════════
+  const exportCSV = async () => {
+    try {
+      setExporting('csv');
+      setExportMenuOpen(false);
+
+      const params: any = {};
+      if (debouncedSearch) params.search = debouncedSearch;
+
+      const res = await api.get('/api/admin/orders/export', {
+        params,
+        responseType: 'text',
+        headers: { Accept: 'text/csv' },
+        transformResponse: [(d: any) => d],
+      });
+
+      let csvText: string = res.data;
+      if (!csvText.startsWith('\uFEFF')) csvText = '\uFEFF' + csvText;
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `tasleem-delivered-${dateStr}.csv`;
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, csvText, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'فتح الملف في Google Sheets',
+          UTI: 'public.comma-separated-values-text',
+        });
+        toast.success('تم تصدير الملف');
+      } else {
+        toast.error('المشاركة غير متاحة على هذا الجهاز');
+      }
+    } catch (e: any) {
+      console.error('Export CSV error:', e);
+      toast.error(e?.message || 'فشل التصدير');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════
+  // ✅ Export as PDF
+  // ═══════════════════════════════════════════
+  const exportPDF = async () => {
+    try {
+      setExporting('pdf');
+      setExportMenuOpen(false);
+
+      const params: any = {};
+      if (debouncedSearch) params.search = debouncedSearch;
+
+      const { data } = await api.get('/api/admin/orders/export-json', { params });
+      const headers: string[] = data.headers || [];
+      const rows: any[][] = data.rows || [];
+
+      if (rows.length === 0) {
+        toast.warning('لا توجد طلبات تم توصيلها');
+        return;
+      }
+
+      const totalProfit = rows.reduce((s, r) => s + (Number(r[7]) || 0), 0);
+      const totalSales = rows.reduce((s, r) => s + (Number(r[6]) || 0), 0);
+      const totalItems = rows.reduce((s, r) => s + (Number(r[5]) || 0), 0);
+
+      const fmtNum = (n: number) => Math.round(n).toLocaleString('en-US');
+
+      const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Tahoma, Arial, sans-serif;
+      padding: 20px;
+      color: #111827;
+      direction: rtl;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid #0c6679;
+    }
+    .header h1 {
+      font-size: 22px;
+      color: #0c6679;
+      margin-bottom: 6px;
+      font-weight: 800;
+    }
+    .header p {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .summary {
+      display: flex;
+      justify-content: space-around;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 18px;
+      border: 1px solid #e5e7eb;
+    }
+    .sum-item { text-align: center; }
+    .sum-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0c6679;
+      margin-bottom: 2px;
+    }
+    .sum-lbl {
+      font-size: 10px;
+      color: #6b7280;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    thead {
+      background: #0c6679;
+      color: #fff;
+    }
+    th {
+      padding: 8px 6px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 10px;
+      border: 1px solid #0a5361;
+    }
+    td {
+      padding: 6px;
+      text-align: center;
+      border: 1px solid #e5e7eb;
+      vertical-align: middle;
+    }
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr:nth-child(odd) { background: #fff; }
+    td.num { font-family: 'Courier New', monospace; font-weight: 700; }
+    td.profit { color: #059669; font-weight: 700; }
+    td.product { text-align: right; font-weight: 600; max-width: 220px; }
+    td.customer { text-align: right; font-weight: 600; }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 10px;
+      color: #9ca3af;
+      padding-top: 10px;
+      border-top: 1px solid #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>تقرير الطلبات - تم التوصيل</h1>
+    <p>التاريخ: ${new Date().toLocaleDateString('en-GB')} — بازاري</p>
+  </div>
+
+  <div class="summary">
+    <div class="sum-item">
+      <div class="sum-val">${fmtNum(rows.length)}</div>
+      <div class="sum-lbl">عدد المنتجات</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-val">${fmtNum(totalItems)}</div>
+      <div class="sum-lbl">عدد القطع</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-val">${fmtNum(totalSales)}</div>
+      <div class="sum-lbl">إجمالي المبيعات (د.ع)</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-val" style="color: #059669;">${fmtNum(totalProfit)}</div>
+      <div class="sum-lbl">إجمالي الأرباح (د.ع)</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `<tr>${row
+            .map((cell, i) => {
+              let cls = 'num';
+              if (i === 2) cls = 'customer';
+              if (i === 3) cls = 'product';
+              if (i === 7) cls = 'profit';
+              if (i === 8 || i === 9) cls = '';
+              return `<td class="${cls}">${cell ?? ''}</td>`;
+            })
+            .join('')}</tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    عدد الصفوف: ${rows.length} — تم الإنشاء بواسطة بازاري
+  </div>
+</body>
+</html>`;
+
+      const { uri } = await Print.printToFileAsync({ html });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'مشاركة التقرير',
+          UTI: 'com.adobe.pdf',
+        });
+        toast.success('تم إنشاء التقرير');
+      } else {
+        toast.error('المشاركة غير متاحة');
+      }
+    } catch (e: any) {
+      console.error('Export PDF error:', e);
+      toast.error(e?.message || 'فشل إنشاء PDF');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filtered = orders;
@@ -229,24 +462,87 @@ export default function OrdersTab() {
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* شريط البحث والفلاتر */}
+      {/* ── شريط البحث + زر التصدير ── */}
       <View style={s.topBar}>
-        <View style={s.searchRow}>
-          <Ionicons name="search-outline" size={17} color="#9ca3af" />
-          <TextInput
-            style={s.searchInput}
-            placeholder="ابحث برقم الطلب أو اسم الزبون..."
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            placeholderTextColor="#9ca3af"
-            textAlign="right"
-          />
-          {searchTerm ? (
-            <TouchableOpacity onPress={clearSearch}>
-              <Ionicons name="close-circle" size={17} color="#9ca3af" />
+        <View style={s.searchRowWrap}>
+          <View style={s.searchRow}>
+            <Ionicons name="search-outline" size={17} color="#9ca3af" />
+            <TextInput
+              style={s.searchInput}
+              placeholder="ابحث برقم الطلب أو اسم الزبون..."
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              placeholderTextColor="#9ca3af"
+              textAlign="right"
+            />
+            {searchTerm ? (
+              <TouchableOpacity onPress={clearSearch}>
+                <Ionicons name="close-circle" size={17} color="#9ca3af" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* زر التصدير */}
+          <View style={s.exportWrap}>
+            <TouchableOpacity
+              style={[s.exportBtn, exporting && { opacity: 0.6 }]}
+              onPress={() => setExportMenuOpen((v) => !v)}
+              disabled={!!exporting}
+              activeOpacity={0.85}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={16} color="#fff" />
+                  <Ionicons name="chevron-down" size={12} color="#fff" />
+                </>
+              )}
             </TouchableOpacity>
-          ) : null}
+
+            {exportMenuOpen && !exporting && (
+              <>
+                <TouchableOpacity
+                  style={s.menuBackdrop}
+                  activeOpacity={1}
+                  onPress={() => setExportMenuOpen(false)}
+                />
+                <View style={s.exportMenu}>
+                  <TouchableOpacity
+                    style={s.exportMenuItem}
+                    onPress={exportCSV}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[s.menuIconBox, { backgroundColor: '#10b98115' }]}>
+                      <Ionicons name="grid-outline" size={16} color="#10b981" />
+                    </View>
+                    <View style={s.menuTextWrap}>
+                      <Text style={s.menuTitle}>Google Sheets</Text>
+                      <Text style={s.menuSubtitle}>CSV — يفتح مباشرة</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={s.menuDivider} />
+
+                  <TouchableOpacity
+                    style={s.exportMenuItem}
+                    onPress={exportPDF}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[s.menuIconBox, { backgroundColor: '#ef444415' }]}>
+                      <Ionicons name="document-text-outline" size={16} color="#ef4444" />
+                    </View>
+                    <View style={s.menuTextWrap}>
+                      <Text style={s.menuTitle}>PDF</Text>
+                      <Text style={s.menuSubtitle}>تقرير مصمّم</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
         </View>
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
           {FILTERS.map(f => (
             <TouchableOpacity
@@ -286,8 +582,6 @@ export default function OrdersTab() {
 
           return (
             <View style={s.card}>
-
-              {/* رأس الكارد */}
               <View style={s.cardHeader}>
                 <View style={s.orderIdRow}>
                   <Text style={s.orderId}>#{o.id}</Text>
@@ -305,7 +599,6 @@ export default function OrdersTab() {
                 </TouchableOpacity>
               </View>
 
-              {/* أزرار التعديل والحذف */}
               <View style={s.actionRow}>
                 <TouchableOpacity style={s.deleteBtn} onPress={() => confirmDelete(o)}>
                   <Ionicons name="trash-outline" size={14} color={DANGER} />
@@ -317,7 +610,6 @@ export default function OrdersTab() {
                 </TouchableOpacity>
               </View>
 
-              {/* Dropdown الحالات */}
               {dropdownId === o.id && (
                 <View style={s.dropdown}>
                   {Object.entries(STATUS).map(([key, val]) => (
@@ -325,10 +617,7 @@ export default function OrdersTab() {
                       key={key}
                       style={[s.dropdownItem, o.status === key && { backgroundColor: val.color + '15' }]}
                       onPress={() => {
-                        if (o.status === key) {
-                          setDropdownId(null);
-                          return;
-                        }
+                        if (o.status === key) { setDropdownId(null); return; }
                         updateStatus.mutate({ id: o.id, status: key });
                       }}
                       disabled={updateStatus.isPending}>
@@ -344,7 +633,6 @@ export default function OrdersTab() {
 
               <View style={s.divider} />
 
-              {/* معلومات الزبون */}
               <View style={s.section}>
                 <View style={s.sectionLabelRow}>
                   <Ionicons name="person-outline" size={13} color={PRIMARY} />
@@ -384,7 +672,6 @@ export default function OrdersTab() {
                 </View>
               </View>
 
-              {/* معلومات التاجر */}
               {merchant && (
                 <>
                   <View style={s.divider} />
@@ -410,7 +697,6 @@ export default function OrdersTab() {
                 </>
               )}
 
-              {/* الأسعار */}
               <View style={s.divider} />
               <View style={s.priceRow}>
                 <View style={s.priceBox}>
@@ -435,7 +721,6 @@ export default function OrdersTab() {
                 </View>
               </View>
 
-              {/* زر التفاصيل */}
               <TouchableOpacity
                 style={s.expandBtn}
                 onPress={() => setExpanded(isOpen ? null : o.id)}>
@@ -443,7 +728,6 @@ export default function OrdersTab() {
                 <Text style={s.expandTxt}>{isOpen ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}</Text>
               </TouchableOpacity>
 
-              {/* التفاصيل الموسعة */}
               {isOpen && (
                 <View style={s.details}>
                   {items.length > 0 && (
@@ -701,7 +985,13 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
   },
+  searchRowWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   searchRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
@@ -712,6 +1002,82 @@ const s = StyleSheet.create({
     borderColor: '#e8edf2',
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: '#111827', textAlign: 'right' },
+
+  // ✅ Export button + menu
+  exportWrap: { position: 'relative' },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  menuBackdrop: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    zIndex: 5,
+  },
+  exportMenu: {
+    position: 'absolute',
+    top: 48,
+    right: 0,
+    minWidth: 210,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    zIndex: 10,
+  },
+  exportMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  menuIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuTextWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  menuTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  menuSubtitle: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginTop: 1,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: 8,
+  },
 
   chip: {
     flexDirection: 'row',
