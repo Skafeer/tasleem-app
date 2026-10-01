@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Clipboard, Alert, Modal, TextInput,
-  ScrollView, KeyboardAvoidingView, Platform,
+  ScrollView, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,19 +16,30 @@ const SUCCESS = '#10b981';
 const SECONDARY = '#f5a006';
 const DANGER = '#ef4444';
 const BG = '#f2f6f9';
+const ECOM_COLOR = '#3b82f6';
+const STORE_BASE_URL = 'https://bazari-app.vercel.app';
 
-// --- أنواع الفلاتر (مثل الصفحة الرئيسية ولكن خاصة بالتجار) ---
+// --- أنواع الفلاتر ---
 type FilterState = {
   status: 'all' | 'active' | 'inactive';
   balance: 'all' | 'has_balance' | 'no_balance';
   orders: 'all' | 'high_orders' | 'low_orders';
-  sortBy: 'newest' | 'name_asc' | 'name_desc' | 'balance_high' | 'balance_low' | 'orders_high';
+  store: 'all' | 'with_store' | 'without_store';
+  sortBy:
+    | 'newest'
+    | 'name_asc'
+    | 'name_desc'
+    | 'balance_high'
+    | 'balance_low'
+    | 'orders_high'
+    | 'products_high';
 };
 
 const defaultFilters: FilterState = {
   status: 'all',
   balance: 'all',
   orders: 'all',
+  store: 'all',
   sortBy: 'newest',
 };
 
@@ -40,7 +51,7 @@ export default function MerchantsTab() {
   const [showPass, setShowPass] = useState(false);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
-  const [tempFilters, setTempFilters] = useState<FilterState>(defaultFilters); // للمودال
+  const [tempFilters, setTempFilters] = useState<FilterState>(defaultFilters);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // جلب بيانات التجار
@@ -53,7 +64,6 @@ export default function MerchantsTab() {
     refetchInterval: 30000,
   });
 
-  // --- دوال التحديث والحذف (نفسها) ---
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: any) => {
       const res = await api.patch(`/api/admin/users/${id}`, data);
@@ -70,6 +80,13 @@ export default function MerchantsTab() {
   const copy = (text: string, label: string) => {
     Clipboard.setString(text ?? '');
     toast.success(`تم نسخ ${label}`);
+  };
+
+  const openStore = (code: string) => {
+    if (!code) return;
+    Linking.openURL(`${STORE_BASE_URL}/${code}`).catch(() => {
+      toast.error('فشل فتح الرابط');
+    });
   };
 
   const openEdit = (u: any) => {
@@ -118,10 +135,9 @@ export default function MerchantsTab() {
     updateUser.mutate({ id: editUser.id, data: editForm });
   };
 
-  // --- دالة الفلترة المحسنة (مثل الصفحة الرئيسية) ---
+  // --- الفلترة ---
   const getFilteredMerchants = () => {
-    let filtered = (users as any[])
-      .filter((u: any) => u.role !== 'admin');
+    let filtered = (users as any[]).filter((u: any) => u.role !== 'admin');
 
     // البحث
     if (search.trim()) {
@@ -129,11 +145,13 @@ export default function MerchantsTab() {
       filtered = filtered.filter((u: any) =>
         u.storeName?.toLowerCase().includes(query) ||
         u.phone?.includes(query) ||
-        String(u.merchantId || u.id).includes(query)
+        String(u.merchantId || u.id).includes(query) ||
+        u.storeCode?.toLowerCase().includes(query) ||
+        u.storeEcomName?.toLowerCase().includes(query)
       );
     }
 
-    // فلترة حسب الحالة (النشاط)
+    // فلترة حسب الحالة
     if (filters.status === 'active') {
       filtered = filtered.filter((u: any) => (u.balance || 0) > 0 || (u.pendingBalance || 0) > 0);
     } else if (filters.status === 'inactive') {
@@ -147,11 +165,18 @@ export default function MerchantsTab() {
       filtered = filtered.filter((u: any) => (u.balance || 0) === 0);
     }
 
-    // فلترة حسب الطلبات (تقديرية باستخدام الرصيد كمعيار مؤقت)
+    // فلترة حسب الطلبات
     if (filters.orders === 'high_orders') {
       filtered = filtered.filter((u: any) => (u.balance || 0) > 50000);
     } else if (filters.orders === 'low_orders') {
       filtered = filtered.filter((u: any) => (u.balance || 0) < 10000);
+    }
+
+    // ✅ فلترة حسب المتجر الإلكتروني
+    if (filters.store === 'with_store') {
+      filtered = filtered.filter((u: any) => u.hasEcomStore === true);
+    } else if (filters.store === 'without_store') {
+      filtered = filtered.filter((u: any) => !u.hasEcomStore);
     }
 
     // الترتيب
@@ -171,7 +196,10 @@ export default function MerchantsTab() {
       case 'orders_high':
         filtered.sort((a: any, b: any) => (b.pendingBalance || 0) - (a.pendingBalance || 0));
         break;
-      default: // 'newest'
+      case 'products_high':
+        filtered.sort((a: any, b: any) => (b.storeProductsCount || 0) - (a.storeProductsCount || 0));
+        break;
+      default:
         filtered.sort((a: any, b: any) => b.id - a.id);
     }
 
@@ -198,10 +226,12 @@ export default function MerchantsTab() {
     setShowFilterModal(false);
   };
 
-  // --- إحصائيات سريعة (مثل السابق) ---
-  const totalMerchants = (users as any[]).filter((u: any) => u.role !== 'admin').length;
-  const activeMerchants = (users as any[]).filter((u: any) => u.role !== 'admin' && (u.balance || 0) > 0).length;
-  const totalBalance = (users as any[]).filter((u: any) => u.role !== 'admin').reduce((s, u) => s + (u.balance || 0), 0);
+  // --- إحصائيات سريعة ---
+  const merchantsOnly = (users as any[]).filter((u: any) => u.role !== 'admin');
+  const totalMerchants = merchantsOnly.length;
+  const activeMerchants = merchantsOnly.filter((u: any) => (u.balance || 0) > 0).length;
+  const withEcomStore = merchantsOnly.filter((u: any) => u.hasEcomStore === true).length;
+  const totalBalance = merchantsOnly.reduce((s, u) => s + (u.balance || 0), 0);
 
   if (isLoading) {
     return (
@@ -215,13 +245,13 @@ export default function MerchantsTab() {
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
 
-      {/* ── شريط البحث والفلترة (مثل الصفحة الرئيسية) ── */}
+      {/* ── شريط البحث والفلترة ── */}
       <View style={s.topBar}>
         <View style={s.searchWrap}>
           <Ionicons name="search-outline" size={17} color="#9ca3af" />
           <TextInput
             style={s.searchInput}
-            placeholder="ابحث بالاسم، الهاتف، أو رقم التاجر..."
+            placeholder="ابحث بالاسم، الهاتف، كود المتجر..."
             value={search}
             onChangeText={setSearch}
             placeholderTextColor="#9ca3af"
@@ -236,10 +266,13 @@ export default function MerchantsTab() {
 
         <TouchableOpacity style={s.filterBtn} onPress={openFilterModal}>
           <Ionicons name="options-outline" size={20} color={PRIMARY} />
+          {(filters.store !== 'all' || filters.status !== 'all' || filters.balance !== 'all' || filters.orders !== 'all') && (
+            <View style={s.filterDot} />
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* ── إحصائيات سريعة (نفسها) ── */}
+      {/* ── إحصائيات سريعة ── */}
       <View style={s.quickStats}>
         <View style={s.statItem}>
           <Text style={s.statNumber}>{totalMerchants}</Text>
@@ -252,8 +285,8 @@ export default function MerchantsTab() {
         </View>
         <View style={s.statDivider} />
         <View style={s.statItem}>
-          <Text style={[s.statNumber, { color: PRIMARY }]}>{totalMerchants - activeMerchants}</Text>
-          <Text style={s.statLabel}>غير نشط</Text>
+          <Text style={[s.statNumber, { color: ECOM_COLOR }]}>{withEcomStore}</Text>
+          <Text style={s.statLabel}>🌐 متاجر</Text>
         </View>
         <View style={s.statDivider} />
         <View style={s.statItem}>
@@ -274,7 +307,11 @@ export default function MerchantsTab() {
           <View style={s.center}>
             <Ionicons name="people-outline" size={52} color="#d1d5db" />
             <Text style={s.emptyTxt}>
-              {search || filters.status !== 'all' || filters.balance !== 'all' || filters.orders !== 'all'
+              {search ||
+              filters.status !== 'all' ||
+              filters.balance !== 'all' ||
+              filters.orders !== 'all' ||
+              filters.store !== 'all'
                 ? 'لا توجد نتائج مطابقة للبحث أو الفلتر'
                 : 'لا يوجد تجار'}
             </Text>
@@ -338,6 +375,75 @@ export default function MerchantsTab() {
 
             <View style={s.divider} />
 
+            {/* ✅ بطاقة المتجر الإلكتروني */}
+            {u.hasEcomStore && (
+              <>
+                <View style={s.storeBadge}>
+                  <View style={s.storeBadgeHeader}>
+                    <View style={s.storeBadgeTitleRow}>
+                      <View style={s.storeBadgeIcon}>
+                        <Ionicons name="globe-outline" size={15} color={ECOM_COLOR} />
+                      </View>
+                      <Text style={s.storeBadgeTitle}>متجر إلكتروني</Text>
+                      {u.storeIsActive ? (
+                        <View style={s.storeLivePill}>
+                          <View style={s.storeLiveDot} />
+                          <Text style={s.storeLiveText}>مفعّل</Text>
+                        </View>
+                      ) : (
+                        <View style={s.storeOffPill}>
+                          <Text style={s.storeOffText}>معطّل</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={s.storeProductsCount}>
+                      {u.storeProductsCount} منتج
+                    </Text>
+                  </View>
+
+                  <View style={s.storeBadgeActions}>
+                    <TouchableOpacity
+                      style={s.storeActionBtn}
+                      onPress={(e) => { e.stopPropagation(); openStore(u.storeCode); }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="open-outline" size={13} color={ECOM_COLOR} />
+                      <Text style={s.storeActionTxt}>فتح</Text>
+                    </TouchableOpacity>
+
+                    <View style={s.storeActionDivider} />
+
+                    <TouchableOpacity
+                      style={s.storeActionBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        copy(`${STORE_BASE_URL}/${u.storeCode}`, 'رابط المتجر');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="link-outline" size={13} color={ECOM_COLOR} />
+                      <Text style={s.storeActionTxt}>نسخ الرابط</Text>
+                    </TouchableOpacity>
+
+                    <View style={s.storeActionDivider} />
+
+                    <TouchableOpacity
+                      style={s.storeActionBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        copy(u.storeCode, 'كود المتجر');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="copy-outline" size={13} color={ECOM_COLOR} />
+                      <Text style={s.storeActionCode}>{u.storeCode}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={s.divider} />
+              </>
+            )}
+
             <View style={s.section}>
               <View style={s.infoLine}>
                 <TouchableOpacity style={s.copyBtn} onPress={() => copy(u.phone, 'رقم الهاتف')}>
@@ -384,7 +490,7 @@ export default function MerchantsTab() {
         )}
       />
 
-      {/* ── مودال الفلترة (نفس تصميم الصفحة الرئيسية) ── */}
+      {/* ── مودال الفلترة ── */}
       <Modal visible={showFilterModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <View style={s.filterModalContent}>
@@ -396,6 +502,32 @@ export default function MerchantsTab() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+
+              {/* ✅ قسم المتجر الإلكتروني — الأولوية */}
+              <Text style={s.filterSectionTitle}>🌐 حسب المتجر الإلكتروني</Text>
+              <View style={s.filterOptionsGroup}>
+                {[
+                  { id: 'all', label: 'الكل' },
+                  { id: 'with_store', label: 'عنده متجر' },
+                  { id: 'without_store', label: 'ما عنده' },
+                ].map(option => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      s.filterOption,
+                      tempFilters.store === option.id && s.filterOptionActive,
+                    ]}
+                    onPress={() => setTempFilters(prev => ({ ...prev, store: option.id as any }))}
+                  >
+                    <View style={[s.radioCircle, tempFilters.store === option.id && s.radioSelected]} />
+                    <Text style={[
+                      s.filterOptionText,
+                      tempFilters.store === option.id && s.filterOptionTextActive,
+                    ]}>{option.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* قسم النشاط */}
               <Text style={s.filterSectionTitle}>حسب النشاط</Text>
               <View style={s.filterOptionsGroup}>
@@ -463,6 +595,7 @@ export default function MerchantsTab() {
                   { id: 'balance_high', label: 'أعلى رصيد' },
                   { id: 'balance_low', label: 'أقل رصيد' },
                   { id: 'orders_high', label: 'أكثر طلبات' },
+                  { id: 'products_high', label: 'أكثر منتجات' },
                 ].map(option => (
                   <TouchableOpacity
                     key={option.id}
@@ -475,14 +608,13 @@ export default function MerchantsTab() {
                 ))}
               </View>
 
-              {/* زر إعادة تعيين (داخل المودال) */}
+              {/* زر إعادة تعيين */}
               <TouchableOpacity style={s.resetFilterBtn} onPress={resetFilters}>
                 <Ionicons name="refresh-outline" size={16} color={PRIMARY} />
                 <Text style={s.resetFilterBtnText}>إعادة تعيين الفلتر</Text>
               </TouchableOpacity>
             </ScrollView>
 
-            {/* أزرار التطبيق والإلغاء */}
             <View style={s.modalFooter}>
               <TouchableOpacity style={s.cancelFilterBtn} onPress={() => setShowFilterModal(false)}>
                 <Text style={s.cancelFilterBtnText}>إلغاء</Text>
@@ -495,7 +627,7 @@ export default function MerchantsTab() {
         </View>
       </Modal>
 
-      {/* ── مودال التعديل (نفسه) ── */}
+      {/* ── مودال التعديل ── */}
       <Modal visible={!!editUser} transparent animationType="slide">
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.modalOverlay}>
@@ -590,12 +722,12 @@ export default function MerchantsTab() {
   );
 }
 
-// ── الأنماط (مع إضافة أنماط الراديو والأزرار) ──
+// ── الأنماط ──
 const s = StyleSheet.create({
   listContent: { padding: 12, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60, gap: 10 },
   loadingTxt: { fontSize: 14, color: '#9ca3af' },
-  emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600' },
+  emptyTxt: { fontSize: 16, color: '#9ca3af', fontWeight: '600', textAlign: 'center', paddingHorizontal: 20 },
 
   // ── شريط البحث والفلترة ──
   topBar: {
@@ -629,9 +761,21 @@ const s = StyleSheet.create({
     borderColor: '#e8edf2',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  filterDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: DANGER,
+    borderWidth: 1.5,
+    borderColor: '#fff',
   },
 
-  // ── إحصائيات سريعة ──
+  // ── إحصائيات ──
   quickStats: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -642,8 +786,8 @@ const s = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: 'center', gap: 2 },
   statDivider: { width: 1, backgroundColor: '#e8edf2' },
-  statNumber: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  statLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  statNumber: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  statLabel: { fontSize: 9.5, color: '#9ca3af', fontWeight: '600', textAlign: 'center' },
 
   // ── كارد التاجر ──
   card: {
@@ -732,6 +876,105 @@ const s = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: '#f3f4f6', marginHorizontal: 14 },
 
+  // ── ✅ بطاقة المتجر الإلكتروني ──
+  storeBadge: {
+    backgroundColor: ECOM_COLOR + '08',
+    marginHorizontal: 14,
+    marginVertical: 12,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: ECOM_COLOR + '25',
+  },
+  storeBadgeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  storeBadgeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  storeBadgeIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: ECOM_COLOR + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storeBadgeTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  storeLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: SUCCESS + '15',
+  },
+  storeLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: SUCCESS,
+  },
+  storeLiveText: { fontSize: 10, fontWeight: '700', color: SUCCESS },
+  storeOffPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#f3f4f6',
+  },
+  storeOffText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+  storeProductsCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: ECOM_COLOR,
+    backgroundColor: ECOM_COLOR + '12',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+
+  storeBadgeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ECOM_COLOR + '20',
+    overflow: 'hidden',
+  },
+  storeActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 9,
+  },
+  storeActionTxt: { fontSize: 11.5, fontWeight: '700', color: ECOM_COLOR },
+  storeActionCode: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ECOM_COLOR,
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  storeActionDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: ECOM_COLOR + '20',
+  },
+
   section: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   infoLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoRight: { alignItems: 'flex-end', flex: 1 },
@@ -757,14 +1000,14 @@ const s = StyleSheet.create({
   balanceLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
   balanceVal: { fontSize: 14, fontWeight: 'bold' },
 
-  // ── مودال الفلترة (جديد) ──
+  // ── مودال الفلترة ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   filterModalContent: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
   },
   filterModalHeader: {
     flexDirection: 'row',
@@ -778,7 +1021,7 @@ const s = StyleSheet.create({
   filterModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   filterSectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#374151',
     marginTop: 16,
     marginBottom: 10,
@@ -802,6 +1045,12 @@ const s = StyleSheet.create({
     borderColor: '#e5e7eb',
     minWidth: '30%',
   },
+  filterOptionActive: {
+    backgroundColor: PRIMARY + '10',
+    borderColor: PRIMARY + '50',
+  },
+  filterOptionText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  filterOptionTextActive: { color: PRIMARY, fontWeight: '700' },
   radioCircle: {
     width: 18,
     height: 18,
@@ -813,7 +1062,6 @@ const s = StyleSheet.create({
     borderColor: PRIMARY,
     backgroundColor: PRIMARY,
   },
-  filterOptionText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
 
   resetFilterBtn: {
     flexDirection: 'row',

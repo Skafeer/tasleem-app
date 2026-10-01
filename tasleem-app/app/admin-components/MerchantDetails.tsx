@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+// app/admin/merchant/[id].tsx (أو المسار اللي عندك)
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Clipboard, FlatList,
+  ActivityIndicator, RefreshControl, Clipboard, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,9 @@ const SUCCESS = '#10b981';
 const DANGER = '#ef4444';
 const WARNING = '#f59e0b';
 const INFO = '#3b82f6';
+const ECOM_COLOR = '#3b82f6';
 const BG = '#f2f6f9';
+const STORE_BASE_URL = 'https://bazari-app.vercel.app';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('ar-IQ');
 
@@ -35,7 +38,7 @@ export default function MerchantDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'orders' | 'withdrawals'>('orders');
 
-  // جلب بيانات التاجر والطلبات
+  // جلب بيانات التاجر
   const { data: merchant, isLoading: merchantLoading, refetch: refetchMerchant } = useQuery({
     queryKey: ['merchant', id],
     queryFn: async () => {
@@ -79,6 +82,13 @@ export default function MerchantDetailsScreen() {
     toast.success(`تم نسخ ${label}`);
   };
 
+  const openStore = (code: string) => {
+    if (!code) return;
+    Linking.openURL(`${STORE_BASE_URL}/${code}`).catch(() => {
+      toast.error('فشل فتح الرابط');
+    });
+  };
+
   if (merchantLoading || !merchant) {
     return (
       <SafeAreaView style={s.container} edges={['top']}>
@@ -97,10 +107,13 @@ export default function MerchantDetailsScreen() {
   const totalOrders = allOrders.length;
   const deliveryRate = totalOrders > 0 ? Math.round((delivered.length / totalOrders) * 100) : 0;
 
+  // طلبات المتجر الإلكتروني
+  const storeOrders = allOrders.filter(o => o.source === 'store');
+  const appOrders = allOrders.filter(o => o.source !== 'store');
+
   const ws = withdrawals as any[];
   const paidWithdrawals = ws.filter(w => w.status === 'paid');
   const totalWithdrawn = paidWithdrawals.reduce((s, w) => s + (w.amount || 0), 0);
-  const pendingWithdrawals = ws.filter(w => w.status === 'pending' || w.status === 'approved');
 
   const formatDate = (d: string) => {
     if (!d) return '';
@@ -116,7 +129,7 @@ export default function MerchantDetailsScreen() {
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>التاجر: {merchant.storeName}</Text>
+        <Text style={s.headerTitle} numberOfLines={1}>التاجر: {merchant.storeName}</Text>
         <TouchableOpacity style={s.copyBtn} onPress={() => copy(String(merchant.id), 'رقم التاجر')}>
           <Ionicons name="copy-outline" size={18} color={PRIMARY} />
         </TouchableOpacity>
@@ -128,7 +141,9 @@ export default function MerchantDetailsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
       >
 
+        {/* ═══════════════════════════════════════ */}
         {/* بطاقة المعلومات الأساسية */}
+        {/* ═══════════════════════════════════════ */}
         <View style={s.profileCard}>
           <View style={s.avatarBig}>
             <Text style={s.avatarBigTxt}>{merchant.storeName?.charAt(0) || '؟'}</Text>
@@ -145,7 +160,112 @@ export default function MerchantDetailsScreen() {
           )}
         </View>
 
+        {/* ═══════════════════════════════════════ */}
+        {/* ✅ بطاقة المتجر الإلكتروني */}
+        {/* ═══════════════════════════════════════ */}
+        {merchant.hasEcomStore ? (
+          <View style={s.storeCard}>
+            {/* Header */}
+            <View style={s.storeHeader}>
+              <View style={s.storeIconBox}>
+                <Ionicons name="globe-outline" size={24} color={ECOM_COLOR} />
+              </View>
+              <View style={s.storeHeaderInfo}>
+                <View style={s.storeTitleRow}>
+                  <Text style={s.storeTitle} numberOfLines={1}>
+                    {merchant.storeEcomName || merchant.storeName}
+                  </Text>
+                  {merchant.storeIsActive ? (
+                    <View style={s.storeLivePill}>
+                      <View style={s.storeLiveDot} />
+                      <Text style={s.storeLiveText}>مفعّل</Text>
+                    </View>
+                  ) : (
+                    <View style={s.storeOffPill}>
+                      <Text style={s.storeOffText}>معطّل</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={s.storeSubtitle}>
+                  {merchant.storeProductsCount} منتج في المتجر
+                </Text>
+              </View>
+            </View>
+
+            {/* Code */}
+            <TouchableOpacity
+              style={s.storeCodeBox}
+              onPress={() => copy(merchant.storeCode, 'كود المتجر')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="key-outline" size={14} color={ECOM_COLOR} />
+              <Text style={s.storeCodeLabel}>كود المتجر:</Text>
+              <Text style={s.storeCodeValue}>{merchant.storeCode}</Text>
+              <Ionicons name="copy-outline" size={13} color="#9ca3af" />
+            </TouchableOpacity>
+
+            {/* Link */}
+            <TouchableOpacity
+              style={s.storeLinkBox}
+              onPress={() => copy(`${STORE_BASE_URL}/${merchant.storeCode}`, 'رابط المتجر')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="link-outline" size={13} color="#6b7280" />
+              <Text style={s.storeLinkText} numberOfLines={1}>
+                {STORE_BASE_URL}/{merchant.storeCode}
+              </Text>
+              <Ionicons name="copy-outline" size={13} color="#9ca3af" />
+            </TouchableOpacity>
+
+            {/* Action buttons */}
+            <View style={s.storeActionsRow}>
+              <TouchableOpacity
+                style={[s.storeActionBtn, s.storeActionBtnPrimary]}
+                onPress={() => openStore(merchant.storeCode)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="open-outline" size={16} color="#fff" />
+                <Text style={s.storeActionBtnTextPrimary}>فتح المتجر</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.storeActionBtn, s.storeActionBtnGhost]}
+                onPress={() => copy(`${STORE_BASE_URL}/${merchant.storeCode}`, 'رابط المتجر')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="share-outline" size={16} color={ECOM_COLOR} />
+                <Text style={s.storeActionBtnTextGhost}>مشاركة الرابط</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Store stats */}
+            <View style={s.storeStatsRow}>
+              <View style={s.storeStatBox}>
+                <Text style={s.storeStatVal}>{merchant.storeProductsCount}</Text>
+                <Text style={s.storeStatLabel}>منتج</Text>
+              </View>
+              <View style={s.storeStatDivider} />
+              <View style={s.storeStatBox}>
+                <Text style={[s.storeStatVal, { color: ECOM_COLOR }]}>{storeOrders.length}</Text>
+                <Text style={s.storeStatLabel}>طلب من المتجر</Text>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={s.noStoreCard}>
+            <View style={s.noStoreIconBox}>
+              <Ionicons name="globe-outline" size={20} color="#9ca3af" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.noStoreTitle}>لا يوجد متجر إلكتروني</Text>
+              <Text style={s.noStoreSubtitle}>هذا التاجر لم ينشئ متجراً حتى الآن</Text>
+            </View>
+          </View>
+        )}
+
+        {/* ═══════════════════════════════════════ */}
         {/* إحصائيات سريعة */}
+        {/* ═══════════════════════════════════════ */}
         <View style={s.statsGrid}>
           <View style={s.statCard}>
             <Text style={[s.statVal, { color: PRIMARY }]}>{totalOrders}</Text>
@@ -165,25 +285,75 @@ export default function MerchantDetailsScreen() {
           </View>
         </View>
 
+        {/* ═══════════════════════════════════════ */}
+        {/* مصدر الطلبات (اختياري — يظهر لو فيه متجر) */}
+        {/* ═══════════════════════════════════════ */}
+        {merchant.hasEcomStore && totalOrders > 0 && (
+          <View style={s.sourceCard}>
+            <Text style={s.sourceTitle}>مصدر الطلبات</Text>
+            <View style={s.sourceBar}>
+              <View
+                style={[
+                  s.sourceBarSegment,
+                  {
+                    flex: appOrders.length || 0.001,
+                    backgroundColor: PRIMARY,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  s.sourceBarSegment,
+                  {
+                    flex: storeOrders.length || 0.001,
+                    backgroundColor: ECOM_COLOR,
+                  },
+                ]}
+              />
+            </View>
+            <View style={s.sourceLegend}>
+              <View style={s.sourceLegendItem}>
+                <View style={[s.sourceDot, { backgroundColor: PRIMARY }]} />
+                <Text style={s.sourceLegendText}>
+                  التطبيق ({appOrders.length})
+                </Text>
+              </View>
+              <View style={s.sourceLegendItem}>
+                <View style={[s.sourceDot, { backgroundColor: ECOM_COLOR }]} />
+                <Text style={s.sourceLegendText}>
+                  المتجر ({storeOrders.length})
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ═══════════════════════════════════════ */}
         {/* الرصيد */}
+        {/* ═══════════════════════════════════════ */}
         <View style={s.balanceCard}>
           <View style={s.balanceItem}>
             <Text style={s.balanceLabel}>الرصيد المتاح</Text>
-            <Text style={[s.balanceVal, { color: SUCCESS }]}>{fmt(merchant.balance || 0)} د.ع</Text>
+            <Text style={[s.balanceVal, { color: SUCCESS }]}>{fmt(merchant.balance || 0)}</Text>
+            <Text style={s.balanceUnit}>د.ع</Text>
           </View>
           <View style={s.balanceDivider} />
           <View style={s.balanceItem}>
             <Text style={s.balanceLabel}>الرصيد المعلق</Text>
-            <Text style={[s.balanceVal, { color: WARNING }]}>{fmt(merchant.pendingBalance || 0)} د.ع</Text>
+            <Text style={[s.balanceVal, { color: WARNING }]}>{fmt(merchant.pendingBalance || 0)}</Text>
+            <Text style={s.balanceUnit}>د.ع</Text>
           </View>
           <View style={s.balanceDivider} />
           <View style={s.balanceItem}>
             <Text style={s.balanceLabel}>إجمالي السحوبات</Text>
-            <Text style={[s.balanceVal, { color: INFO }]}>{fmt(totalWithdrawn)} د.ع</Text>
+            <Text style={[s.balanceVal, { color: INFO }]}>{fmt(totalWithdrawn)}</Text>
+            <Text style={s.balanceUnit}>د.ع</Text>
           </View>
         </View>
 
+        {/* ═══════════════════════════════════════ */}
         {/* تبويبات الطلبات والسحوبات */}
+        {/* ═══════════════════════════════════════ */}
         <View style={s.tabsRow}>
           <TouchableOpacity
             style={[s.tabBtn, activeTab === 'orders' && s.tabBtnActive]}
@@ -205,7 +375,9 @@ export default function MerchantDetailsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ═══════════════════════════════════════ */}
         {/* قائمة الطلبات */}
+        {/* ═══════════════════════════════════════ */}
         {activeTab === 'orders' && (
           <>
             {allOrders.length === 0 ? (
@@ -216,6 +388,7 @@ export default function MerchantDetailsScreen() {
             ) : (
               allOrders.map((o: any) => {
                 const st = STATUS[o.status] || STATUS.processing;
+                const isStoreOrder = o.source === 'store';
                 return (
                   <TouchableOpacity
                     key={o.id}
@@ -223,7 +396,15 @@ export default function MerchantDetailsScreen() {
                     onPress={() => router.push(`/order-details/${o.id}`)}
                   >
                     <View style={s.orderHeader}>
-                      <Text style={s.orderId}>طلب #{o.id}</Text>
+                      <View style={s.orderIdRow}>
+                        <Text style={s.orderId}>طلب #{o.id}</Text>
+                        {isStoreOrder && (
+                          <View style={s.orderSourceBadge}>
+                            <Ionicons name="globe-outline" size={10} color={ECOM_COLOR} />
+                            <Text style={s.orderSourceText}>متجر</Text>
+                          </View>
+                        )}
+                      </View>
                       <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
                         <Ionicons name={st.icon} size={12} color={st.color} />
                         <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
@@ -239,7 +420,9 @@ export default function MerchantDetailsScreen() {
           </>
         )}
 
+        {/* ═══════════════════════════════════════ */}
         {/* قائمة السحوبات */}
+        {/* ═══════════════════════════════════════ */}
         {activeTab === 'withdrawals' && (
           <>
             {ws.length === 0 ? (
@@ -306,7 +489,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827', flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#111827', flex: 1, textAlign: 'center', marginHorizontal: 8 },
   copyBtn: { padding: 6, backgroundColor: PRIMARY + '12', borderRadius: 8 },
 
   // Profile
@@ -315,7 +498,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     padding: 20,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -339,8 +522,212 @@ const s = StyleSheet.create({
   phoneText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
   addressText: { fontSize: 12, color: '#6b7280', marginTop: 4 },
 
-  // Stats
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  // ═══════════════════════════════════════
+  // ✅ E-Commerce Store Card
+  // ═══════════════════════════════════════
+  storeCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: ECOM_COLOR + '30',
+    shadowColor: ECOM_COLOR,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  storeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  storeIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: ECOM_COLOR + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storeHeaderInfo: { flex: 1 },
+  storeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  storeTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#111827',
+    maxWidth: '60%',
+  },
+  storeLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: SUCCESS + '15',
+  },
+  storeLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: SUCCESS,
+  },
+  storeLiveText: { fontSize: 10, fontWeight: '700', color: SUCCESS },
+  storeOffPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  storeOffText: { fontSize: 10, fontWeight: '700', color: '#9ca3af' },
+  storeSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 3,
+    fontWeight: '500',
+  },
+
+  // Code row
+  storeCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: ECOM_COLOR + '08',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ECOM_COLOR + '15',
+    marginBottom: 8,
+  },
+  storeCodeLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  storeCodeValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: ECOM_COLOR,
+    letterSpacing: 1.5,
+    textAlign: 'right',
+  },
+
+  // Link row
+  storeLinkBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    marginBottom: 14,
+  },
+  storeLinkText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'right',
+  },
+
+  // Action buttons
+  storeActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  storeActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  storeActionBtnPrimary: {
+    backgroundColor: ECOM_COLOR,
+  },
+  storeActionBtnGhost: {
+    backgroundColor: ECOM_COLOR + '12',
+    borderWidth: 1,
+    borderColor: ECOM_COLOR + '30',
+  },
+  storeActionBtnTextPrimary: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  storeActionBtnTextGhost: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: ECOM_COLOR,
+  },
+
+  // Store stats
+  storeStatsRow: {
+    flexDirection: 'row',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: ECOM_COLOR + '15',
+  },
+  storeStatBox: { flex: 1, alignItems: 'center', gap: 3 },
+  storeStatDivider: { width: 1, backgroundColor: ECOM_COLOR + '20' },
+  storeStatVal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  storeStatLabel: {
+    fontSize: 11,
+    color: '#9ca3af',
+    fontWeight: '600',
+  },
+
+  // No Store card
+  noStoreCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+    borderStyle: 'dashed',
+  },
+  noStoreIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noStoreTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#6b7280',
+  },
+  noStoreSubtitle: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+
+  // Stats grid
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   statCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -354,6 +741,51 @@ const s = StyleSheet.create({
   statVal: { fontSize: 20, fontWeight: 'bold' },
   statLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600', marginTop: 2 },
 
+  // ✅ Source breakdown
+  sourceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e8edf2',
+  },
+  sourceTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 10,
+    textAlign: 'right',
+  },
+  sourceBar: {
+    flexDirection: 'row',
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+    marginBottom: 10,
+  },
+  sourceBarSegment: { height: '100%' },
+  sourceLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  sourceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sourceDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  sourceLegendText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+
   // Balance
   balanceCard: {
     backgroundColor: '#fff',
@@ -361,14 +793,15 @@ const s = StyleSheet.create({
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e8edf2',
   },
-  balanceItem: { flex: 1, alignItems: 'center', gap: 4 },
-  balanceDivider: { width: 1, height: 40, backgroundColor: '#e8edf2' },
-  balanceLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
-  balanceVal: { fontSize: 16, fontWeight: 'bold' },
+  balanceItem: { flex: 1, alignItems: 'center', gap: 3 },
+  balanceDivider: { width: 1, height: 44, backgroundColor: '#e8edf2' },
+  balanceLabel: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  balanceVal: { fontSize: 15, fontWeight: 'bold' },
+  balanceUnit: { fontSize: 10, color: '#9ca3af', fontWeight: '600' },
 
   // Tabs
   tabsRow: {
@@ -403,7 +836,22 @@ const s = StyleSheet.create({
     borderColor: '#e8edf2',
   },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   orderId: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
+  orderSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: ECOM_COLOR + '12',
+  },
+  orderSourceText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: ECOM_COLOR,
+  },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   statusText: { fontSize: 11, fontWeight: 'bold' },
   orderCustomer: { fontSize: 13, color: '#6b7280', marginTop: 4, textAlign: 'right' },
