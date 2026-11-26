@@ -29,6 +29,7 @@ export default function AuthScreen() {
   const [password,   setPassword]   = useState('');
   const [storeName,  setStoreName]  = useState('');
   const [address,    setAddress]    = useState('');
+  const [referralCode, setReferralCode] = useState(''); // ✅ حقل كود الإحالة
   const [showPass,   setShowPass]   = useState(false);
   const [otpDigits,  setOtpDigits]  = useState(['', '', '', '', '', '']);
   const [countdown,  setCountdown]  = useState(0);
@@ -61,7 +62,7 @@ export default function AuthScreen() {
     Animated.spring(slideAnim, { toValue: login ? 0 : 1, useNativeDriver: false, tension: 120, friction: 8 }).start();
     setIsLogin(login);
     setStep('form');
-    setPhone(''); setPassword(''); setStoreName(''); setAddress('');
+    setPhone(''); setPassword(''); setStoreName(''); setAddress(''); setReferralCode(''); // ✅ تصفير الحقل
     setOtpDigits(['', '', '', '', '', '']);
     setAgreedToPolicies(false);
   };
@@ -156,7 +157,8 @@ export default function AuthScreen() {
   const handleVerify = (code?: string) => {
     const otpCode = code || otpDigits.join('');
     if (otpCode.length < 6) { toast.warning('أدخل رمز التحقق كاملاً'); return; }
-    registerMutation.mutate({ phone, password, storeName, address, otpCode });
+    // ✅ تمرير كود الإحالة مع البيانات
+    registerMutation.mutate({ phone, password, storeName, address, otpCode, referralCode });
   };
 
   // ── زر الإرسال الرئيسي ───────────────────────────────────────
@@ -345,6 +347,20 @@ export default function AuthScreen() {
                             onChangeText={setAddress}
                             textAlign="right"
                             placeholderTextColor="#9ca3af"
+                          />
+                        </View>
+
+                        {/* ✅ حقل كود الإحالة الجديد */}
+                        <View style={s.fieldWrap}>
+                          <Ionicons name="gift-outline" size={19} color="#9ca3af" style={s.fieldIcon} />
+                          <TextInput
+                            style={s.fieldInput}
+                            placeholder="كود الإحالة (اختياري)"
+                            value={referralCode}
+                            onChangeText={setReferralCode}
+                            textAlign="right"
+                            placeholderTextColor="#9ca3af"
+                            autoCapitalize="characters"
                           />
                         </View>
 

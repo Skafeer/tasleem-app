@@ -14,7 +14,7 @@ import OrdersTab      from '../admin-components/OrdersTab';
 import WithdrawalsTab from '../admin-components/WithdrawalsTab';
 import MerchantsTab   from '../admin-components/MerchantsTab';
 import PromosTab      from '../admin-components/PromosTab';
-import CampaignsTab   from '../admin-components/CampaignsTab'; // ✅ جديد
+import CampaignsTab   from '../admin-components/CampaignsTab';
 import StatsTab       from '../admin-components/StatsTab';
 import NotificationsTab from '../admin-components/NotificationsTab';
 import BannersTab     from '../admin-components/BannersTab';
@@ -22,6 +22,7 @@ import AdminsTab      from '../admin-components/AdminsTab';
 import SupportTab     from '../admin-components/SupportTab';
 import CategoriesTab  from '../admin-components/CategoriesTab';
 import InventoryTab   from '../admin-components/InventoryTab';
+import ReferralsTab   from '../admin-components/ReferralsTab'; // ✅ استيراد تبويب الإحالات
 
 const PRIMARY = '#0c6679';
 const BG = '#f2f6f9';
@@ -41,7 +42,8 @@ const TABS = [
   { key: 'categories',  label: 'الفئات',    icon: 'grid-outline',         component: CategoriesTab },
   { key: 'banners',     label: 'البنرات',   icon: 'images-outline',       component: BannersTab },
   { key: 'promos',      label: 'الأكواد',   icon: 'pricetag-outline',     component: PromosTab },
-  { key: 'campaigns',   label: 'التحديات',  icon: 'trophy-outline',       component: CampaignsTab }, // ✅ جديد
+  { key: 'campaigns',   label: 'التحديات',  icon: 'trophy-outline',       component: CampaignsTab },
+  { key: 'referrals',   label: 'الإحالات',  icon: 'gift-outline',         component: ReferralsTab }, // ✅ تبويب الإحالات الجديد
   { key: 'admins',      label: 'الأدمنية',  icon: 'shield-half-outline',  component: AdminsTab },
 ];
 
@@ -225,7 +227,7 @@ export default function AdminScreen() {
     if (key === 'withdrawals') return pendingWithdrawals;
     if (key === 'merchants') return merchantCount;
     if (key === 'promos') return (promos as any[]).length;
-    if (key === 'campaigns') return activeCampaigns; // ✅
+    if (key === 'campaigns') return activeCampaigns; 
     return 0;
   };
 

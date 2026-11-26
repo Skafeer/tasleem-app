@@ -56,6 +56,16 @@ export default function ProfileScreen() {
       badge: hasStore ? 'نشط' : 'جديد',
       badgeColor: hasStore ? '#10b981' : '#f59e0b',
     },
+    // ✅ عنصر جديد: الإحالات والمكافآت
+    {
+      key: 'referrals',
+      label: 'الإحالات والمكافآت',
+      icon: 'gift-outline',
+      gradient: ['#f59e0b', '#d97706'],
+      route: '/referrals',
+      badge: 'جديد',
+      badgeColor: '#ef4444',
+    },
     { key: 'profile-edit', label: 'الملف الشخصي',        icon: 'person-outline',           gradient: ['#3b82f6', '#2563eb'], route: '/profile-edit' },
     { key: 'favorites',    label: 'المنتجات المفضلة',     icon: 'heart-outline',            gradient: ['#ef4444', '#dc2626'], route: '/favorites' },
     { key: 'withdrawals',  label: 'سجل السحوبات',         icon: 'time-outline',             gradient: ['#8b5cf6', '#7c3aed'], route: '/withdraw-history' },
