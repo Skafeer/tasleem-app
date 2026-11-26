@@ -416,3 +416,4 @@ const styles = StyleSheet.create({
   drawerBadgeText: { fontSize: 10, color: '#6b7280', fontWeight: 'bold' },
   drawerBadgeTextActive: { color: '#fff' },
 });
+
